@@ -7,7 +7,7 @@ module ED_DIAG
   USE ED_VARS_GLOBAL
   USE ED_AUX_FUNX, ONLY:imp_sectorns,bdecomp,init_bath_ed
   USE ED_GETH
-  USE ED_GETGF,ONLY: imp_getfunx
+  USE ED_GETGF
   USE ED_GETOBS
   implicit none
   private
@@ -20,28 +20,44 @@ contains
   !TYPE     : subroutine
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine ed_solver()
-    logical,save :: setup=.true.
+  subroutine ed_solver(status)
+    integer,optional :: status
+    integer,save :: quo=-2
 
-    if(setup)then
-       call msg(bold_green("Entered ed_solver w/ status=0: setup eigenspace"))
+    if(present(status))quo=status
+
+    select case(quo)
+    case(-2)
+       call msg(bold_green("status=-2 | INIT SOLVER, SETUP EIGENSPACE"))
        call init_bath_ed
        if(heff/=0.d0)then
           heff=-abs(heff)
-          write(*,"(A,F12.9)"),"Symmetry Breaking field = ",heff
+          write(*,"(A,F12.9)")"Symmetry Breaking field = ",heff
           epsiup = epsiup - heff
           epsidw = epsidw + heff
           heff=0.d0
        endif
        call setup_eigenspace
-       setup=.false.
-    endif
+       quo=0
 
-    call flush_eigenspace()
-    call imp_diag
-    call imp_getfunx
-    call imp_getobs
-    call dump_bath(Hfile)
+    case(-1)
+       call msg(bold_green("status=-1 | FINALIZE SOLVER"))
+       call flush_eigenspace()
+       call imp_diag
+       call imp_getfunx
+       if(chiflag)call imp_getchi
+       call imp_getobs
+       call dump_bath(Hfile)
+
+    case default
+       call msg(bold_green("status=0 | NORMAL"))
+       call flush_eigenspace()
+       call imp_diag
+       call imp_getfunx
+       call imp_getobs
+       call dump_bath(Hfile)
+    end select
+
   end subroutine ed_solver
 
 
@@ -246,17 +262,17 @@ contains
     forall(isloop=startloop_mod:lastloop_mod)espace(isloop)%e = espace(isloop)%e - egs
 
     !Get the partition function Z and rescale energies
-    zeta=0.d0;zeta=0.d0
+    zeta_function=0.d0;zeta_function=0.d0
     do isloop=startloop,lastloop
        idg=deg(isloop)
        do i=1,idg
-          zeta=zeta+exp(-beta*espace(isloop)%e(i))
+          zeta_function=zeta_function+exp(-beta*espace(isloop)%e(i))
        enddo
     enddo
 
     write(*,"(A,f14.9)")'egs  =',egs
-    write(*,"(A,f14.9)")'Z    =',zeta    
-    open(3,file='egs.data',access='append')
+    write(*,"(A,f14.9)")'Z    =',zeta_function    
+    open(3,file='egs.ed',access='append')
     write(3,*)egs
     close(3)
   end subroutine findgs

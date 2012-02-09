@@ -40,7 +40,7 @@ contains
     do i=1,Nfit
        fgand(i) = delta_and(xi*wm(i),epsi,vi)
     enddo
-    call splot("fit_result.data",wm(1:Nfit),aimag(fg(1:Nfit)),aimag(fgand(1:Nfit)))
+    call splot("fit_delta.ed",wm(1:Nfit),aimag(fg(1:Nfit)),aimag(fgand(1:Nfit)),real(fg(1:Nfit)),real(fgand(1:Nfit)))
   end subroutine dump_fit_result
 
 

@@ -1,63 +1,76 @@
 !###################################################################
-!PROGRAM  : FULLED
-!TYPE     : main code
-!PURPOSE  : Complete ED solution of DMFT equations (STD interface HM/PAM)
+!PURPOSE  : Fulle ED solution of DMFT problem for Hubbard model.
 !AUTHORS  : A. Amaricci
-!COMMENTS : USE THIS INTERFACE TO BUILD YOUR OWN CODE 
 !###################################################################
 program fullED
-  USE VARS_GLOBAL
-  USE DIAG
-  USE TOFITGF
-  USE TOOLS
+  USE DMFT_FULLED
   implicit none
-  integer :: success
+  logical :: converged
 
-  call initialize("inputED.in")
+  call read_input("inputED.in")
 
-  store_treshold=100
-  do iloop=1,nloop
-     call ed_solver(iloop,.true.) !Solve the EFFECTIVE IMPURITY PROBLEM
-     call get_delta_bethe_integral()
-     success = scc_fit(iloop)     !Perform SELF-CONSISTENCY and Check convergency
+  !Setup solver:
+  call ed_solver(status=-2)
+
+  !DMFT loop
+  iloop=0;converged=.false.
+  do while(.not.converged)
+     iloop=iloop+1
+     call start_loop(iloop,nloop,"DMFT-loop")
+
+     !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
+     call ed_solver() 
+
+     !Get the Weiss field/Delta function to be fitted (user defined)
+     call get_delta_bethe
+
+     !Perform the SELF-CONSISTENCY by fitting the new bath
+     call chi2_fitgf(delta(1,:),epsiup,vup)
+     epsidw=epsiup;vdw=vup
+
+     !Check convergence (if required change chemical potential)
+     converged = check_convergence(delta(1,:),eps_error,nsuccess,nloop)
+     if(nread/=0.d0)call search_mu(nimp1,converged)
+     call end_loop
   enddo
-  call finalize(success)
+
+  !Finalize calculation
+  call ed_solver(status=-1)
+
 
 contains
 
+
   !+----------------------------------------+
-  subroutine get_delta_bethe_integral
-    integer :: i,j
-    real(8) :: w
+  subroutine get_delta_bethe
+    integer    :: i,j
+    real(8)    :: gtau(0:Ltau)
     complex(8) :: iw,deltaAnd,g0and,self,zetan,g0loc,deltaLoc
-    complex(8) :: gloc(NL),grloc(-Nw:Nw)
-    if(allocated(delta))deallocate(delta)
-    allocate(delta(NL))
+    complex(8) :: gloc(NL),grloc(Nw)
 
     gloc=zero;grloc=zero
     do i=1,NL
-       w=wm(i);iw=xi*w
-       deltaAnd=sum(vup(1:Nbath)**2/(iw-epsiup(1:Nbath)))
-       g0and = iw + xmu - ed0 -deltaAnd
-       self  = g0and - one/Giw(i)
+       iw=xi*wm(i)
+       g0and= iw + xmu -ed0 -delta_and(iw,epsiup,vup)
+       self  = g0and - one/Giw(1,i)
        zetan = iw + xmu - ed0 - self
-       gloc(i)=gfbethe(w,zetan,D)
+       gloc(i)=gfbethe(wm(i),zetan,D)
        g0loc=self + one/gloc(i)
-       delta(i)= iw+xmu-g0loc
+       delta(1,i)= iw+xmu-g0loc
     enddo
 
-    do i=-Nw,Nw
-       w=wr(i);iw=cmplx(w,eps)
-       deltaAnd=sum(vup(1:Nbath)**2/(iw-epsiup(1:Nbath)))
-       g0and = iw + xmu - ed0 -deltaAnd
-       self = g0and - one/Gwr(i)       
+    do i=1,Nw
+       iw=cmplx(wr(i),eps)
+       g0and = iw + xmu - ed0 - delta_and(iw,epsiup,vup)
+       self = g0and - one/Gwr(1,i)    
        zetan=iw + xmu - ed0 - self
-       grloc(i)=gfbethe(w,zetan,D)
+       grloc(i)=gfbether(wr(i),zetan,D)
     enddo
-    call splot("locG_iw.data",wm(1:NL0),gloc(1:NL0))
-    call splot("locG_realw.data",wr,grloc)
+    call splot("locG_iw.ed",wm,gloc)
+    call splot("locG_realw.ed",wr,grloc)
+    call splot("Delta_iw.ed",wm,delta(1,:),append=TT)
     return    
-  end subroutine get_delta_bethe_integral
+  end subroutine get_delta_bethe
   !+----------------------------------------+
 
 end program fullED

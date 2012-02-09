@@ -7,45 +7,45 @@ MODULE ED_GETGF
   USE ED_AUX_FUNX, only:c,cdg,bdecomp,delta_and
   implicit none
   private 
-  public :: imp_getfunx
+  public :: imp_getfunx,imp_getchi
+
 contains
 
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine imp_getfunx()
     real(8)                  :: cdgmat(2),matcdg(2)
     integer,dimension(N)     :: ib(N)
     integer                  :: i,j,k,r,ll,m,in,is,ispin
     integer                  :: idg,jdg,isloop,jsloop,ia
-    real(8)                  :: alfa,cc,spin1,spin2,spin12,peso1,peso2,peso12
+    real(8)                  :: alfa=0.001d0,cc,spin1,spin2,spin12,peso1,peso2,peso12
     real(8)                  :: expterm,peso,de,w0,it,chij1,chij2,chij12
     complex(8)               :: iw
-    complex(8),dimension(1:2,NL) :: G0iw,Siw
-    complex(8),dimension(1:2,Nw) :: G0wr,Swr
+    complex(8),dimension(1:2,NL) :: G0iw
+    complex(8),dimension(1:2,Nw) :: G0wr
 
     !----------------------------------------------
     !<i|C^+|j>=<in,is,idg|C^+|jn,js,jdg>=C^+_{ij} |
     !----------------------------------------------
 
-    alfa=0.001d0
-
     !Initialize some functions
     Giw   =zero
     Gwr   =zero
-    chitau=0.d0
-
     if(Nimp==2)then
        G2iw = zero  
        G2wr=zero
     endif
 
-
     !Paramagnetic .OR. spin=UP :
     !==========================================================================
-    call msg("Evaluating G_imp_1")
+    call msg("Evaluating G_imp_s1")
     call start_timer
     ispin=1
     do isloop=startloop,lastloop
        if(isloop < getloop(2,0))cycle
        jsloop=getCUPloop(isloop);if(jsloop==0)cycle
+       call eta(isloop,lastloop,file="Gimp_s1.eta")
        idg=deg(isloop)     !i-th sector dimension
        jdg=deg(jsloop)     !j-th sector dimension
        do i=1,idg          !loop over the states in the i-th sect.
@@ -62,14 +62,16 @@ contains
                       cdgmat(1)=cdgmat(1)+&
                            espace(isloop)%M(r,i)*cc*espace(jsloop)%M(ll,j)
                    endif
-                   if(Nimp==2 .AND. ib(2) == 0)then
-                      call cdg(2,m,k);cc=dble(k)/dble(abs(k));k=abs(k)
-                      r=invnmap(isloop,k) !map back to OUT sector (i)
-                      cdgmat(2)=cdgmat(2)+&
-                           espace(isloop)%M(r,i)*cc*espace(jsloop)%M(ll,j)
+                   if(Nimp==2)then
+                      if(ib(2) == 0)then
+                         call cdg(2,m,k);cc=dble(k)/dble(abs(k));k=abs(k)
+                         r=invnmap(isloop,k) !map back to OUT sector (i)
+                         cdgmat(2)=cdgmat(2)+&
+                              espace(isloop)%M(r,i)*cc*espace(jsloop)%M(ll,j)
+                      endif
                    endif
                 enddo
-                peso=expterm/zeta
+                peso=expterm/zeta_function
                 de=espace(jsloop)%e(j)-espace(isloop)%e(i)
                 matcdg=peso*cdgmat**2
                 !
@@ -79,7 +81,7 @@ contains
                 enddo
                 do m=1,Nw 
                    w0=wr(m);iw=cmplx(w0,eps+alfa*abs(w0))
-                   Gwr(ispin,m)=Gwr(ispin,m)+matcdg(1)*(one/(de+iw))
+                   Gwr(ispin,m)=Gwr(ispin,m)+matcdg(1)/(de+iw)
                 enddo
                 !
                 if(Nimp==2)then
@@ -89,7 +91,7 @@ contains
                    enddo
                    do m=1,Nw 
                       w0=wr(m);iw=cmplx(w0,eps+alfa*abs(w0))
-                      G2wr(ispin,m)=G2wr(ispin,m)+matcdg(2)*(one/(de+iw))
+                      G2wr(ispin,m)=G2wr(ispin,m)+matcdg(2)/(de+iw)
                    enddo
                 endif
                 !
@@ -103,11 +105,11 @@ contains
     !spin=DW :
     !==========================================================================
     if(Nspin==2)then
-       call msg("Evaluating Gimp_2")
+       call msg("Evaluating Gimp_s2")
        call start_timer
        ispin=2
        do isloop=startloop,lastloop
-          call eta(isloop,lastloop,file="ETA.Gimp_2")
+          call eta(isloop,lastloop,file="Gimp_s2.eta")
           if(isloop < getloop(2,-2))cycle
           jsloop=getCDWloop(isloop);if(jsloop==0)cycle
           idg=deg(isloop)     !i-th sector dimension
@@ -134,7 +136,7 @@ contains
                            espace(isloop)%M(r,i)*cc*espace(jsloop)%M(ll,j)
                    endif
                 enddo
-                peso=expterm/zeta
+                peso=expterm/zeta_function
                 de=espace(jsloop)%e(j)-espace(isloop)%e(i)
                 matcdg=peso*cdgmat**2
                 !
@@ -164,130 +166,101 @@ contains
        call stop_timer
     endif
 
-
-    !Imaginary time susceptibility \X(tau). |<i|S_z|j>|^2
-    if(chiflag)then
-       call msg("Evaluating \Chi(tau)")
-       call start_timer
-       do isloop=1,Nsect !loop over <i| total particle number
-          in=getin(isloop)
-          is=getis(isloop)
-          idg=deg(isloop)
-          do i=1,idg 
-             do j=1,idg
-                chij1=0.d0
-                chij2=0.d0
-                chij12=0.d0
-                do ll=1,idg 
-                   ia=nmap(isloop,ll)
-                   call bdecomp(ia,ib)
-                   spin1=dble(ib(1))-dble(ib(1+Ns))                
-                   chij1=chij1+espace(isloop)%M(ll,i)*spin1*espace(isloop)%M(ll,j)
-                   if(Nimp==2)then
-                      spin2=dble(ib(2))-dble(ib(2+Ns))
-                      spin12=spin1+spin2
-                      chij2=chij2+espace(isloop)%M(ll,i)*spin2*espace(isloop)%M(ll,j)
-                      chij12=chij12+espace(isloop)%M(ll,i)*spin12*espace(isloop)%M(ll,j)
-                   endif
-                enddo
-                peso1=chij1**2/zeta
-                do m=0,Ltau 
-                   it=tau(m)
-                   chitau(m)=chitau(m)+&
-                        exp(-it*espace(isloop)%e(i))*&
-                        exp(-(beta-it)*espace(isloop)%e(j))*peso/zeta
-                enddo
-                !
-                if(Nimp==2)then
-                   peso2=chij2**2/zeta
-                   peso12=chij12**2/zeta
-                   do m=1,Ltau 
-                      it=tau(m)
-                      chi2tau(m)=chi2tau(m)+&
-                           exp(-it*espace(isloop)%e(i))*&
-                           exp(-(beta-it)*espace(isloop)%e(j))*peso2/zeta
-                      chi12tau(m)=chi12tau(m)+&
-                           exp(-it*espace(isloop)%e(i))*&
-                           exp(-(beta-it)*espace(isloop)%e(j))*peso12/zeta
-                   enddo
-                endif
-             enddo
-          enddo
-       enddo
-       call stop_timer
-    endif
-
-
-    !Print convenience impurity functions:
-    select case(Nspin)
-    case default
-       call splot(trim(GMimp1file),wm,Giw(1,:))
-       call splot(trim(GRimp1file),wr,Gwr(1,:))
-       if(Nimp==2)then
-          call splot(trim(GMimp2file),wm,G2iw(1,:))
-          call splot(trim(GRimp2file),wr,G2wr(1,:))
-       endif
-
-       do i=1,NL          
-          iw=xi*wm(i)
-          G0iw(1,i)= iw + xmu - ed0 - delta_and(iw,epsiup,vup)
-          Siw(1,i) = G0iw(1,i) - one/Giw(1,i)
-       enddo
-       do i=1,Nw
-          iw=cmplx(wr(i),eps)
-          G0wr(1,i)= iw + xmu - ed0 - delta_and(iw,epsiup,vup)
-          Swr(1,i) = G0wr(1,i) - one/Gwr(1,i)
-       enddo
-       call splot("impG0_iw.ed",wm(1:Nfit),one/G0iw(1,1:Nfit))
-       call splot("impSigma_iw.ed",wm(1:Nfit),Siw(1,1:Nfit))
-       call splot("impG0_realw.ed",wr,one/G0wr(1,:))
-       call splot("impSigma_realw.ed",wr,Swr(1,:))
-
-
-    case (2)
-       call splot(trim(GMimp1file),wm,Giw(1,:))
-       call splot(trim(GMimp1file),wm,Giw(2,:),append=TT)
-       call splot(trim(GRimp1file),wr,Gwr(1,:))
-       call splot(trim(GRimp1file),wr,Gwr(2,:),append=TT)
-       if(Nimp==2)then
-          call splot(trim(GMimp2file),wm,G2iw(1,:))
-          call splot(trim(GMimp2file),wm,G2iw(2,:),append=TT)
-          call splot(trim(GRimp2file),wr,G2wr(1,:))
-          call splot(trim(GRimp2file),wr,G2wr(2,:),append=TT)
-       endif
-
-       do i=1,NL
-          iw=xi*wm(i)
-          G0iw(1,i)= iw + xmu - ed0 - delta_and(iw,epsiup,vup)
-          G0iw(2,i)= iw + xmu - ed0 - delta_and(iw,epsidw,vdw)
-       enddo
-       Siw = G0iw - one/Giw
-
-       do i=1,Nw
-          iw=cmplx(wr(i),eps)
-          G0wr(1,i)= iw + xmu - ed0 - delta_and(iw,epsiup,vup)
-          G0wr(2,i)= iw + xmu - ed0 - delta_and(iw,epsidw,vdw)
-       enddo
-       Swr = G0wr - one/Gwr
-       call splot("impG0_iw.ed",wm(1:Nfit),one/G0iw(1,1:Nfit))
-       call splot("impG0_iw.ed",wm(1:Nfit),one/G0iw(2,1:Nfit),append=TT)
-       call splot("impSigma_iw.ed",wm(1:Nfit),Siw(1,1:Nfit))
-       call splot("impSigma_iw.ed",wm(1:Nfit),Siw(2,1:Nfit),append=TT)
-       call splot("impG0_realw.ed",wr,one/G0wr(1,:))
-       call splot("impG0_realw.ed",wr,one/G0wr(2,:),append=TT)
-       call splot("impSigma_realw.ed",wr,Swr(1,:))
-       call splot("impSigma_realw.ed",wr,Swr(2,:),append=TT)
-    end select
-    !
-    if(chiflag)then
-       call splot(trim(CTimp1file),tau,chitau)
-       if(Nimp==2)then
-          call splot(trim(CTimp2file),tau,chi2tau)
-          call splot(trim(CTimpAfile),tau,chi12tau)
-       endif
-    endif
+    !###########################PRINTING######################################
+    include "printgf_ed_getgf.f90"
   end subroutine imp_getfunx
 
 
+
+  !*********************************************************************
+  !*********************************************************************
+  !*********************************************************************
+
+
+
+
+  !+------------------------------------------------------------------+
+  !PROGRAM  : 
+  !TYPE     : subroutine
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine imp_getchi()
+    real(8)                  :: cdgmat(2),matcdg(2)
+    integer,dimension(N)     :: ib(N)
+    integer                  :: i,j,k,r,ll,m,in,is,ispin
+    integer                  :: idg,jdg,isloop,jsloop,ia
+    real(8)                  :: cc,spin1,spin2,spin12,peso1,peso2,peso12
+    real(8)                  :: expterm,peso,de,w0,it,chij1,chij2,chij12
+    complex(8)               :: iw
+
+    chitau=0.d0
+    if(Nimp==2)then
+       chi2tau=0.d0
+       chi12tau=0.d0
+    endif
+
+    !Imaginary time susceptibility \X(tau). |<i|S_z|j>|^2
+    call msg("Evaluating Chi(tau)")
+    call start_timer
+    do isloop=1,Nsect !loop over <i| total particle number
+       call eta(isloop,lastloop,file="chi.eta")
+       in=getin(isloop)
+       is=getis(isloop)
+       idg=deg(isloop)
+       do i=1,idg 
+          do j=1,idg
+             chij1=0.d0
+             chij2=0.d0
+             chij12=0.d0
+             do ll=1,idg 
+                ia=nmap(isloop,ll)
+                call bdecomp(ia,ib)
+                spin1=dble(ib(1))-dble(ib(1+Ns))                
+                chij1=chij1+espace(isloop)%M(ll,i)*spin1*espace(isloop)%M(ll,j)
+                if(Nimp==2)then
+                   spin2=dble(ib(2))-dble(ib(2+Ns))
+                   spin12=spin1+spin2
+                   chij2=chij2+espace(isloop)%M(ll,i)*spin2*espace(isloop)%M(ll,j)
+                   chij12=chij12+espace(isloop)%M(ll,i)*spin12*espace(isloop)%M(ll,j)
+                endif
+             enddo
+             peso1=chij1**2/zeta_function
+             do m=0,Ltau 
+                it=tau(m)
+                chitau(m)=chitau(m)+&
+                     exp(-it*espace(isloop)%e(i))*&
+                     exp(-(beta-it)*espace(isloop)%e(j))*peso1/zeta_function
+             enddo
+             !
+             if(Nimp==2)then
+                peso2=chij2**2/zeta_function
+                peso12=chij12**2/zeta_function
+                do m=0,Ltau 
+                   it=tau(m)
+                   chi2tau(m)=chi2tau(m)+&
+                        exp(-it*espace(isloop)%e(i))*&
+                        exp(-(beta-it)*espace(isloop)%e(j))*peso2/zeta_function
+                   chi12tau(m)=chi12tau(m)+&
+                        exp(-it*espace(isloop)%e(i))*&
+                        exp(-(beta-it)*espace(isloop)%e(j))*peso12/zeta_function
+                enddo
+             endif
+          enddo
+       enddo
+    enddo
+    call stop_timer
+
+    !###########################PRINTING######################################
+    call splot(trim(CTimp1file),tau,chitau)
+    if(Nimp==2)then
+       call splot(trim(CTimp2file),tau,chi2tau)
+       call splot(trim(CTimpAfile),tau,chi12tau)
+    endif
+  end subroutine imp_getchi
+
+
+  !*********************************************************************
+  !*********************************************************************
+  !*********************************************************************
 
 end MODULE ED_GETGF

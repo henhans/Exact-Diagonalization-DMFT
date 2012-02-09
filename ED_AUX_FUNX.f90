@@ -50,9 +50,10 @@ contains
     !Initialize the parameter for every mu-loop                  
     inquire(file=trim(Hfile),exist=IOfile)
     if(.NOT.IOfile)then
+       write(*,"(A)")bg_red('Generating bath from scratch')
        call guess_bath_params
     else
-       write(*,*)'Reading the seed from file'       
+       write(*,"(A)")bg_red('Reading bath/xmu from file')
        open(51,file=trim(Hfile))
        read(51,*)xmu
        do i=1,Nbath
@@ -69,7 +70,7 @@ contains
   !+------------------------------------------------------------------+
   subroutine guess_bath_params
     integer :: i,n2
-    write(*,*)'Generating the seed'
+
     n2=Nbath/2;if(n2==0)n2=1
     do i=0,Nbath-1            !(1->NC=Nbath/2=#sites in each Bath)
        epsiup(i+1)=2.d0*dfloat(i-1-n2)/dfloat(n2) !d/2.d0+heff

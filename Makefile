@@ -1,9 +1,7 @@
-EXE   =fulled_pam2imp
-#_bethe
+EXE   =fulled_pam_2imp
 DIREXE=$(HOME)/.bin
 
 #########################################################################
-#This file includes compilation options (STD/OPT/DEB)
 include $(HOME)/lib/lib.mk
 #########################################################################
 
@@ -41,7 +39,7 @@ ED_DIAG_DEB.o \
 DMFT_FULLED_DEB.o
 
 #=================STANDARD COMPILATION====================================
-all: 	$(OBJS)
+all: 	version $(OBJS)
 	@echo " ........... compile: normal ........... "
 	$(FC) $(STD) $(OBJS) models_interface/$(EXE).f90 -o $(DIREXE)/$(EXE) $(MODS) $(LIBS)
 	@echo ""
@@ -51,7 +49,7 @@ all: 	$(OBJS)
 
 
 #=================OPTIMIZED COMPILATION====================================
-opt: 	$(OBJS_OPT)
+opt: 	version $(OBJS_OPT)
 	@echo " ........... compile: optimized ........... "
 	$(FC) $(OPT) $(OBJS_OPT) models_interface/$(EXE).f90 -o $(DIREXE)/$(EXE) $(MODS) $(LIBS)
 	@echo ""
@@ -61,7 +59,7 @@ opt: 	$(OBJS_OPT)
 
 
 #================DEBUGGIN COMPILATION=====================================
-debug:	$(OBJS_DEB)	
+debug:	version $(OBJS_DEB)	
 	@echo " ........... compile : debug   ........... "
 	${FC} ${DEB} ${OBJS_DEB} models_interface/${EXE}.f90 -o ${DIREXE}/${EXE} ${MODS} ${LIBS}
 	@echo ""
@@ -131,7 +129,8 @@ DMFT_FULLED_DEB.o: DMFT_FULLED.f90
 
 clean: 
 	@echo 'removing *.mod *.o *~'
-	@rm -f *.mod
-	@rm -f *.o
-	@rm -f *~
-	@rm -vf ${DIREXE}/${EXE}
+	@rm -f *.mod *.o *~ revision.inc
+
+#########################################################################
+include  $(HOME)/lib/version.mk
+#########################################################################

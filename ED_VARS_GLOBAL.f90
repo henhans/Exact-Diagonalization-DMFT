@@ -10,7 +10,8 @@ Module ED_VARS_GLOBAL
   USE TOOLS
   USE CHRONOBAR
   implicit none
-  save 
+
+  include "revision.inc"
 
   !SIZE OF THE PROBLEM (as PARAMETERS to allocate in the stack)
   !VARIABLES and DEFINITIONS in common to every subroutine
@@ -31,8 +32,6 @@ Module ED_VARS_GLOBAL
   integer,allocatable,dimension(:)   :: deg,getin,getis
   integer                            :: startloop,lastloop
   integer                            :: startloop_mod,lastloop_mod
-  ! character(len=16)                  :: model,order,searchmode
-  ! character(len=1)                   :: lat_label
 
 
   !Dimension of the functions:
@@ -51,8 +50,7 @@ Module ED_VARS_GLOBAL
 
   !Partition function
   !=========================================================
-  real(8) :: zeta
-
+  real(8) :: zeta_function
 
   !Frequency and time arrays:
   !=========================================================
@@ -65,28 +63,18 @@ Module ED_VARS_GLOBAL
   !Spin order UP/DW
   real(8),allocatable,dimension(:) :: epsiup,epsidw
   real(8),allocatable,dimension(:) :: vup,vdw
-  ! !Charge order A/B
-  ! real(8),allocatable,dimension(:) :: epsiA,epsiB
-  ! real(8),allocatable,dimension(:) :: vA,vB
-  ! !Charge-Spin order Au/Ad/Bu/Bd
-  ! real(8),allocatable,dimension(:) :: epsiAup,epsiAdw,epsiBup,epsiBdw
-  ! real(8),allocatable,dimension(:) :: vAup,vAdw,vBup,vBdw
-  ! !charge ordering
-  ! real(8) :: xmuA,xmuB
-  ! !for charge ordering
-  ! real(8) :: zna,znb,zntot
-
 
 
   !Functions for GETGFUNX 
   !=========================================================
   !1imp
-  complex(8),allocatable,dimension(:,:) :: Giw
-  complex(8),allocatable,dimension(:,:) :: delta
-  complex(8),allocatable,dimension(:,:) :: Gwr
+  complex(8),allocatable,dimension(:,:) :: Delta
+  complex(8),allocatable,dimension(:,:) :: Giw,Siw
+  complex(8),allocatable,dimension(:,:) :: Gwr,Swr
   real(8),allocatable,dimension(:)      :: Chitau
   !2imp
-  complex(8),allocatable,dimension(:,:) :: G2iw,G2wr
+  complex(8),allocatable,dimension(:,:) :: G2iw
+  complex(8),allocatable,dimension(:,:) :: G2wr
   real(8),allocatable,dimension(:)      :: Chi2tau,Chi12tau
 
 
@@ -169,6 +157,8 @@ contains
        stop
     endif
     include "nml_read_cml.f90"
+
+    call version(revision)
 
     call allocate_system_structure()
 
@@ -275,8 +265,9 @@ contains
 
     !Functions
     allocate(Delta(Nspin,NL))
-    allocate(Giw(Nspin,NL))
-    allocate(Gwr(Nspin,Nw))
+    allocate(Giw(Nspin,NL),Siw(Nspin,NL))
+    allocate(Gwr(Nspin,Nw),Swr(Nspin,Nw))
+
     if(chiflag)allocate(Chitau(0:Ltau))
 
     if(Nimp==2)then
