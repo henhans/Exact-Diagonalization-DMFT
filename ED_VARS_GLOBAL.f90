@@ -106,7 +106,7 @@ Module ED_VARS_GLOBAL
        CTimp1file,CTimp2file,CTimpAfile
 
   !Writing/Reading Units:
-  character(len=32),parameter :: USEDinput
+  character(len=32) :: USEDinput
 
   namelist/EDvars/Ns,Nimp,Nspin,d,beta,xmu,u,v,tpd,tpp,ep0,ed0,ts,tsp,&
        nloop,chiflag,NL,Nw,Ltau,eps,weigth,nread,nerr,ndelta,&
