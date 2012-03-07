@@ -1,4 +1,4 @@
-EXE   =fulled_pam_2imp
+EXE   =fulled_pam_bethe
 DIREXE=$(HOME)/.bin
 
 #########################################################################

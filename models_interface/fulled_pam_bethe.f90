@@ -62,7 +62,7 @@ contains
     real(8)    :: w
     complex(8) :: iw,zita
     complex(8) :: gp(NL),gd(NL),sp(NL),sd(NL),g0p(NL),g0d(NL)
-    complex(8) :: gpr(Nw),gdr(Nw),spr(Nw),sdr(Nw),g0pw(Nw),g0r(Nw)
+    complex(8) :: gpr(Nw),gdr(Nw),spr(Nw),sdr(Nw),g0pw(Nw),g0dr(Nw)
     real(8)    :: gptau(0:Ltau),gdtau(0:Ltau)
 
     delta=zero

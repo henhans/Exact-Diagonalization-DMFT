@@ -105,17 +105,15 @@ Module ED_VARS_GLOBAL
        GMimp1file,GRimp1file,GMimp2file,GRimp2file,&
        CTimp1file,CTimp2file,CTimpAfile
 
-  namelist/ModelConf/Ns,Nimp,Nspin
-  namelist/Hvars/d,beta,xmu,u,v,tpd,tpp,ep0,ed0,ts,tsp
-  namelist/Loops/nloop,chiflag
-  namelist/Parameters/NL,Nw,Ltau,eps,weigth,nread,nerr,ndelta,&
-       wini,wfin,heff,Nx,Ny,Nfit,cutoff,eps_error,Nsuccess
-  namelist/ReadUnits/Hfile,Ofile,&
-       GMimp1file,GRimp1file,GMimp2file,GRimp2file,&
+  !Writing/Reading Units:
+  character(len=32),parameter :: USEDinput
+
+  namelist/EDvars/Ns,Nimp,Nspin,d,beta,xmu,u,v,tpd,tpp,ep0,ed0,ts,tsp,&
+       nloop,chiflag,NL,Nw,Ltau,eps,weigth,nread,nerr,ndelta,&
+       wini,wfin,heff,Nx,Ny,Nfit,cutoff,eps_error,Nsuccess,&
+       Hfile,Ofile,GMimp1file,GRimp1file,GMimp2file,GRimp2file,&
        CTimp1file,CTimp2file,CTimpAfile
 
-  !Writing/Reading Units:
-  character(len=32),parameter :: USEDinput="used.inputED.data"
 
 
 contains
@@ -133,26 +131,16 @@ contains
     include "help_buffer.f90"
 
     include "nml_default_values.f90"
-    inquire(file=adjustl(trim(INPUTunit)),exist=control)    
+    inquire(file=INPUTunit,exist=control)    
     if(control)then
-       open(50,file=trim(INPUTunit),status='old')
-       read(50,nml=ModelConf)
-       read(50,nml=Hvars)
-       read(50,nml=Loops)
-       read(50,nml=Parameters)
-       read(50,nml=ReadUnits)
+       open(50,file=INPUTunit,status='old')
+       read(50,nml=EDvars)
        close(50)
     else
        print*,"Can not find INPUT file"
-       print*,"Printing a default version in default."//trim(INPUTunit)
-       open(50,file="default."//trim(INPUTunit))
-       open(50,file=trim(INPUTunit),status='old')
-       write(50,nml=ModelConf)
-       write(50,nml=Hvars)
-       write(50,nml=Loops)
-       write(50,nml=Parameters)
-       write(50,nml=ReadUnits)
-       close(50)
+       print*,"Printing a default version in default."//INPUTunit
+       open(50,file="default."//INPUTunit)
+       write(50,nml=EDvars)
        close(50)
        stop
     endif
@@ -175,21 +163,13 @@ contains
     write(*,*)'| mu       = ',xmu
     write(*,*)'| T        = ',1.d0/beta
     write(*,*)"--------------------------------------------"
-    write(*,nml=ModelConf)
-    write(*,nml=Hvars)
-    write(*,nml=Loops)
-    write(*,nml=Parameters)
-    write(*,nml=ReadUnits)
+    write(*,nml=EDvars)
     write(*,*)"--------------------------------------------"
     print*,''
-    open(50,file=trim(USEDinput))
-    write(50,nml=ModelConf)
-    write(50,nml=Hvars)
-    write(50,nml=Loops)
-    write(50,nml=Parameters)
-    write(50,nml=ReadUnits)
+    USEDinput="used."//INPUTunit
+    open(50,file=trim(adjustl(trim(USEDinput))))
+    write(50,nml=EDvars)
     close(50)
-
 
     temp=1.d0/beta  ; pt = pi/beta
     call global_check
