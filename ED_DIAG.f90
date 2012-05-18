@@ -31,10 +31,10 @@ contains
        call msg(bold_green("status=-2 | INIT SOLVER, SETUP EIGENSPACE"))
        call init_bath_ed
        if(heff/=0.d0)then
-          heff=-abs(heff)
+          heff=abs(heff)
           write(*,"(A,F12.9)")"Symmetry Breaking field = ",heff
-          epsiup = epsiup - heff
-          epsidw = epsidw + heff
+          epsiup = epsiup + heff
+          epsidw = epsidw - heff
           heff=0.d0
        endif
        call setup_eigenspace
@@ -270,8 +270,8 @@ contains
        enddo
     enddo
 
-    write(*,"(A,f14.9)")'egs  =',egs
-    write(*,"(A,f14.9)")'Z    =',zeta_function    
+    write(*,"(A,f18.12)")'egs  =',egs
+    write(*,"(A,f18.12)")'Z    =',zeta_function    
     open(3,file='egs.ed',access='append')
     write(3,*)egs
     close(3)

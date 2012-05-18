@@ -17,6 +17,17 @@ contains
   subroutine search_mu(ntmp,convergence)
     logical,intent(inout) :: convergence
     real(8)               :: ntmp
+    logical               :: check
+    integer,save          :: count=0
+    if(count==0)then
+       inquire(file="searchmu_file.restart",exist=check)
+       if(check)then
+          open(10,file="searchmu_file.restart")
+          read(10,*)ndelta,nindex          
+          close(10)
+       endif
+    endif
+    count=count+1
     nindex1=nindex
     ndelta1=ndelta
     if((ntmp >= nread+nerr))then
@@ -27,17 +38,26 @@ contains
        nindex=0
     endif
     if(nindex1+nindex==0)then !avoid loop forth and back
-       ndelta=ndelta1/2.d0 !decreasing the step
-       xmu=xmu+real(nindex,8)*ndelta
+       ndelta=ndelta1/2.d0 !decreasing the step       
     else
        ndelta=ndelta1
-       xmu=xmu+real(nindex,8)*ndelta
     endif
+    xmu=xmu+real(nindex,8)*ndelta
     write(*,"(A,f15.12,A,f15.12,A,f15.12,A,f15.12)")" n=",ntmp," /",nread,&
          "| shift=",nindex*ndelta,"| xmu=",xmu
     write(*,"(A,f15.12)")"dn=",abs(ntmp-nread)
     print*,""
-    if(abs(ntmp-nread)>nerr)convergence=.false.
+    if(abs(ntmp-nread)>nerr)then
+       convergence=.false.
+    else
+       convergence=.true.
+    endif
+    print*,""
+    print*,"Convergence:",convergence
+    print*,""
+    open(10,file="searchmu_file.restart")
+    write(10,*)ndelta,nindex
+    close(10)
   end subroutine search_mu
 
   !+------------------------------------------------------------------+
@@ -70,7 +90,6 @@ contains
   !+------------------------------------------------------------------+
   subroutine guess_bath_params
     integer :: i,n2
-
     n2=Nbath/2;if(n2==0)n2=1
     do i=0,Nbath-1            !(1->NC=Nbath/2=#sites in each Bath)
        epsiup(i+1)=2.d0*dfloat(i-1-n2)/dfloat(n2) !d/2.d0+heff

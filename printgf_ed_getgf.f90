@@ -2,7 +2,6 @@
   !Print convenience impurity functions:
   select case(Nspin)
   case default
-
      !Print GFs
      call splot(trim(GMimp1file),wm,Giw(1,:))
      call splot(trim(GRimp1file),wr,Gwr(1,:))
@@ -33,13 +32,16 @@
      endif
 
   case (2)
-
      !Print GFs
-     call splot(trim(GMimp1file),wm,Giw(1,:),Giw(2,:))
-     call splot(trim(GRimp1file),wr,Gwr(1,:),Gwr(2,:))
+     call splot(trim(GMimp1file),wm,Giw(1,:))
+     call splot(trim(GMimp1file),wm,Giw(2,:),append=.true.)
+     call splot(trim(GRimp1file),wr,Gwr(1,:))
+     call splot(trim(GRimp1file),wr,Gwr(2,:),append=.true.)
      if(Nimp==2)then
-        call splot(trim(GMimp2file),wm,G2iw(1,:),G2iw(2,:))
-        call splot(trim(GRimp2file),wr,G2wr(1,:),G2wr(2,:))
+        call splot(trim(GMimp2file),wm,G2iw(1,:))
+        call splot(trim(GMimp2file),wm,G2iw(2,:),append=.true.)
+        call splot(trim(GRimp2file),wr,G2wr(1,:))
+        call splot(trim(GRimp2file),wr,G2wr(2,:),append=.true.))
      endif
 
      !Get Weiss Fields (from Bath):
@@ -53,14 +55,17 @@
         G0wr(1,i)= iw + xmu - ed0 - delta_and(iw,epsiup,vup)
         G0wr(2,i)= iw + xmu - ed0 - delta_and(iw,epsidw,vdw)
      enddo
-     call splot("impG0_iw.ed",wm(1:Nfit),one/G0iw(1,1:Nfit),one/G0iw(2,1:Nfit))
-     call splot("impG0_realw.ed",wr,one/G0wr(1,:),one/G0wr(2,:))
-
+     call splot("impG0_iw.ed",wm(1:Nfit),one/G0iw(1,1:Nfit))
+     call splot("impG0_iw.ed",wm(1:Nfit),one/G0iw(2,1:Nfit),append=.true.)
+     call splot("impG0_realw.ed",wr,one/G0wr(1,:))
+     call splot("impG0_realw.ed",wr,one/G0wr(2,:),append=.true.)
      if(Nimp==1)then
         Siw = G0iw - one/Giw
         Swr = G0wr - one/Gwr
-        call splot("impSigma_iw.ed",wm(1:Nfit),Siw(1,1:Nfit),Siw(2,1:Nfit))
-        call splot("impSigma_realw.ed",wr,Swr(1,:),Swr(2,:))
+        call splot("impSigma_iw.ed",wm(1:Nfit),Siw(1,1:Nfit))
+        call splot("impSigma_iw.ed",wm(1:Nfit),Siw(2,1:Nfit),append=.true.)
+        call splot("impSigma_realw.ed",wr,Swr(1,:))
+        call splot("impSigma_realw.ed",wr,Swr(2,:),append=.true.)
      endif
   end select
   !

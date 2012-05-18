@@ -26,7 +26,7 @@
   call parse_cmd_variable(wfin,"WFIN","WMAX")
   call parse_cmd_variable(chiflag,"CHIFLAG")
   call parse_cmd_variable(eps,"EPS")
-  call parse_cmd_variable(weigth,"WEIGTH","WEIGHT")
+  call parse_cmd_variable(weight,"WEIGTH","WEIGHT")
   call parse_cmd_variable(cutoff,"CUTOFF")
   call parse_cmd_variable(heff,"HEFF")
   call parse_cmd_variable(Nx,"NX")

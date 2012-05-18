@@ -8,6 +8,8 @@ MODULE ED_GETOBS
   private
 
   public :: imp_getobs
+  logical,save :: iolegend=.true.
+  integer,save :: loop=0
 
 contains 
 
@@ -94,20 +96,54 @@ contains
 
     freenimp=-(1.d0/beta)*log(zeta_function)
 
-    
 
-    open(10,file=trim(Ofile),access="append")
+    if(iolegend)call write_legend
+    loop=loop+1
+    open(10,file=trim(Ofile)//"_all.ed",access="append")
     call write_to_unit_column(10)
     close(10)
 
 
+    open(20,file=trim(Ofile))
+    call write_to_unit_column(20)
+    close(20)
+
+
   contains
 
+    subroutine write_legend()
+      select case(Nimp)
+      case default
+         if(Nspin==1)then            
+            open(unit=50,file="columns_info.ed")
+            write(50,"(3A18,1A7,8A18)"),"1u","2xmu","3beta","4loop","5nimp","6docc","7mag","8mom2","9z","10sig","11ho","12freeE"
+            close(50)
+         else
+            open(unit=50,file="columns_info.ed")
+            write(50,"(3A18,1A7,13A18)"),"1u","2xmu","3beta","4loop","5nimp","6n_up","7n_dw","8docc","9mag","10mom2","11z_up",&
+                 "12_dw","13sig_up","14sig_dw","15rho_up","16rho_dw","17freeE"
+            close(50)
+         endif
+
+      case (2)
+         if(Nspin==1)then
+            open(unit=50,file="columns_info.ed")
+            write(50,"(3A18,1A7,12A18)"),"1u","2xmu","3beta","4loop","5nimp_1","6nimp_2","7docc_1","8docc_2","9mag_1","10mag_2",&
+                 "11mom2_1","12mom2_2","13mom12","14rho_1","15rho_2","16freeE"
+            close(50)
+         else
+            open(unit=50,file="columns_info.ed")
+            write(50,"(3A18,1A7,19A18)")"1u","2xmu","3beta","4loop","5nimp_1","6n_1up","7n_1dw","8nimp_2","9n_2up","10_2dw",&
+                 "12docc_1","13docc_2","14mag_1","15mag_2","16mom2_1","17mom2_2","18mom2_12","19rho_1up","20rho_1dw",&
+                 "21rho_2up","22rho_2dw","23freeE"
+            close(50)
+         endif
+      end select
+      iolegend=.false.
+    end subroutine write_legend
 
     subroutine write_to_unit_column(unit)
       integer :: unit
-      logical,save :: head=.true.
-      if(head)write(unit,*)
       select case(Nimp)
       case default
          !
@@ -121,11 +157,10 @@ contains
          rdwimp1   = dimag(Giw(2,1)) - wm(1)*(dimag(Giw(2,2))-dimag(Giw(2,1)))/(wm(2)-wm(1))
          !
          if(Nspin==1)then
-            if(head)write(unit,"(11A18)")"1nimp","2docc","3mag","4mom2","5z","6sig","7rho","8freeE","9u","10xmu","11beta"
-            write(unit,"(13f18.12)")nimp1,dimp1,magimp1,m2imp1,zupimp,supimp,rupimp1,freenimp,u,xmu,beta
+            write(unit,"(3f18.12,I7,8f18.12)")u,xmu,beta,loop,nimp1,dimp1,magimp1,m2imp1,zupimp,supimp,rupimp1,freenimp
          else
-            if(head)write(unit,"(16A18)")"1nimp","2n_up","3n_dw","4docc","5mag","6mom2","7z_up","8z_dw","9sig_up","10sig_dw","11rho_up","12rho_dw","13freeE","14u","15xmu","16beta"
-            write(unit,"(18f18.12)")nimp1,nupimp1,ndwimp1,dimp1,magimp1,m2imp1,zupimp,zdwimp,supimp,sdwimp,rupimp1,rdwimp1,freenimp,u,xmu,beta
+            write(unit,"(3f18.12,I7,14f18.12)")u,xmu,beta,loop,nimp1,nupimp1,ndwimp1,dimp1,magimp1,m2imp1,zupimp,zdwimp,supimp,sdwimp,&
+                 rupimp1,rdwimp1,freenimp
          endif
 
       case (2)
@@ -134,14 +169,13 @@ contains
          rupimp2   = dimag(G2iw(1,1)) - wm(1)*(dimag(G2iw(1,2))-dimag(G2iw(1,1)))/(wm(2)-wm(1))
          rdwimp2   = dimag(G2iw(2,1)) - wm(1)*(dimag(G2iw(2,2))-dimag(G2iw(2,1)))/(wm(2)-wm(1))
          if(Nspin==1)then
-            if(head)write(unit,"(17A18)")"1nimp_1","2nimp_2","3docc_1","4docc_2","5mag_1","6mag_2","7mom2_1","8mom2_2","9mom12","10rho_1","11rho_2","12freeE","13u","14xmu","15beta"
-            write(unit,"(18f18.12)")nimp1,nimp2,dimp1,dimp2,magimp1,magimp2,m2imp1,m2imp2,m2imp12,rupimp1,rupimp2,freenimp,u,xmu,beta
+            write(unit,"(3f18.12,I7,14f18.12)")u,xmu,beta,loop,nimp1,nimp2,dimp1,dimp2,magimp1,magimp2,m2imp1,m2imp2,m2imp12,rupimp1,&
+                 rupimp2,freenimp
          else
-            if(head)write(unit,"(26A18)")"1nimp_1","2n_1up","3n_1dw","4nimp_2","5n_2up","6n_2dw","7docc_1","8docc_2","9mag_1","10mag_2","11mom2_1","12mom2_2","13mom2_12","14rho_1up","15rho_1dw","16rho_2up","17rho_2dw","19freeE","20u","21xmu","22beta"
-            write(unit,"(26f18.12)")nimp1,nupimp1,ndwimp1,nimp2,nupimp2,ndwimp2,dimp1,dimp2,magimp1,magimp2,m2imp1,m2imp2,m2imp12,rupimp1,rdwimp1,rupimp2,rdwimp2,freenimp,u,xmu,beta
+            write(unit,"(3f18.12,I7,22f18.12)")u,xmu,beta,loop,nimp1,nupimp1,ndwimp1,nimp2,nupimp2,ndwimp2,dimp1,dimp2,magimp1,magimp2,&
+                 m2imp1,m2imp2,m2imp12,rupimp1,rdwimp1,rupimp2,rdwimp2,freenimp
          endif
       end select
-      head=.false.
     end subroutine write_to_unit_column
 
 

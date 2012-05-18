@@ -86,7 +86,7 @@ Module ED_VARS_GLOBAL
   !=========================================================
   real(8) :: wini,wfin
   real(8) :: heff
-  real(8) :: weigth
+  real(8) :: weight
   real(8) :: pt
   logical :: chiflag
   real(8) :: cutoff !cutoff for the energy of the states for spectral summation
@@ -109,7 +109,7 @@ Module ED_VARS_GLOBAL
   character(len=32) :: USEDinput
 
   namelist/EDvars/Ns,Nimp,Nspin,d,beta,xmu,u,v,tpd,tpp,ep0,ed0,ts,tsp,&
-       nloop,chiflag,NL,Nw,Ltau,eps,weigth,nread,nerr,ndelta,&
+       nloop,chiflag,NL,Nw,Ltau,eps,weight,nread,nerr,ndelta,&
        wini,wfin,heff,Nx,Ny,Nfit,cutoff,eps_error,Nsuccess,&
        Hfile,Ofile,GMimp1file,GRimp1file,GMimp2file,GRimp2file,&
        CTimp1file,CTimp2file,CTimpAfile

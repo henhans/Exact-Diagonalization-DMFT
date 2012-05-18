@@ -1,0 +1,400 @@
+(* Content-type: application/mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Mathematica 7.0' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       145,          7]
+NotebookDataLength[     13716,        391]
+NotebookOptionsPosition[     13023,        362]
+NotebookOutlinePosition[     13363,        377]
+CellTagsIndexPosition[     13320,        374]
+WindowFrame->Generic*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+
+Cell[CellGroupData[{
+Cell[BoxData[
+ RowBox[{"M", "=", 
+  RowBox[{"{", 
+   RowBox[{
+    RowBox[{"{", 
+     RowBox[{"alfap", ",", 
+      RowBox[{"-", "ek"}], ",", 
+      RowBox[{"-", "tpd"}], ",", "0"}], "}"}], ",", 
+    RowBox[{"{", 
+     RowBox[{
+      RowBox[{"-", "ek"}], ",", "alfam", ",", "0", ",", 
+      RowBox[{"-", "tpd"}]}], "}"}], ",", 
+    RowBox[{"{", 
+     RowBox[{
+      RowBox[{"-", "tpd"}], ",", "0", ",", "gammap", ",", "0"}], "}"}], ",", 
+    RowBox[{"{", 
+     RowBox[{"0", ",", 
+      RowBox[{"-", "tpd"}], ",", "0", ",", "gammam"}], "}"}]}], 
+   "}"}]}]], "Input",
+ CellChangeTimes->{{3.542694291903307*^9, 3.542694387419939*^9}, {
+  3.542694448531476*^9, 3.542694499564433*^9}, {3.5426945734025908`*^9, 
+  3.542694575527977*^9}}],
+
+Cell[BoxData[
+ RowBox[{"{", 
+  RowBox[{
+   RowBox[{"{", 
+    RowBox[{"alfap", ",", 
+     RowBox[{"-", "ek"}], ",", 
+     RowBox[{"-", "tpd"}], ",", "0"}], "}"}], ",", 
+   RowBox[{"{", 
+    RowBox[{
+     RowBox[{"-", "ek"}], ",", "alfam", ",", "0", ",", 
+     RowBox[{"-", "tpd"}]}], "}"}], ",", 
+   RowBox[{"{", 
+    RowBox[{
+     RowBox[{"-", "tpd"}], ",", "0", ",", "gammap", ",", "0"}], "}"}], ",", 
+   RowBox[{"{", 
+    RowBox[{"0", ",", 
+     RowBox[{"-", "tpd"}], ",", "0", ",", "gammam"}], "}"}]}], 
+  "}"}]], "Output",
+ CellChangeTimes->{3.542694575924842*^9}]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"MatrixForm", "[", "M", "]"}]], "Input",
+ CellChangeTimes->{{3.542694583252166*^9, 3.5426945861487713`*^9}}],
+
+Cell[BoxData[
+ TagBox[
+  RowBox[{"(", "\[NoBreak]", GridBox[{
+     {"alfap", 
+      RowBox[{"-", "ek"}], 
+      RowBox[{"-", "tpd"}], "0"},
+     {
+      RowBox[{"-", "ek"}], "alfam", "0", 
+      RowBox[{"-", "tpd"}]},
+     {
+      RowBox[{"-", "tpd"}], "0", "gammap", "0"},
+     {"0", 
+      RowBox[{"-", "tpd"}], "0", "gammam"}
+    },
+    GridBoxAlignment->{
+     "Columns" -> {{Center}}, "ColumnsIndexed" -> {}, "Rows" -> {{Baseline}}, 
+      "RowsIndexed" -> {}},
+    GridBoxSpacings->{"Columns" -> {
+        Offset[0.27999999999999997`], {
+         Offset[0.7]}, 
+        Offset[0.27999999999999997`]}, "ColumnsIndexed" -> {}, "Rows" -> {
+        Offset[0.2], {
+         Offset[0.4]}, 
+        Offset[0.2]}, "RowsIndexed" -> {}}], "\[NoBreak]", ")"}],
+  Function[BoxForm`e$, 
+   MatrixForm[BoxForm`e$]]]], "Output",
+ CellChangeTimes->{3.54269458679659*^9}]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"\[IndentingNewLine]", 
+  RowBox[{"FullSimplify", "[", 
+   RowBox[{"Det", "[", "M", "]"}], "]"}]}]], "Input",
+ CellChangeTimes->{{3.5426948690804787`*^9, 3.542694899810073*^9}}],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{
+   RowBox[{"(", 
+    RowBox[{
+     RowBox[{"alfam", " ", "alfap"}], "-", 
+     SuperscriptBox["ek", "2"]}], ")"}], " ", "gammam", " ", "gammap"}], "-", 
+  
+  RowBox[{
+   RowBox[{"(", 
+    RowBox[{
+     RowBox[{"alfam", " ", "gammam"}], "+", 
+     RowBox[{"alfap", " ", "gammap"}]}], ")"}], " ", 
+   SuperscriptBox["tpd", "2"]}], "+", 
+  SuperscriptBox["tpd", "4"]}]], "Output",
+ CellChangeTimes->{{3.542694888036002*^9, 3.5426949002190733`*^9}}]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"MatrixForm", "[", 
+  RowBox[{"Inverse", "[", "M", "]"}], "]"}]], "Input",
+ CellChangeTimes->{{3.5426945898598747`*^9, 3.542694665740551*^9}}],
+
+Cell[BoxData[
+ TagBox[
+  RowBox[{"(", "\[NoBreak]", GridBox[{
+     {
+      FractionBox[
+       RowBox[{
+        RowBox[{"alfam", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"gammap", " ", 
+         SuperscriptBox["tpd", "2"]}]}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]], 
+      FractionBox[
+       RowBox[{"ek", " ", "gammam", " ", "gammap"}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]], 
+      FractionBox[
+       RowBox[{
+        RowBox[{"alfam", " ", "gammam", " ", "tpd"}], "-", 
+        SuperscriptBox["tpd", "3"]}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]], 
+      FractionBox[
+       RowBox[{"ek", " ", "gammap", " ", "tpd"}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]]},
+     {
+      FractionBox[
+       RowBox[{"ek", " ", "gammam", " ", "gammap"}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]], 
+      FractionBox[
+       RowBox[{
+        RowBox[{"alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"gammam", " ", 
+         SuperscriptBox["tpd", "2"]}]}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]], 
+      FractionBox[
+       RowBox[{"ek", " ", "gammam", " ", "tpd"}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]], 
+      FractionBox[
+       RowBox[{
+        RowBox[{"alfap", " ", "gammap", " ", "tpd"}], "-", 
+        SuperscriptBox["tpd", "3"]}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]]},
+     {
+      FractionBox[
+       RowBox[{
+        RowBox[{"alfam", " ", "gammam", " ", "tpd"}], "-", 
+        SuperscriptBox["tpd", "3"]}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]], 
+      FractionBox[
+       RowBox[{"ek", " ", "gammam", " ", "tpd"}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]], 
+      FractionBox[
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam"}], "-", 
+        RowBox[{"alfap", " ", 
+         SuperscriptBox["tpd", "2"]}]}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]], 
+      FractionBox[
+       RowBox[{"ek", " ", 
+        SuperscriptBox["tpd", "2"]}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]]},
+     {
+      FractionBox[
+       RowBox[{"ek", " ", "gammap", " ", "tpd"}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]], 
+      FractionBox[
+       RowBox[{
+        RowBox[{"alfap", " ", "gammap", " ", "tpd"}], "-", 
+        SuperscriptBox["tpd", "3"]}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]], 
+      FractionBox[
+       RowBox[{"ek", " ", 
+        SuperscriptBox["tpd", "2"]}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]], 
+      FractionBox[
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", 
+         SuperscriptBox["tpd", "2"]}]}], 
+       RowBox[{
+        RowBox[{"alfam", " ", "alfap", " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{
+         SuperscriptBox["ek", "2"], " ", "gammam", " ", "gammap"}], "-", 
+        RowBox[{"alfam", " ", "gammam", " ", 
+         SuperscriptBox["tpd", "2"]}], "-", 
+        RowBox[{"alfap", " ", "gammap", " ", 
+         SuperscriptBox["tpd", "2"]}], "+", 
+        SuperscriptBox["tpd", "4"]}]]}
+    },
+    GridBoxAlignment->{
+     "Columns" -> {{Center}}, "ColumnsIndexed" -> {}, "Rows" -> {{Baseline}}, 
+      "RowsIndexed" -> {}},
+    GridBoxSpacings->{"Columns" -> {
+        Offset[0.27999999999999997`], {
+         Offset[0.7]}, 
+        Offset[0.27999999999999997`]}, "ColumnsIndexed" -> {}, "Rows" -> {
+        Offset[0.2], {
+         Offset[0.4]}, 
+        Offset[0.2]}, "RowsIndexed" -> {}}], "\[NoBreak]", ")"}],
+  Function[BoxForm`e$, 
+   MatrixForm[BoxForm`e$]]]], "Output",
+ CellChangeTimes->{{3.542694600460342*^9, 3.5426946664806223`*^9}}]
+}, Open  ]],
+
+Cell[BoxData[" "], "Input",
+ CellChangeTimes->{3.54269469205365*^9}]
+},
+WindowSize->{1633, 898},
+WindowMargins->{{Automatic, 101}, {Automatic, -14}},
+FrontEndVersion->"7.0 for Linux x86 (64-bit) (November 11, 2008)",
+StyleDefinitions->"Default.nb"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[CellGroupData[{
+Cell[568, 22, 730, 21, 32, "Input"],
+Cell[1301, 45, 568, 18, 31, "Output"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[1906, 68, 131, 2, 32, "Input"],
+Cell[2040, 72, 860, 26, 76, "Output"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[2937, 103, 200, 4, 55, "Input"],
+Cell[3140, 109, 480, 15, 33, "Output"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[3657, 129, 165, 3, 32, "Input"],
+Cell[3825, 134, 9111, 222, 136, "Output"]
+}, Open  ]],
+Cell[12951, 359, 68, 1, 32, "Input"]
+}
+]
+*)
+
+(* End of internal cache information *)

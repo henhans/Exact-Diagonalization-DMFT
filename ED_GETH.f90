@@ -40,14 +40,14 @@ contains
        call bdecomp(m,ib)
 
        if(Nimp==1)then
-          nup=dfloat(ib(1))
-          ndw=dfloat(ib(1+Ns))
+          nup=real(ib(1),8)
+          ndw=real(ib(1+Ns),8)
           !Diagonal part
           h(i,i)=(-xmu+ed0)*(nup+ndw) + u*(nup-0.5d0)*(ndw-0.5d0) + heff*(nup-ndw)
           !energy of the bath=\sum_{n=1,N}\e_l n_l
           do kp=2,Ns
-             h(i,i)=h(i,i)+epsiup(kp-1)*(dfloat(ib(kp)))
-             h(i,i)=h(i,i)+epsidw(kp-1)*(dfloat(ib(kp+Ns)))
+             h(i,i)=h(i,i)+epsiup(kp-1)*real(ib(kp),8)
+             h(i,i)=h(i,i)+epsidw(kp-1)*real(ib(kp+Ns),8)
           enddo
           !NON-Diagonal part
           do ms=2,Ns

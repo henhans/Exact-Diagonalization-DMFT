@@ -24,6 +24,7 @@
       real(8),dimension(2*size(aa)) :: a
       real(8),parameter             :: ftol=1.d-12
       real(8)                       :: chi
+      write(*,*)"Fit Delta(iw):"
       Nff = size(g)
       allocate(ome(Nff),gf(Nff))
       ome(1:Nff) = z(1:Nff)
@@ -43,38 +44,6 @@
     end subroutine fitgreen
 
 
-    ! subroutine fitgreen(z,g,nsite,agues,bgues,aa,bb)
-    !   complex(8),dimension(:)   :: g
-    !   real(8),dimension(size(g)):: z
-    !   integer                   :: i,nsite,iter
-    !   real(8),dimension(2*nsite):: a
-    !   real(8),dimension(nsite)  :: agues,bgues
-    !   real(8),dimension(nsite)  :: aa,bb
-    !   real(8),parameter         :: ftol=1.e-12
-    !   real(8)                   :: chi
-    !   WMIN=abs(z(1))/2
-
-    !   Nff = size(g) !; if(Nff > 1024)Nff=1024   !fix an upper bound
-    !   write(*,"(A,I)") "n_fit=", nff
-
-    !   allocate(Ome(Nff),Gf(Nff))
-    !   Ome(1:Nff) = z(1:Nff)
-    !   Gf(1:Nff)  = g(1:Nff)
-
-    !   forall(i=1:nsite)
-    !      a(i)       = agues(i)
-    !      a(i+nsite) = bgues(i)
-    !   end forall
-    !   call conjugate(a,ftol,iter,chi)
-    !   forall(i=1:nsite)
-    !      aa(i) = a(i)
-    !      bb(i) = a(i+nsite)
-    !   end forall
-    !   write(*,*) 'chi^2,iter=',chi,iter
-    !   print*,'------------------------------------'
-    !   deallocate(Ome,Gf)
-    !   return
-    ! end subroutine fitgreen
 
     !********************************************************************
     !********************************************************************
@@ -109,8 +78,8 @@
       INTEGER, INTENT(OUT)                 :: iter
       REAL(8), INTENT(IN)                  :: ftol
       REAL(8), INTENT(OUT)                 :: fret
-      INTEGER, PARAMETER                   :: ITMAX=2000
-      REAL(8), PARAMETER                   :: EPS=1.0e-6
+      INTEGER, PARAMETER                   :: ITMAX=500
+      REAL(8), PARAMETER                   :: EPS=1.D-9
       INTEGER                              :: its
       REAL(8)                              :: dgg,fp,gam,gg
       REAL(8), DIMENSION(size(p))          :: g,h,xi

@@ -31,7 +31,7 @@
   Ltau   = 256
   Nfit   = 1024
   eps   = 0.01d0
-  weigth= 0.8d0
+  weight= 0.8d0
   nread  = 0.d0
   nerr = 1.d-4
   ndelta=0.1d0

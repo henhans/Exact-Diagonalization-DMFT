@@ -46,6 +46,7 @@ program fullED
      epsidw=epsiup;vdw=vup
      converged = check_convergence(delta(1,:),eps_error,nsuccess,nloop)
      if(nread/=0.d0)call search_mu(ntot,converged)
+     if(iloop>nloop)converged=.true.
      call end_loop
   enddo
 
@@ -86,17 +87,18 @@ contains
 
     do i=1,Nw
        iw=cmplx(wr(i),eps)
-       g0dr(i) = iw + xmu - ed0 -delta_and(iw,epsiup,vup)
+       g0dr(i) = wr(i) + xmu - ed0 - delta_and(wr(i)+zero,epsiup,vup)
        sdr(i)  = g0dr(i) - one/Gwr(1,i)
        spr(i)  = tpd**2/(iw + xmu - ed0 - sdr(i))
        zita    = iw + xmu -ep0 - spr(i)
        gpr(i)  = gfbether(wr(i),zita,D)
        gdr(i)  = one/(iw+xmu-ed0-sdr(i)) + tpd**2/(iw+xmu-ed0-sdr(i))**2*gpr(i)
     enddo
-    call splot("Delta_iw.ed",wm,delta(1,:),append=TT)
+    call splot("Delta_iw.ed",wm,delta(1,:))
     call splot("Gdd_iw.ed",wm,gd)
     call splot("Gpp_iw.ed",wm,gp)
-    call splot("Gdd.pp_tau.ed",tau,gdtau,gptau)
+    call splot("G_tau_ddpp.ed",tau,gdtau,gptau)
+    call splot("G0dd_realw.ed",wr,one/g0dr)
     call splot("Gdd_realw.ed",wr,gdr)
     call splot("Gpp_realw.ed",wr,gpr)
     call splot("Sigmapp_iw.ed",wm,sp)
