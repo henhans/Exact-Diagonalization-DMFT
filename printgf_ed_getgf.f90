@@ -41,7 +41,7 @@
         call splot(trim(GMimp2file),wm,G2iw(1,:))
         call splot(trim(GMimp2file),wm,G2iw(2,:),append=.true.)
         call splot(trim(GRimp2file),wr,G2wr(1,:))
-        call splot(trim(GRimp2file),wr,G2wr(2,:),append=.true.))
+        call splot(trim(GRimp2file),wr,G2wr(2,:),append=.true.)
      endif
 
      !Get Weiss Fields (from Bath):

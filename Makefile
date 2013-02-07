@@ -1,5 +1,5 @@
-EXE =fulled_AFpam_bethe
-DIR =models_interface
+EXE =fulled_AFhm_bethe
+DIR =drivers
 DIREXE=$(HOME)/.bin
 
 #########################################################################

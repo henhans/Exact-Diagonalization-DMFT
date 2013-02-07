@@ -47,12 +47,12 @@
 
   !ReadUnits
   Hfile="hamiltonian.restart"
-  GMimp1file="impG_1_iw.ed"
-  GRimp1file="impG_1_realw.ed"
-  GMimp2file="impG_2_iw.ed"
-  GRimp2file="impG_2_realw.ed"
-  CTimp1file="impChi_1_tau.ed"
-  CTimp2file="impChi_2_tau.ed"
-  CTimpAfile="impChi_12_tau.ed"
+  GMimp1file="Gimp1_iw.ed"
+  GRimp1file="Gimp1_realw.ed"
+  GMimp2file="Gimp2_iw.ed"
+  GRimp2file="Gimp2_realw.ed"
+  CTimp1file="Chi_imp1_tau.ed"
+  CTimp2file="Chi_imp2_tau.ed"
+  CTimpAfile="Chi_imp12_tau.ed"
   Ofile="observables.ed"
 
