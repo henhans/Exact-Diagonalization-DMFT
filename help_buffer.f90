@@ -1,4 +1,3 @@
-  allocate(help_buffer(62))
   help_buffer=([&
        'NAME',&
        '  full_ed',&
@@ -62,4 +61,3 @@
        'GRfile [gfRimp.data]   -- Store GF Real-axis.',&
        'CTfile [chiTimp.data]  -- Store Chi Im. time.',&
        '  '])
-  call parse_cmd_help(help_buffer)

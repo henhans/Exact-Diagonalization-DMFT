@@ -1,11 +1,10 @@
 !########################################################################
 !PURPOSE  : Diagonalize the Effective Impurity Problem
-!AUTHORS  : Adriano Amaricci
-!New ordering of the sites:|ImpUP,(2ImpUP),BathUP;,ImpDW,(2ImpDW),BathDW >
+!New ordering of the sites:|ImpUP,BathUP;,ImpDW,BathDW >
 !########################################################################
 module ED_DIAG
   USE ED_VARS_GLOBAL
-  USE ED_AUX_FUNX, ONLY:imp_sectorns,bdecomp,init_bath_ed
+  USE ED_AUX_FUNX, ONLY:imp_sectorns,bdecomp,init_bath_ed,dump_bath
   USE ED_GETH
   USE ED_GETGF
   USE ED_GETOBS
@@ -30,11 +29,11 @@ contains
     case(-2)
        call msg(bold_green("status=-2 | INIT SOLVER, SETUP EIGENSPACE"))
        call init_bath_ed
-       if(heff/=0.d0)then
+       if(Nspin==2)then
           heff=abs(heff)
           write(*,"(A,F12.9)")"Symmetry Breaking field = ",heff
-          epsiup = epsiup + heff
-          epsidw = epsidw - heff
+          ebath(1,:) = ebath(1,:) + heff
+          ebath(2,:) = ebath(2,:) - heff
           heff=0.d0
        endif
        call setup_eigenspace
@@ -73,23 +72,20 @@ contains
   subroutine setup_eigenspace
     integer :: isloop,idg,jsloop
     call imp_setup
-    !call getloop_range(1) 
     startloop=1;lastloop=Nsect
-    startloop_mod=startloop;lastloop_mod=lastloop
     do isloop=startloop,lastloop
        jsloop=getCUPloop(isloop)
        if(jsloop==0)cycle
-       if(startloop_mod > jsloop)startloop_mod=jsloop     
+       if(startloop > jsloop)startloop=jsloop     
     enddo
     do isloop=startloop,lastloop
        jsloop=getCDWloop(isloop)
        if(jsloop==0)cycle
-       if(startloop_mod > jsloop)startloop_mod=jsloop     
+       if(startloop > jsloop)startloop=jsloop     
     enddo
-    !Each CPU allocate the necessary and sufficient number of eigenspaces
     if(allocated(espace)) deallocate(espace)
-    allocate(espace(startloop_mod:lastloop_mod))
-    do isloop=startloop_mod,lastloop_mod
+    allocate(espace(startloop:lastloop))
+    do isloop=startloop,lastloop
        idg=deg(isloop)
        allocate(espace(isloop)%e(idg),espace(isloop)%M(idg,idg))
     enddo
@@ -103,14 +99,11 @@ contains
 
   subroutine flush_eigenspace
     integer :: isloop
-    forall(isloop=startloop_mod:lastloop_mod)
+    forall(isloop=startloop:lastloop)
        espace(isloop)%e=0.d0
        espace(isloop)%M=0.d0
     end forall
   end subroutine flush_eigenspace
-
-
-
 
 
 
@@ -123,20 +116,19 @@ contains
     real(8),dimension(Nsect) :: e0 
     integer                  :: info
     integer                  :: lwork
-    real(8),dimension(3*NP)  :: work !biggest dimension
+    !real(8),dimension(3*NP)  :: work !biggest dimension
 
-    lwork=3*NP
+    !lwork=3*NP
     e0=0.d0
     call msg("Get Hamiltonian:")
     call start_timer
-    !_mod are the "enlarged" sector range to take care of GF calculation
-    do isloop=startloop_mod,lastloop_mod
-       call eta(isloop,lastloop_mod,file="diag.eta")
+    do isloop=startloop,lastloop
+       call eta(isloop,lastloop,file="diag.eta")
        idg=deg(isloop)
        call imp_geth(isloop)
-       call dsyev('V','U',idg,espace(isloop)%M,idg,espace(isloop)%e,work,lwork,info)
+       call matrix_diagonalize(espace(isloop)%M,espace(isloop)%e,'V','U')
+       !call dsyev('V','U',idg,espace(isloop)%M,idg,espace(isloop)%e,work,lwork,info)
        if(info /= 0)print*,info
-       !Avoid superpositions of sectors: startloop_mod < startloop
        if(isloop >=startloop)e0(isloop)=minval(espace(isloop)%e)
     enddo
     call stop_timer
@@ -149,46 +141,6 @@ contains
   !*********************************************************************
   !*********************************************************************
   !*********************************************************************
-
-
-
-
-
-  ! !+-------------------------------------------------------------------+
-  ! !PROGRAM  : 
-  ! !TYPE     : subroutine
-  ! !PURPOSE  : 
-  ! !+-------------------------------------------------------------------+
-  ! subroutine imp_searchmu(loop)
-  !   integer          :: loop
-  !   if(trim(order)=="co")then 
-  !      call imp_searchmu_CO(loop) !model and searchmode NOT implemented yet
-  !      return
-  !   else
-  !      call imp_searchmu_std(loop)
-  !      return
-  !   endif
-  ! end subroutine imp_searchmu
-  ! !*********************************************************************
-  ! !*********************************************************************
-  ! !*********************************************************************
-
-
-
-  ! !+-------------------------------------------------------------------+
-  ! !PROGRAM  : SEARCHMU
-  ! !TYPE     : subroutine
-  ! !PURPOSE  : Solve the impurity problem by ED fix the density
-  ! !+-------------------------------------------------------------------+
-  ! !FIXDENSITY routines
-  ! include "get_nobj.f90"
-  ! include "imp_searchmu.f90"
-  ! !*********************************************************************
-  ! !*********************************************************************
-  ! !*********************************************************************
-
-
-
 
 
 
@@ -256,10 +208,8 @@ contains
     integer :: i,isloop,idg
     real(8) :: egs
     real(8),dimension(Nsect) :: e0 
-
-    !Get the GS energy and BCAST it
     egs=minval(e0)
-    forall(isloop=startloop_mod:lastloop_mod)espace(isloop)%e = espace(isloop)%e - egs
+    forall(isloop=startloop:lastloop)espace(isloop)%e = espace(isloop)%e - egs
 
     !Get the partition function Z and rescale energies
     zeta_function=0.d0;zeta_function=0.d0
@@ -280,24 +230,6 @@ contains
   !*********************************************************************
   !*********************************************************************
 
-
-
-  !+-------------------------------------------------------------------+
-  !PROGRAM  : 
-  !TYPE     : subroutine
-  !PURPOSE  : 
-  !+-------------------------------------------------------------------+
-  subroutine dump_bath(bath_file)
-    character(len=*) :: bath_file
-    integer :: i
-    open(51,file=trim(bath_file))
-    write(51,*)xmu
-    do i=1,Nbath
-       write(51,"(4(F13.9,1X))")epsiup(i),epsidw(i),vup(i),vdw(i)
-    enddo
-    close(51)
-    return
-  end subroutine dump_bath
 
 
 end MODULE ED_DIAG

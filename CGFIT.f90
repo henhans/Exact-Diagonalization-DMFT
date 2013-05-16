@@ -39,7 +39,7 @@
          aa(i) = a(i)
          bb(i) = a(i+nsite)
       end forall
-      write(*,"(A,E15.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
+      write(*,"(A,E17.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
       deallocate(ome,gf)
     end subroutine fitgreen
 

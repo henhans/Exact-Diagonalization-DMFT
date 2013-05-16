@@ -5,6 +5,7 @@
 program fullED
   USE DMFT_FULLED
   implicit none
+  integer :: iloop
   logical :: converged
 
   call read_input("inputED.in")
@@ -25,12 +26,11 @@ program fullED
      call get_delta_bethe
 
      !Perform the SELF-CONSISTENCY by fitting the new bath
-     call chi2_fitgf(delta(1,:),epsiup,vup)
-     epsidw=epsiup;vdw=vup
+     call chi2_fitgf(delta(1,:),ebath(1,:),vbath(1,:))
 
      !Check convergence (if required change chemical potential)
      converged = check_convergence(delta(1,:),eps_error,nsuccess,nloop)
-     if(nread/=0.d0)call search_mu(nimp1,converged)
+     if(nread/=0.d0)call search_mu(nsimp,converged)
      call end_loop
   enddo
 
@@ -51,7 +51,7 @@ contains
     gloc=zero;grloc=zero
     do i=1,NL
        iw=xi*wm(i)
-       g0and= iw + xmu -ed0 -delta_and(iw,epsiup,vup)
+       g0and= iw + xmu -ed0 -delta_and(iw,ebath(1,:),vbath(1,:))
        self(i)  = g0and - one/Giw(1,i)
        zetan = iw + xmu - ed0 - self(i)
        gloc(i)=gfbethe(wm(i),zetan,D)
@@ -61,16 +61,18 @@ contains
 
     do i=1,Nw
        iw=cmplx(wr(i),eps)
-       g0and = wr(i) + xmu - ed0 - delta_and(wr(i)+zero,epsiup,vup)
+       g0and = wr(i) + xmu - ed0 - delta_and(wr(i)+zero,ebath(1,:),vbath(1,:))
        selfr(i) = g0and - one/Gwr(1,i)    
        zetan=iw + xmu - ed0 - selfr(i)
        grloc(i)=gfbether(wr(i),zetan,D)
     enddo
+
     call splot("G_iw.ed",wm,gloc)
     call splot("Sigma_iw.ed",wm,self)
     call splot("G_realw.ed",wr,grloc)
     call splot("Sigma_realw.ed",wr,selfr)
     call splot("Delta_iw.ed",wm,delta(1,:))
+    call splot("DOS.ed",wr,-dimag(grloc)/pi)
     return    
   end subroutine get_delta_bethe
   !+----------------------------------------+

@@ -62,8 +62,8 @@ contains
           Gand  = G0and(Ome(i), a)
           dGand = GradG0and(Ome(i), a)
           do j=1,size(a)
-             df(j) = df(j) + (real(Gf(i))-real(Gand))*real(dGand(j)) +&
-                  (aimag(Gf(i))-aimag(Gand))*aimag(dGand(j))
+             df(j) = df(j) + (dreal(Gf(i))-dreal(Gand))*dreal(dGand(j)) +&
+                  (dimag(Gf(i))-dimag(Gand))*dimag(dGand(j))
           enddo
        endif
     enddo
