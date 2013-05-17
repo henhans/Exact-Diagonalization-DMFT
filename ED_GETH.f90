@@ -47,7 +47,12 @@ contains
        ndw=real(ib(1+Ns),8)
 
        !Diagonal part
-       h(i,i)=(-xmu+ed0)*(nup+ndw) + u*(nup-0.5d0)*(ndw-0.5d0) + heff*(nup-ndw)
+       select case(hfmode)
+       case(.true.)
+          h(i,i)= -xmu*(nup+ndw) + U*(nup-0.5d0)*(ndw-0.5d0) + heff*(nup-ndw)
+       case (.false.)
+          h(i,i)= -(xmu+U/2d0)*(nup+ndw) + U*nup*ndw + heff*(nup-ndw)
+       end select
 
        !energy of the bath=\sum_{n=1,N}\e_l n_l
        do kp=2,Ns

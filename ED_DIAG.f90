@@ -123,12 +123,12 @@ contains
     call msg("Get Hamiltonian:")
     call start_timer
     do isloop=startloop,lastloop
-       call eta(isloop,lastloop,file="diag.eta")
+       call eta(isloop,lastloop,file="ETA_diag.ed")
        idg=deg(isloop)
        call imp_geth(isloop)
        call matrix_diagonalize(espace(isloop)%M,espace(isloop)%e,'V','U')
        !call dsyev('V','U',idg,espace(isloop)%M,idg,espace(isloop)%e,work,lwork,info)
-       if(info /= 0)print*,info
+       !if(info /= 0)print*,info
        if(isloop >=startloop)e0(isloop)=minval(espace(isloop)%e)
     enddo
     call stop_timer

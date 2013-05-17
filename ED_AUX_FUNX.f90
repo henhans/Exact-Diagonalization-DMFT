@@ -22,6 +22,8 @@ contains
     real(8)               :: ntmp
     logical               :: check
     integer,save          :: count=0
+    integer,save          :: nindex
+    real(8)               :: ndelta1,nindex1
     if(count==0)then
        inquire(file="searchmu_file.restart",exist=check)
        if(check)then
@@ -40,7 +42,7 @@ contains
     else
        nindex=0
     endif
-    if(nindex1+nindex==0)then !avoid loop forth and back
+    if(nindex1+nindex==0.AND.nindex/=0)then !avoid loop forth and back
        ndelta=ndelta1/2.d0 !decreasing the step       
     else
        ndelta=ndelta1

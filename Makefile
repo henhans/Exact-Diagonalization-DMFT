@@ -1,7 +1,9 @@
 #=========================================================================
 include sfmake.inc
 #=========================================================================
-EXE =fulled_bethe
+EXE=fulled_lda1b
+#EXE =fulled_pam_2dsquare
+#EXE=fulled_pam_bethe
 DIR =drivers
 DIREXE=$(HOME)/.bin
 
