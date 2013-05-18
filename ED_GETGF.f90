@@ -269,11 +269,11 @@ contains
     open(unit(1),file=trim(CTfile))
     unit(2)=free_unit()
     open(unit(2),file=trim(CWfile))
-    do i=1,Ltau
+    do i=0,Ltau
        write(unit(1),*)tau(i),chitau(i)
     enddo
     do i=1,Nw
-       write(unit(2),*)wr(i),dimag(chiw(i)),dreal(chiw(i))
+       if(wr(i)>=0.d0)write(unit(2),*)wr(i),dimag(chiw(i)),dreal(chiw(i))
     enddo
     close(unit(1))
     close(unit(2))

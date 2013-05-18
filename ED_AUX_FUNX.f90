@@ -81,10 +81,8 @@ contains
     else
        write(*,"(A)")bg_red('Reading bath/xmu from file')
        open(51,file=trim(Hfile))
-       read(51,*)xmu
        do i=1,Nbath
           read(51,"(6(F13.9,1X))")(ebath(ispin,i),vbath(ispin,i),ispin=1,Nspin)
-          !read(51,*)epsiup(i),epsidw(i),vup(i),vdw(i)
        enddo
        close(51)
     endif
@@ -98,7 +96,6 @@ contains
     character(len=*) :: bath_file
     integer :: i,ispin
     open(51,file=trim(bath_file))
-    write(51,*)xmu
     do i=1,Nbath
        write(51,"(6(F13.9,1X))")(ebath(ispin,i),vbath(ispin,i),ispin=1,Nspin)
     enddo

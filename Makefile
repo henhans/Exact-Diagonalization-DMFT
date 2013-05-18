@@ -1,9 +1,10 @@
 #=========================================================================
 include sfmake.inc
 #=========================================================================
-EXE=fulled_lda1b
+#EXE=fulled_lda1b
 #EXE =fulled_pam_2dsquare
 #EXE=fulled_pam_bethe
+EXE=fulled_hm_bethe
 DIR =drivers
 DIREXE=$(HOME)/.bin
 
@@ -14,7 +15,7 @@ REV= $(shell git rev-parse HEAD)
 VER='character(len=41),parameter :: revision = "$(REV)"' > revision.inc
 
 #COMPILATION:
-OBJS=CGFIT.o ED_VARS_GLOBAL.o ED_AUX_FUNX.o ED_GETH.o ED_GETGF.o ED_GETOBS.o ED_CHI2FIT.o ED_DIAG.o DMFT_FULLED.o
+OBJS=ED_VARS_GLOBAL.o ED_AUX_FUNX.o ED_GETH.o ED_GETGF.o ED_GETOBS.o ED_CHI2FIT.o ED_DIAG.o DMFT_FULLED.o
 
 #=================STANDARD COMPILATION====================================
 all: FLAG=$(STD) 

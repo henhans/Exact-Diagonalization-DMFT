@@ -5,6 +5,7 @@ MODULE ED_VARS_GLOBAL
   USE IOTOOLS
   USE FUNCTIONS
   USE MATRIX
+  USE OPTIMIZE
   USE TOOLS
   implicit none
 
@@ -37,7 +38,8 @@ MODULE ED_VARS_GLOBAL
   logical :: HFmode         !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
   real(8) :: cutoff         !cutoff for spectral summation
   real(8) :: eps_error      !
-
+  integer :: cgNitmax       !Max number of iteration in the fit
+  real(8) :: cgFtol         !Tolerance in the cg fit
 
   !Dimension of the functions:
   !=========================================================
@@ -103,6 +105,7 @@ MODULE ED_VARS_GLOBAL
        nread,nerr,ndelta,       &
        chiflag,cutoff,HFmode,   &
        eps_error,Nsuccess,      &
+       cgNitmax,cgFtol,         &
        Hfile,Ofile,GMfile,GRfile,CTfile,CWfile
 
 contains
@@ -143,6 +146,8 @@ contains
     cutoff     = 1.d-9
     eps_error  = 1.d-5
     nsuccess   = 2
+    cgNitmax   = 1000
+    cgFtol     = 1.d-9
     !ReadUnits
     Hfile  ="hamiltonian.restart"
     GMfile ="impG_iw.ed"
@@ -183,6 +188,8 @@ contains
        write(50,*)" ndelta [0.10]     -- Starting delta for chemical potential search."
        write(50,*)" wini [-4.0]       -- Lower bound frequency interval."
        write(50,*)" wfin [4.0]        -- Upper bound frequency interval."
+       write(50,*)" cgNitmax [100]    -- Max iteration in CG fit."
+       write(50,*)" cgFtol [1.e-9]    -- Tolerance in CG fit."
        write(50,*)" heff [0.0]        -- Symmetry Breaking field."
        write(50,*)" cutoff [1.e-9]    -- Cutoff parameter for the spectrum contributing to GF calculation."
        write(50,*)" Hfile [Hamiltonian.restart] -- Store bath hamiltonian ."
@@ -218,6 +225,8 @@ contains
     call parse_cmd_variable(eps,"EPS")
     call parse_cmd_variable(cutoff,"CUTOFF")
     call parse_cmd_variable(heff,"HEFF")
+    call parse_cmd_variable(cgNitmax,"CGNITMAX")
+    call parse_cmd_variable(cgFtol,"CGFTOL")
     call parse_cmd_variable(Hfile,"HFILE")
     call parse_cmd_variable(Ofile,"OFILE")
     call parse_cmd_variable(GMfile,"GMFILE")
