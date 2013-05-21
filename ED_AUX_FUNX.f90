@@ -17,6 +17,11 @@ MODULE ED_AUX_FUNX
 
 contains
 
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine search_mu(ntmp,convergence)
     logical,intent(inout) :: convergence
     real(8)               :: ntmp
@@ -120,6 +125,26 @@ contains
 
 
 
+
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+-------------------------------------------------------------------+
+  pure function delta_and(x,ichan) result(fg)
+    complex(8),intent(in)            :: x
+    integer,intent(in)               :: ichan
+    complex(8)                       :: fg
+    integer                          :: i
+    fg=zero
+    do i=1,Nbath
+       fg=fg+vbath(ichan,i)**2/(x-ebath(ichan,i))
+    enddo
+  end function delta_and
+
+
+
+
+
   !+------------------------------------------------------------------+
   !PURPOSE  : constructs the pointers for the different sectors and
   !the vectors isrt and jsrt with the corresponding
@@ -160,18 +185,12 @@ contains
     enddo
     return
   end subroutine imp_sectorns
-  !==================================================================
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
 
 
   !+------------------------------------------------------------------+
-  !PROGRAM  : bdecomp
-  !TYPE     : subroutine
   !PURPOSE  : input a state |i> and output a vector ivec(N)
   !with its binary decomposition
   !(corresponds to the decomposition of the number i-1)
@@ -189,17 +208,11 @@ contains
     enddo
     return 
   end subroutine bdecomp
-  !=======================================================================
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
 
   !+-------------------------------------------------------------------+
-  !PROGRAM  : C
-  !TYPE     : subroutine
   !PURPOSE  : input state |i> of the basis and calculates |j>=Cm|i>
   !the sign of j has the phase convention
   !m labels the sites
@@ -225,17 +238,11 @@ contains
     endif
     return
   end subroutine c
-  !=======================================================================
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
 
   !+-------------------------------------------------------------------+
-  !PROGRAM  : CDG
-  !TYPE     : subroutine
   !PURPOSE  : input state |i> of the basis and calculates |j>=Cm+|i>
   !the sign of j has the phase convention
   !m labels the sites
@@ -261,36 +268,17 @@ contains
     endif
     return
   end subroutine cdg
-  !=======================================================================
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
 
-  pure function delta_and(x,epsi,vi) result(fg)
-    complex(8),intent(in)            :: x
-    real(8),dimension(:),intent(in)  :: epsi,vi
-    complex(8)                       :: fg
-    integer                          :: i
-    fg=zero
-    do i=1,size(epsi)
-       fg=fg+vi(i)**2/(x-epsi(i))
-    enddo
-  end function delta_and
 
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
   ! !+------------------------------------------------------------------+
-  ! !PROGRAM  : 
-  ! !TYPE     : subroutine
   ! !PURPOSE  : 
   ! !+------------------------------------------------------------------+
   ! subroutine getloop_range(initloop)
@@ -315,8 +303,5 @@ contains
   !      endif
   !   enddo
   ! end subroutine getloop_range
-  ! !*********************************************************************
-  ! !*********************************************************************
-  ! !*********************************************************************
 
 END MODULE ED_AUX_FUNX

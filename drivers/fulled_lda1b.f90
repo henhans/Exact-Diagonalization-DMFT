@@ -62,7 +62,7 @@ program fulled_lda
   allocate(delta(NL))
 
   !setup solver
-  call ed_solver(status=-2)
+  call ed_solver(status=-1) 
 
   !DMFT loop
   iloop=0;converged=.false.
@@ -71,13 +71,13 @@ program fulled_lda
      call start_loop(iloop,nloop,"DMFT-loop")
 
      !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
-     call ed_solver() 
+     call ed_solver(status=0) 
 
      !Get the Weiss field/Delta function to be fitted (user defined)
      call get_delta
 
      !Fit the new bath, starting from the old bath + the supplied delta
-     call chi2_fitgf(delta(:),ebath(1,:),vbath(1,:))
+     call chi2_fitgf(delta(:),ichan=1)
 
      !Check convergence (if required change chemical potential)
      converged = check_convergence(delta(:),eps_error,nsuccess,nloop)
@@ -87,7 +87,7 @@ program fulled_lda
   enddo
 
   !finalize calculation
-  call ed_solver(status=-1)
+  call ed_solver(status=1)
 
 
 contains
@@ -102,7 +102,7 @@ contains
     delta=zero
     do i=1,NL
        iw     = xi*wm(i)
-       g0d(i) = iw + xmu - delta_and(iw,ebath(1,:),vbath(1,:))
+       g0d(i) = iw + xmu - delta_and(iw,1)
        sd(i)  = g0d(i) - one/Giw(1,i)      
        zita(1)= iw + xmu - sd(i)
        zita(2)= iw + xmu 
@@ -124,7 +124,7 @@ contains
 
     do i=1,Nw
        iw=cmplx(wr(i),eps)
-       g0dr(i) = wr(i) + xmu - delta_and(wr(i)+zero,ebath(1,:),vbath(1,:))
+       g0dr(i) = wr(i) + xmu - delta_and(wr(i)+zero,1)
        sdr(i)  = g0dr(i) - one/Gwr(1,i)
        zita(1) = iw + xmu - sdr(i)
        zita(2) = iw + xmu 
@@ -150,7 +150,7 @@ contains
     call splot("Sigmadd_realw.ed",wr,sdr)
 
     call splot("G_tau_ddpp.ed",tau,gdtau,gptau)
-    call splot("np.ntot.ed",npimp,ntot,append=TT)
+    call splot("np.ntot.ed",npimp,ntot,append=.true.)
   end subroutine get_delta
 
 

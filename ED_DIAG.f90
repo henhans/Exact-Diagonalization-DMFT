@@ -20,14 +20,11 @@ contains
   !PURPOSE  : 
   !+------------------------------------------------------------------+
   subroutine ed_solver(status)
-    integer,optional :: status
-    integer,save :: quo=-2
+    integer :: status
 
-    if(present(status))quo=status
-
-    select case(quo)
-    case(-2)
-       call msg(bold_green("status=-2 | INIT SOLVER, SETUP EIGENSPACE"))
+    select case(status)
+    case(-1)
+       call msg("INIT SOLVER, SETUP EIGENSPACE")
        call init_bath_ed
        if(Nspin==2)then
           heff=abs(heff)
@@ -37,26 +34,24 @@ contains
           heff=0.d0
        endif
        call setup_eigenspace
-       quo=0
+       call msg("SET STATUS TO 0.")
 
-    case(-1)
-       call msg(bold_green("status=-1 | FINALIZE SOLVER"))
+    case default
+       call msg("ED SOLUTION")
+       call flush_eigenspace()
+       call imp_diag
+       call imp_getfunx
+       call imp_getobs(.false.)
+       call dump_bath(Hfile)
+    case(1)
+       call msg("ED FINALIZE")
        call flush_eigenspace()
        call imp_diag
        call imp_getfunx
        if(chiflag)call imp_getchi
-       call imp_getobs
-       call dump_bath(Hfile)
-
-    case default
-       call msg(bold_green("status=0 | NORMAL"))
-       call flush_eigenspace()
-       call imp_diag
-       call imp_getfunx
-       call imp_getobs
+       call imp_getobs(.true.)
        call dump_bath(Hfile)
     end select
-
   end subroutine ed_solver
 
 
@@ -219,9 +214,11 @@ contains
           zeta_function=zeta_function+exp(-beta*espace(isloop)%e(i))
        enddo
     enddo
-
+    call msg("DIAG resume:")
     write(*,"(A,f18.12)")'egs  =',egs
     write(*,"(A,f18.12)")'Z    =',zeta_function    
+    print*,""
+
     open(3,file='egs.ed',access='append')
     write(3,*)egs
     close(3)

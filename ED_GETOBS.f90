@@ -20,7 +20,7 @@ contains
   !TYPE     : subroutine
   !PURPOSE  : Evaluate and print out many interesting physical qties
   !+-------------------------------------------------------------------+
-  subroutine imp_getobs
+  subroutine imp_getobs(last)
     !Configuration vector
     integer,dimension(N)     :: ib
     integer                  :: i,j,ia,isloop
@@ -35,7 +35,7 @@ contains
     complex(8)               :: iw,alpha,greend0,selfd,zita
     complex(8),dimension(NL) :: dummy
     real(8),dimension(0:NL)  :: dummyt
-
+    logical                  :: last
     nsimp   =0.d0
     nupimp =0.d0
     ndwimp =0.d0
@@ -77,14 +77,7 @@ contains
     supimp   = dimag(Siw(1,1)) - wm1*(dimag(Siw(1,2))-dimag(Siw(1,1)))/(wm2-wm1)
     zupimp   = 1.d0/( 1.d0 + abs( dimag(Siw(1,1))/wm1 ))
     rupimp   = dimag(Giw(1,1)) - wm1*(dimag(Giw(1,2))-dimag(Giw(1,1)))/(wm2-wm1)
-    write(*,*)"Main observables:"
-    write(*,"(A,f18.10)")"nimp=  ",nsimp
-    write(*,"(A,f18.12)")"docc=  ",dimp
-    write(*,"(A,f18.12)")"mom2=  ",m2imp
     if(Nspin==2)then
-       write(*,"(A,f18.12)")"n_up=  ",nupimp
-       write(*,"(A,f18.12)")"n_dw=  ",ndwimp
-       write(*,"(A,f18.12)")"mag=   ",magimp
        sdwimp   = dimag(Siw(2,1)) - wm1*(dimag(Siw(2,2))-dimag(Siw(2,1)))/(wm2-wm1)
        zdwimp   = 1.d0/( 1.d0 + abs( dimag(Siw(2,1))/wm1 ))
        rdwimp   = dimag(Giw(2,1)) - wm1*(dimag(Giw(2,2))-dimag(Giw(2,1)))/(wm2-wm1)
@@ -96,12 +89,21 @@ contains
     call write_to_unit_column(10)
     close(10)
 
-
     open(20,file=trim(Ofile))
     call write_to_unit_column(20)
     close(20)
 
-    write(*,*)""
+
+    if(last)then
+       call write_to_unit_list(6)
+    else
+       call msg("Main observables:")
+       write(*,"(A,f18.10)")"nimp=  ",nsimp
+       write(*,"(A,f18.12)")"docc=  ",dimp
+       if(Nspin==2)then
+          write(*,"(A,f18.12)")"mag=   ",magimp
+       endif
+    endif
     write(*,*)""
 
   contains
@@ -109,7 +111,7 @@ contains
     subroutine write_legend()
       if(Nspin==1)then            
          open(unit=50,file="columns_info.ed")
-         write(50,"(3A18,1A7,8A18)"),"1u","2xmu","3beta","4loop","5nimp","6docc","7mag","8mom2","9z","10sig","11ho","12freeE"
+         write(50,"(3A18,1A7,8A18)"),"1u","2xmu","3beta","4loop","5nimp","6docc","7mag","8mom2","9z","10sig","11rho","12freeE"
          close(50)
       else
          open(unit=50,file="columns_info.ed")
@@ -122,14 +124,12 @@ contains
 
     subroutine write_to_unit_column(unit)
       integer :: unit
-      !
       if(Nspin==1)then
          write(unit,"(3f18.12,I7,8f18.12)")u,xmu,beta,loop,nsimp,dimp,magimp,m2imp,zupimp,supimp,rupimp,freenimp
       else
          write(unit,"(3f18.12,I7,14f18.12)")u,xmu,beta,loop,nsimp,nupimp,ndwimp,dimp,magimp,m2imp,zupimp,zdwimp,supimp,sdwimp,&
               rupimp,rdwimp,freenimp
       endif
-
     end subroutine write_to_unit_column
 
     subroutine write_to_unit_list(unit)

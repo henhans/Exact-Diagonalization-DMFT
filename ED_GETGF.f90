@@ -163,11 +163,11 @@ contains
        !Get Weiss Fields (from Bath):
        do i=1,NL
           iw=xi*wm(i)
-          G0iw(ispin,i)= iw+xmu-delta_and(iw,ebath(ispin,:),vbath(ispin,:))
+          G0iw(ispin,i)= iw+xmu-delta_and(iw,ispin)
        enddo
        do i=1,Nw
           iw=cmplx(wr(i),eps)
-          G0wr(ispin,i)= iw+xmu-delta_and(iw,ebath(ispin,:),vbath(ispin,:))
+          G0wr(ispin,i)= iw+xmu-delta_and(iw,ispin)
        enddo
        Siw(ispin,:) = G0iw(ispin,:) - one/Giw(ispin,:)
        Swr(ispin,:) = G0wr(ispin,:) - one/Gwr(ispin,:)

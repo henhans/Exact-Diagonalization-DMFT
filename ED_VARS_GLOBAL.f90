@@ -1,5 +1,6 @@
 MODULE ED_VARS_GLOBAL
   USE COMMON_VARS
+  USE SCIFOR_VERSION
   USE TIMER
   USE PARSE_CMD
   USE IOTOOLS
@@ -40,6 +41,7 @@ MODULE ED_VARS_GLOBAL
   real(8) :: eps_error      !
   integer :: cgNitmax       !Max number of iteration in the fit
   real(8) :: cgFtol         !Tolerance in the cg fit
+  integer :: cgType         !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
 
   !Dimension of the functions:
   !=========================================================
@@ -74,12 +76,13 @@ MODULE ED_VARS_GLOBAL
   real(8),allocatable,dimension(:,:) :: vbath
 
 
-  !Functions for GETGFUNX 
+  !Functions for GETGFUNX (names must be changed)
   !=========================================================
   complex(8),allocatable,dimension(:,:) :: Giw,Siw
   complex(8),allocatable,dimension(:,:) :: Gwr,Swr
   real(8),allocatable,dimension(:)      :: Chitau
   complex(8),allocatable,dimension(:)   :: Chiw
+
 
   !Variables for fixed density mu-loop 
   !=========================================================
@@ -105,7 +108,7 @@ MODULE ED_VARS_GLOBAL
        nread,nerr,ndelta,       &
        chiflag,cutoff,HFmode,   &
        eps_error,Nsuccess,      &
-       cgNitmax,cgFtol,         &
+       cgNitmax,cgFtol,cgType,   &
        Hfile,Ofile,GMfile,GRfile,CTfile,CWfile
 
 contains
@@ -148,6 +151,7 @@ contains
     nsuccess   = 2
     cgNitmax   = 1000
     cgFtol     = 1.d-9
+    cgType     = 0
     !ReadUnits
     Hfile  ="hamiltonian.restart"
     GMfile ="impG_iw.ed"
@@ -167,38 +171,6 @@ contains
        open(50,file="default."//INPUTunit)
        write(50,nml=EDvars)
        write(50,*)""
-       write(50,*)" Ns   [5]    -- Number of bath sites per spin."
-       write(50,*)" Norb [1]    -- Number of local orbitals"
-       write(50,*)" Nspin [1]   -- Number of spin channels (max=2)"
-       write(50,*)" Nloop [50]  -- Max. number of iterations."
-       write(50,*)" beta [50.0] -- Inverse temperature."
-       write(50,*)" xmu [0.0]   -- Chemical potential."
-       write(50,*)" u [2.0]     -- Local interaction (Hubbard term)."
-       write(50,*)" NL [2048]   -- Number of Matsubara frequencies."
-       write(50,*)" Nw [1024]   -- Number of real frequencies."
-       write(50,*)" Ltau [512]  -- Number of imaginary time points."
-       write(50,*)" Nfit [2048] -- Number of fitted frequncies."
-       write(50,*)" eps_error=[1.d-4] -- Convergence tolerance"
-       write(50,*)" Nsuccess =[2]     -- Number of successive convergence treshold"
-       write(50,*)" chiflag [.false.] -- Evaluation flag for spin susceptibility."
-       write(50,*)" hfmode [.true.]   -- Hartree-Fock interaction form flag U(n-1/2)(n-1/2) Vs. Unn."
-       write(50,*)" eps [0.035]       -- Broadening constant."
-       write(50,*)" nread [0.0]       -- Target density for chemical potential search."
-       write(50,*)" nerror [1.d-4]    -- Tolerance in chemical potential search."
-       write(50,*)" ndelta [0.10]     -- Starting delta for chemical potential search."
-       write(50,*)" wini [-4.0]       -- Lower bound frequency interval."
-       write(50,*)" wfin [4.0]        -- Upper bound frequency interval."
-       write(50,*)" cgNitmax [100]    -- Max iteration in CG fit."
-       write(50,*)" cgFtol [1.e-9]    -- Tolerance in CG fit."
-       write(50,*)" heff [0.0]        -- Symmetry Breaking field."
-       write(50,*)" cutoff [1.e-9]    -- Cutoff parameter for the spectrum contributing to GF calculation."
-       write(50,*)" Hfile [Hamiltonian.restart] -- Store bath hamiltonian ."
-       write(50,*)" Ofile [observables.ed]    -- Store observables."
-       write(50,*)" Dfile [Delta.restart]       -- Store delta function."
-       write(50,*)" GMfile [Gimp_iw.ed]   -- Store GF Matsubara."
-       write(50,*)" GRfile [Gimp_realw.ed]   -- Store GF Real-axis."
-       write(50,*)" CTfile [Chi_tau.ed]  -- Store Chi Im. time."
-       write(50,*)" CWfile [Chi_realw.ed]  -- Store Chi Real-axis."
        stop
     endif
 
@@ -227,6 +199,7 @@ contains
     call parse_cmd_variable(heff,"HEFF")
     call parse_cmd_variable(cgNitmax,"CGNITMAX")
     call parse_cmd_variable(cgFtol,"CGFTOL")
+    call parse_cmd_variable(cgType,"CGTYPE")
     call parse_cmd_variable(Hfile,"HFILE")
     call parse_cmd_variable(Ofile,"OFILE")
     call parse_cmd_variable(GMfile,"GMFILE")
