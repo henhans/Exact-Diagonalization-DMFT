@@ -5,7 +5,8 @@
 !########################################################################
 MODULE ED_GETH
   USE ED_VARS_GLOBAL
-  USE ED_AUX_FUNX, only: cdg,c,bdecomp
+  USE ED_BATH
+  USE ED_AUX_FUNX
   implicit none
   private
   public :: imp_geth

@@ -4,7 +4,8 @@
 !###################################################################
 MODULE ED_GETGF
   USE ED_VARS_GLOBAL
-  USE ED_AUX_FUNX, only:c,cdg,bdecomp,delta_and
+  USE ED_BATH
+  USE ED_AUX_FUNX
   implicit none
   private 
 
@@ -21,17 +22,16 @@ contains
   !PURPOSE  : 
   !+------------------------------------------------------------------+
   subroutine imp_getfunx()
-    real(8)                  :: cdgmat,matcdg
-    integer,dimension(N)     :: ib(N)
-    integer                  :: i,j,k,r,ll,m,in,is,ispin,unit(6)
-    integer                  :: idg,jdg,isloop,jsloop,ia
-    real(8)                  :: Ei,Ej
-    real(8)                  :: cc,spin1,peso1
-    real(8)                  :: expterm,peso,de,w0,it,chij1
-    complex(8)               :: iw
+    real(8)                      :: cdgmat,matcdg
+    integer,dimension(N)         :: ib(N)
+    integer                      :: i,j,k,r,ll,m,in,is,ispin,unit(6)
+    integer                      :: idg,jdg,isloop,jsloop,ia
+    real(8)                      :: Ei,Ej
+    real(8)                      :: cc,spin1,peso1
+    real(8)                      :: expterm,peso,de,w0,it,chij1
+    complex(8)                   :: iw
     complex(8),dimension(1:2,NL) :: G0iw
     complex(8),dimension(1:2,Nw) :: G0wr
-
     !----------------------------------------------
     !<i|C^+|j>=<in,is,idg|C^+|jn,js,jdg>=C^+_{ij} |
     !----------------------------------------------
@@ -50,7 +50,7 @@ contains
 
     !Paramagnetic .OR. spin=UP :
     !==========================================================================
-    call msg("Evaluating G_imp_s1")
+    call msg("Evaluating G_imp_s1",unit=LOGfile)
     call start_timer
     ispin=1
     do isloop=startloop,lastloop
@@ -99,7 +99,7 @@ contains
     !spin=DW :
     !==========================================================================
     if(Nspin==2)then
-       call msg("Evaluating Gimp_s2")
+       call msg("Evaluating Gimp_s2",unit=LOGfile)
        call start_timer
        ispin=2
        do isloop=startloop,lastloop
@@ -163,11 +163,11 @@ contains
        !Get Weiss Fields (from Bath):
        do i=1,NL
           iw=xi*wm(i)
-          G0iw(ispin,i)= iw+xmu-delta_and(iw,ispin)
+          G0iw(ispin,i)= iw+xmu-delta_bath(iw,ispin)
        enddo
        do i=1,Nw
           iw=cmplx(wr(i),eps)
-          G0wr(ispin,i)= iw+xmu-delta_and(iw,ispin)
+          G0wr(ispin,i)= iw+xmu-delta_bath(iw,ispin)
        enddo
        Siw(ispin,:) = G0iw(ispin,:) - one/Giw(ispin,:)
        Swr(ispin,:) = G0wr(ispin,:) - one/Gwr(ispin,:)
@@ -187,6 +187,7 @@ contains
        close(unit(i))
     enddo
     deallocate(wm,tau,wr)
+
   end subroutine imp_getfunx
 
 
@@ -225,7 +226,7 @@ contains
     chitau=0.d0
     chiw=zero
     !Imaginary time susceptibility \X(tau). |<i|S_z|j>|^2
-    call msg("Evaluating Chi(tau)")
+    call msg("Evaluating Chi(tau)",unit=LOGfile)
     call start_timer
     do isloop=1,Nsect !loop over <i| total particle number
        call eta(isloop,lastloop,file="ETA_chi.ed")

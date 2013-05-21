@@ -20,7 +20,7 @@ contains
   !TYPE     : subroutine
   !PURPOSE  : Evaluate and print out many interesting physical qties
   !+-------------------------------------------------------------------+
-  subroutine imp_getobs(last)
+  subroutine imp_getobs()
     !Configuration vector
     integer,dimension(N)     :: ib
     integer                  :: i,j,ia,isloop
@@ -93,20 +93,17 @@ contains
     call write_to_unit_column(20)
     close(20)
 
-
-    if(last)then
-       call write_to_unit_list(6)
-    else
-       call msg("Main observables:")
-       write(*,"(A,f18.10)")"nimp=  ",nsimp
-       write(*,"(A,f18.12)")"docc=  ",dimp
-       if(Nspin==2)then
-          write(*,"(A,f18.12)")"mag=   ",magimp
-       endif
+    call msg("Main observables:",unit=LOGfile)
+    write(LOGfile,"(A,f18.10)")"nimp=  ",nsimp
+    write(LOGfile,"(A,f18.12)")"docc=  ",dimp
+    write(LOGfile,"(A,f18.12)")"mom2=  ",m2imp
+    if(Nspin==2)then
+       write(LOGfile,"(A,f18.12)")"mag=   ",magimp
     endif
-    write(*,*)""
+    write(LOGfile,*)""
 
   contains
+
 
     subroutine write_legend()
       if(Nspin==1)then            
@@ -158,13 +155,6 @@ contains
 
 
   end subroutine imp_getobs
-
-
-
-
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 

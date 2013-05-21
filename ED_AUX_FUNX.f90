@@ -1,18 +1,14 @@
 !########################################################################
 !PROGRAM  : ED_AUX_FUNX
-!PURPOSE  : Auxiliary functions
 !AUTHORS  : Adriano Amaricci
 !########################################################################
-
 MODULE ED_AUX_FUNX
   USE ED_VARS_GLOBAL
   implicit none
   private
   public :: imp_sectorns
   public :: bdecomp
-  public :: delta_and
   public :: c,cdg
-  public :: init_bath_ed,dump_bath
   public :: search_mu
 
 contains
@@ -71,75 +67,6 @@ contains
   end subroutine search_mu
 
 
-  !+------------------------------------------------------------------+
-  !PURPOSE  : Initialize the DMFT loop, builindg H parameters and/or 
-  !reading previous (converged) solution
-  !+------------------------------------------------------------------+
-  subroutine init_bath_ed
-    integer :: i,ispin
-    logical :: IOfile
-    !Initialize the parameter for every mu-loop                  
-    inquire(file=trim(Hfile),exist=IOfile)
-    if(.NOT.IOfile)then
-       write(*,"(A)")bg_red('Generating bath from scratch')
-       call guess_bath_params
-    else
-       write(*,"(A)")bg_red('Reading bath/xmu from file')
-       open(51,file=trim(Hfile))
-       do i=1,Nbath
-          read(51,"(6(F13.9,1X))")(ebath(ispin,i),vbath(ispin,i),ispin=1,Nspin)
-       enddo
-       close(51)
-    endif
-  end subroutine init_bath_ed
-
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+-------------------------------------------------------------------+
-  subroutine dump_bath(bath_file)
-    character(len=*) :: bath_file
-    integer :: i,ispin
-    open(51,file=trim(bath_file))
-    do i=1,Nbath
-       write(51,"(6(F13.9,1X))")(ebath(ispin,i),vbath(ispin,i),ispin=1,Nspin)
-    enddo
-    close(51)
-    return
-  end subroutine dump_bath
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : Build the parameters for the Hamiltonian
-  !+------------------------------------------------------------------+
-  subroutine guess_bath_params
-    integer :: i,ispin,n2
-    n2=Nbath/2;if(n2==0)n2=1
-    do ispin=1,Nspin
-       do i=0,Nbath-1
-          ebath(ispin,i+1)=2.d0*dfloat(i-1-n2)/dfloat(n2)
-          vbath(ispin,i+1)=dsqrt(1.d0/dfloat(Nbath))
-       enddo
-    enddo
-  end subroutine guess_bath_params
-
-
-
-
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+-------------------------------------------------------------------+
-  pure function delta_and(x,ichan) result(fg)
-    complex(8),intent(in)            :: x
-    integer,intent(in)               :: ichan
-    complex(8)                       :: fg
-    integer                          :: i
-    fg=zero
-    do i=1,Nbath
-       fg=fg+vbath(ichan,i)**2/(x-ebath(ichan,i))
-    enddo
-  end function delta_and
 
 
 

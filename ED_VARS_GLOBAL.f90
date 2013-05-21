@@ -70,12 +70,6 @@ MODULE ED_VARS_GLOBAL
   real(8) :: zeta_function
 
 
-  !Bath parameters (to be used in H)
-  !=========================================================
-  real(8),allocatable,dimension(:,:) :: ebath
-  real(8),allocatable,dimension(:,:) :: vbath
-
-
   !Functions for GETGFUNX (names must be changed)
   !=========================================================
   complex(8),allocatable,dimension(:,:) :: Giw,Siw
@@ -95,6 +89,7 @@ MODULE ED_VARS_GLOBAL
 
   !NML READ/WRITE UNITS
   character(len=32) :: Hfile,Ofile,GMfile,GRfile,CTfile,CWfile
+  integer           :: LOGfile
 
 
   !Writing/Reading Units:
@@ -109,7 +104,7 @@ MODULE ED_VARS_GLOBAL
        chiflag,cutoff,HFmode,   &
        eps_error,Nsuccess,      &
        cgNitmax,cgFtol,cgType,   &
-       Hfile,Ofile,GMfile,GRfile,CTfile,CWfile
+       Hfile,Ofile,GMfile,GRfile,CTfile,CWfile,LOGfile
 
 contains
 
@@ -159,6 +154,7 @@ contains
     CTfile ="Chi_tau.ed"
     CWfile ="Chi_realw.ed"    
     Ofile  ="observables.ed"
+    LOGfile=6
 
     inquire(file=INPUTunit,exist=control)    
     if(control)then
@@ -206,6 +202,7 @@ contains
     call parse_cmd_variable(GRfile,"GRFILE")
     call parse_cmd_variable(CTfile,"CTFILE")
     call parse_cmd_variable(CWfile,"CWFILE")
+    call parse_cmd_variable(LOGfile,"LOGFILE")
 
     call version(revision)
 
@@ -230,8 +227,17 @@ contains
     write(50,nml=EDvars)
     close(50)
 
-    call global_check
-    call global_allocation
+    !Some check:
+    if(Nfit>NL)Nfit=NL
+    if(Nimp>1)call abort("Norb > 1 is not yet supported!")
+    if(Ns>8)call abort("Ns > 8 is too big!")
+    if(nerr > eps_error) nerr=eps_error
+
+    !allocate functions
+    allocate(Giw(Nspin,NL),Siw(Nspin,NL))
+    allocate(Gwr(Nspin,Nw),Swr(Nspin,Nw))
+    if(chiflag)allocate(Chitau(0:Ltau),Chiw(Nw))
+
   end subroutine read_input
 
 
@@ -263,38 +269,8 @@ contains
     allocate(nmap(Nsect,NP),invnmap(Nsect,NN))
     allocate(deg(Nsect),getin(Nsect),getis(Nsect))
     allocate(getloop(N,-N:N),getCUPloop(Nsect),getCDWloop(Nsect))
-
   end subroutine allocate_system_structure
 
-
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : perform a sequence of check before calculation start
-  ! if something wrong either EXIT with some error msg or fix on the fly 
-  !+-------------------------------------------------------------------+
-  subroutine global_check
-    if(Nfit>NL)Nfit=NL
-    if(Nimp>1)call abort("Norb > 1 is not yet supported!")
-    if(Ns>8)call abort("Ns > 8 is too big!")
-    if(nerr > eps_error) nerr=eps_error
-  end subroutine global_check
-
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : setup common arrays
-  !+-------------------------------------------------------------------+
-  subroutine global_allocation
-
-    !Bath:
-    allocate(ebath(Nspin,Nbath),vbath(Nspin,Nbath))
-
-    !Functions
-    allocate(Giw(Nspin,NL),Siw(Nspin,NL))
-    allocate(Gwr(Nspin,Nw),Swr(Nspin,Nw))
-
-    if(chiflag)allocate(Chitau(0:Ltau),Chiw(Nw))
-
-  end subroutine global_allocation
 
 
 END MODULE ED_VARS_GLOBAL

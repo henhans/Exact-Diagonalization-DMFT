@@ -4,60 +4,64 @@
 !########################################################################
 module ED_DIAG
   USE ED_VARS_GLOBAL
-  USE ED_AUX_FUNX, ONLY:imp_sectorns,bdecomp,init_bath_ed,dump_bath
+  USE ED_BATH
+  USE ED_AUX_FUNX
   USE ED_GETH
   USE ED_GETGF
   USE ED_GETOBS
   implicit none
   private
+
+  public :: init_ed_solver
   public :: ed_solver
 
 contains
 
+
+  subroutine init_ed_solver(bath)
+    real(8),dimension(:),intent(inout) :: bath
+    integer                            :: i   
+    call msg("INIT SOLVER, SETUP EIGENSPACE",unit=LOGfile)
+    call check_bath_dimension(bath)
+    call allocate_bath
+    call init_bath_ed
+    if(Nspin==2)then
+       heff=abs(heff)
+       write(LOGfile,"(A,F12.9)")"Symmetry Breaking field = ",heff
+       ebath(1,:) = ebath(1,:) + heff
+       ebath(2,:) = ebath(2,:) - heff
+       heff=0.d0
+    endif
+    call setup_eigenspace
+    call write_bath(LOGfile)
+    bath = copy_bath()
+    call deallocate_bath
+    call msg("SET STATUS TO 0 in ED_SOLVER",unit=LOGfile)
+  end subroutine init_ed_solver
+
+
+
+
+
   !+------------------------------------------------------------------+
-  !PROGRAM  : 
-  !TYPE     : subroutine
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine ed_solver(status)
-    integer :: status
-
-    select case(status)
-    case(-1)
-       call msg("INIT SOLVER, SETUP EIGENSPACE")
-       call init_bath_ed
-       if(Nspin==2)then
-          heff=abs(heff)
-          write(*,"(A,F12.9)")"Symmetry Breaking field = ",heff
-          ebath(1,:) = ebath(1,:) + heff
-          ebath(2,:) = ebath(2,:) - heff
-          heff=0.d0
-       endif
-       call setup_eigenspace
-       call msg("SET STATUS TO 0.")
-
-    case default
-       call msg("ED SOLUTION")
-       call flush_eigenspace()
-       call imp_diag
-       call imp_getfunx
-       call imp_getobs(.false.)
-       call dump_bath(Hfile)
-    case(1)
-       call msg("ED FINALIZE")
-       call flush_eigenspace()
-       call imp_diag
-       call imp_getfunx
-       if(chiflag)call imp_getchi
-       call imp_getobs(.true.)
-       call dump_bath(Hfile)
-    end select
+  subroutine ed_solver(bath)
+    real(8),dimension(:),intent(in) :: bath
+    call msg("ED SOLUTION",unit=LOGfile)
+    call check_bath_dimension(bath)
+    call allocate_bath
+    call set_bath(bath)
+    call reset_eigenspace()
+    call imp_diag
+    call imp_getfunx
+    if(chiflag)call imp_getchi
+    call imp_getobs
+    call dump_bath(Hfile)
+    call deallocate_bath
   end subroutine ed_solver
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
@@ -87,18 +91,13 @@ contains
   end subroutine setup_eigenspace
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
-
-
-  subroutine flush_eigenspace
+  subroutine reset_eigenspace
     integer :: isloop
     forall(isloop=startloop:lastloop)
        espace(isloop)%e=0.d0
        espace(isloop)%M=0.d0
     end forall
-  end subroutine flush_eigenspace
+  end subroutine reset_eigenspace
 
 
 
@@ -111,19 +110,14 @@ contains
     real(8),dimension(Nsect) :: e0 
     integer                  :: info
     integer                  :: lwork
-    !real(8),dimension(3*NP)  :: work !biggest dimension
-
-    !lwork=3*NP
     e0=0.d0
-    call msg("Get Hamiltonian:")
+    call msg("Get Hamiltonian:",unit=LOGfile)
     call start_timer
     do isloop=startloop,lastloop
        call eta(isloop,lastloop,file="ETA_diag.ed")
        idg=deg(isloop)
        call imp_geth(isloop)
        call matrix_diagonalize(espace(isloop)%M,espace(isloop)%e,'V','U')
-       !call dsyev('V','U',idg,espace(isloop)%M,idg,espace(isloop)%e,work,lwork,info)
-       !if(info /= 0)print*,info
        if(isloop >=startloop)e0(isloop)=minval(espace(isloop)%e)
     enddo
     call stop_timer
@@ -132,10 +126,6 @@ contains
   end subroutine imp_diag
 
 
-
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
@@ -186,9 +176,6 @@ contains
     enddo
     return
   end subroutine imp_setup
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
@@ -214,18 +201,15 @@ contains
           zeta_function=zeta_function+exp(-beta*espace(isloop)%e(i))
        enddo
     enddo
-    call msg("DIAG resume:")
-    write(*,"(A,f18.12)")'egs  =',egs
-    write(*,"(A,f18.12)")'Z    =',zeta_function    
-    print*,""
+    call msg("DIAG resume:",unit=LOGfile)
+    write(LOGfile,"(A,f18.12)")'egs  =',egs
+    write(LOGfile,"(A,f18.12)")'Z    =',zeta_function    
+    write(LOGfile,*)""
 
     open(3,file='egs.ed',access='append')
     write(3,*)egs
     close(3)
   end subroutine findgs
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 

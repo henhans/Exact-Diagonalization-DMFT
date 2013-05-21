@@ -3,7 +3,8 @@
 !########################################################################
 MODULE ED_CHI2FIT
   USE ED_VARS_GLOBAL
-  USE ED_AUX_FUNX, ONLY:delta_and
+  USE ED_BATH
+  USE ED_AUX_FUNX
   implicit none
   private
 
@@ -17,14 +18,18 @@ contains
   !+-------------------------------------------------------------+
   !PURPOSE  : 
   !+-------------------------------------------------------------+
-  subroutine chi2_fitgf(fg,ichan)
-    complex(8),dimension(:)    :: fg
-    integer                    :: ichan
-    real(8),dimension(2*Nbath) :: a
-    integer                    :: iter
-    real(8)                    :: chi
+  subroutine chi2_fitgf(fg,bath,ichan)
+    complex(8),dimension(:)            :: fg
+    real(8),dimension(:),intent(inout) :: bath
+    integer                            :: ichan
+    real(8),dimension(2*Nbath)         :: a
+    integer                            :: iter
+    real(8)                            :: chi
     !
-    call msg("FIT Delta function:")
+    call msg("FIT Delta function:",unit=LOGfile)
+    call check_bath_dimension(bath)
+    call allocate_bath
+    call set_bath(bath)
 
     Ldelta = size(fg)
     allocate(fdelta(Ldelta))
@@ -43,6 +48,8 @@ contains
     write(*,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
     print*," "
     call dump_fit_result(ichan)
+    bath = copy_bath()
+    call deallocate_bath
     deallocate(Fdelta,Xdelta)
   end subroutine chi2_fitgf
 
@@ -160,7 +167,7 @@ contains
     fgand=zero
     do i=1,Ldelta
        w=Xdelta(i)
-       fgand(i) = delta_and(xi*w,ichan)
+       fgand(i) = delta_bath(xi*w,ichan)
     enddo
     call splot("fit_delta.ed",Xdelta,dimag(Fdelta),dimag(fgand),dreal(Fdelta),dreal(fgand))
   end subroutine dump_fit_result

@@ -15,7 +15,7 @@ REV= $(shell git rev-parse HEAD)
 VER='character(len=41),parameter :: revision = "$(REV)"' > revision.inc
 
 #COMPILATION:
-OBJS=ED_VARS_GLOBAL.o ED_AUX_FUNX.o ED_GETH.o ED_GETGF.o ED_GETOBS.o ED_CHI2FIT.o ED_DIAG.o DMFT_FULLED.o
+OBJS=ED_VARS_GLOBAL.o ED_AUX_FUNX.o ED_BATH.o ED_GETH.o ED_GETGF.o ED_GETOBS.o ED_CHI2FIT.o ED_DIAG.o DMFT_FULLED.o
 
 #=================STANDARD COMPILATION====================================
 all: FLAG=$(STD) 
