@@ -13,8 +13,6 @@ MODULE ED_GETOBS
 
 contains 
 
-
-
   !+-------------------------------------------------------------------+
   !PROGRAM  : GETOUTNS
   !TYPE     : subroutine
@@ -31,7 +29,7 @@ contains
     real(8)                  :: rupimp,rdwimp
     real(8)                  :: wm1,wm2
     real(8)                  :: Ei,nup,ndw,peso
-    real(8)                  :: Etot,freenimp,w
+    real(8)                  :: freenimp,w
     complex(8)               :: iw,alpha,greend0,selfd,zita
     complex(8),dimension(NL) :: dummy
     real(8),dimension(0:NL)  :: dummyt
@@ -44,7 +42,6 @@ contains
     m2imp  =0.d0
 
     freenimp=0.d0
-    Etot=zero
 
     do isloop=startloop,lastloop
        idg=deg(isloop)
@@ -56,13 +53,9 @@ contains
              ia=nmap(isloop,j)
              gs=espace(isloop)%M(j,i)
              call bdecomp(ia,ib)
-
-             Etot    =Etot    +  peso*Ei
-
              nup=real(ib(1),8)
              ndw=real(ib(1+Ns),8)
-
-             nsimp   = nsimp   +  (nup+ndw)*peso*gs**2
+             nsimp  = nsimp  +  (nup+ndw)*peso*gs**2
              nupimp = nupimp +  (nup)*peso*gs**2
              ndwimp = ndwimp +  (ndw)*peso*gs**2
              dimp   = dimp   +  (nup*ndw)*peso*gs**2
@@ -84,8 +77,9 @@ contains
     endif
 
     if(iolegend)call write_legend
+
     loop=loop+1
-    open(10,file=trim(Ofile)//"_all.ed",access="append")
+    open(10,file=trim(Ofile)//".all",access="append")
     call write_to_unit_column(10)
     close(10)
 
@@ -108,11 +102,11 @@ contains
     subroutine write_legend()
       if(Nspin==1)then            
          open(unit=50,file="columns_info.ed")
-         write(50,"(3A18,1A7,8A18)"),"1u","2xmu","3beta","4loop","5nimp","6docc","7mag","8mom2","9z","10sig","11rho","12freeE"
+         write(50,"(A1,3A18,1A7,8A18)")"#","1u","2xmu","3beta","4loop","5nimp","6docc","7mag","8mom2","9z","10sig","11rho","12freeE"
          close(50)
       else
          open(unit=50,file="columns_info.ed")
-         write(50,"(3A18,1A7,13A18)"),"1u","2xmu","3beta","4loop","5nimp","6n_up","7n_dw","8docc","9mag","10mom2","11z_up",&
+         write(50,"(A1,3A18,1A7,13A18)")"#","1u","2xmu","3beta","4loop","5nimp","6n_up","7n_dw","8docc","9mag","10mom2","11z_up",&
               "12_dw","13sig_up","14sig_dw","15rho_up","16rho_dw","17freeE"
          close(50)
       endif

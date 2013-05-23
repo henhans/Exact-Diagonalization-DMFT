@@ -150,7 +150,8 @@ contains
     call splot("Sigmadd_realw.ed",wr,sdr)
 
     call splot("G_tau_ddpp.ed",tau,gdtau,gptau)
-    call splot("np.ntot.ed",npimp,ntot,append=.true.)
+    call splot("np.ntot.ed.all",npimp,ntot,append=.true.)
+    call splot("np.ntot.ed",npimp,ntot)
   end subroutine get_delta
 
 

@@ -23,7 +23,7 @@ contains
     real(8)               :: ntmp
     logical               :: check
     integer,save          :: count=0
-    integer,save          :: nindex
+    integer,save          :: nindex=0
     real(8)               :: ndelta1,nindex1
     if(count==0)then
        inquire(file="searchmu_file.restart",exist=check)
@@ -55,13 +55,13 @@ contains
     print*,""
     if(abs(ntmp-nread)>nerr)then
        convergence=.false.
-    else
-       convergence=.true.
+       ! else
+       !    convergence=.true.
     endif
     print*,""
     print*,"Convergence:",convergence
     print*,""
-    open(10,file="searchmu_file.restart")
+    open(10,file="searchmu_file.restart.new")
     write(10,*)ndelta,nindex
     close(10)
   end subroutine search_mu
