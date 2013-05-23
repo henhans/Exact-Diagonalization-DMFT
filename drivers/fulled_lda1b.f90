@@ -19,6 +19,8 @@ program fulled_lda
   complex(8)             :: iw
   !variables for the model:
   character(len=32)      :: file
+  character(len=4)       :: ntype
+  real(8)                :: nobj
   !Bath:
   real(8),allocatable    :: Bath(:)
   !The local hybridization function:
@@ -30,6 +32,7 @@ program fulled_lda
 
   call read_input("inputED.in")
   call parse_cmd_variable(file,"FILE",default="hkfile.in")
+  call parse_cmd_variable(ntype,"NTYPE",default="ntot")
 
   !Allocate:
   allocate(wm(NL),wr(Nw),tau(0:Ltau))
@@ -152,6 +155,15 @@ contains
     call splot("G_tau_ddpp.ed",tau,gdtau,gptau)
     call splot("np.ntot.ed.all",npimp,ntot,append=.true.)
     call splot("np.ntot.ed",npimp,ntot)
+
+    if(trim(ntype)=="nd")then
+       nobj=nsimp
+    elseif(trim(ntype)=="np")then
+       nobj=npimp
+    else
+       nobj=ntot
+    endif
+
   end subroutine get_delta
 
 
