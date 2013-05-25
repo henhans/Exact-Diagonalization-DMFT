@@ -19,7 +19,7 @@ program fulled_lda
   complex(8)             :: iw
   !variables for the model:
   character(len=32)      :: file
-  character(len=4)       :: ntype
+  integer                :: ntype
   real(8)                :: nobj
   !Bath:
   real(8),allocatable    :: Bath(:)
@@ -32,7 +32,7 @@ program fulled_lda
 
   call read_input("inputED.in")
   call parse_cmd_variable(file,"FILE",default="hkfile.in")
-  call parse_cmd_variable(ntype,"NTYPE",default="ntot")
+  call parse_cmd_variable(ntype,"NTYPE",default=0)
 
   !Allocate:
   allocate(wm(NL),wr(Nw),tau(0:Ltau))
@@ -88,7 +88,7 @@ program fulled_lda
 
      !Check convergence (if required change chemical potential)
      converged = check_convergence(delta(:),eps_error,nsuccess,nloop)
-     if(nread/=0.d0)call search_mu(ntot,converged)
+     if(nread/=0.d0)call search_mu(nobj,converged)
      if(iloop>nloop)converged=.true.
      call end_loop
   enddo
@@ -156,9 +156,9 @@ contains
     call splot("np.ntot.ed.all",npimp,ntot,append=.true.)
     call splot("np.ntot.ed",npimp,ntot)
 
-    if(trim(ntype)=="nd")then
+    if(ntype==1)then
        nobj=nsimp
-    elseif(trim(ntype)=="np")then
+    elseif(ntype==2)then
        nobj=npimp
     else
        nobj=ntot
