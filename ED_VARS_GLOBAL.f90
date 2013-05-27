@@ -52,6 +52,7 @@ MODULE ED_VARS_GLOBAL
   integer,allocatable,dimension(:,:) :: nmap,invnmap
   integer,allocatable,dimension(:,:) :: getloop
   integer,allocatable,dimension(:)   :: getCUPloop,getCDWloop
+  integer,allocatable,dimension(:)   :: getCDAGUPloop,getCDAGDWloop
   integer,allocatable,dimension(:)   :: deg,getin,getis
   integer                            :: startloop,lastloop
 
@@ -63,7 +64,6 @@ MODULE ED_VARS_GLOBAL
      real(8),dimension(:,:),pointer :: M
   end type eigenspace
   type(eigenspace),dimension(:),allocatable :: espace
-
 
   !Partition function
   !=========================================================
@@ -268,7 +268,9 @@ contains
     Nsect = ((Ns+1)*(Ns+1) - 1)
     allocate(nmap(Nsect,NP),invnmap(Nsect,NN))
     allocate(deg(Nsect),getin(Nsect),getis(Nsect))
-    allocate(getloop(N,-N:N),getCUPloop(Nsect),getCDWloop(Nsect))
+    allocate(getloop(N,-N:N))
+    allocate(getCUPloop(Nsect),getCDWloop(Nsect))
+    allocate(getCDAGUPloop(Nsect),getCDAGDWloop(Nsect))
   end subroutine allocate_system_structure
 
 

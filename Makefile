@@ -14,6 +14,10 @@ BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 REV= $(shell git rev-parse HEAD)
 VER='character(len=41),parameter :: revision = "$(REV)"' > revision.inc
 
+#ADD ARPACK LIB:
+SFLIBS += -L/opt/arpack/lib -larpack
+SFLIBS_DEB += -L/opt/arpack/lib -larpack
+
 #COMPILATION:
 OBJS=ED_VARS_GLOBAL.o ED_AUX_FUNX.o ED_BATH.o ED_GETH.o ED_GETGF.o ED_GETOBS.o ED_CHI2FIT.o ED_DIAG.o DMFT_FULLED.o
 

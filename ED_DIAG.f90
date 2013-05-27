@@ -2,8 +2,22 @@
 !PURPOSE  : Diagonalize the Effective Impurity Problem
 !New ordering of the sites:|ImpUP,BathUP;,ImpDW,BathDW >
 !########################################################################
+include "arpack_lanczos.f90"
+module ED_GSVEC
+  USE ED_VARS_GLOBAL
+  implicit none
+  integer :: numzero
+  integer,dimension(:),allocatable :: iszero
+  type gstate
+     real(8),dimension(:),pointer :: vec
+  end type gstate
+  type(gstate),dimension(:),allocatable :: groundstate
+end module ED_GSVEC
+
+
 module ED_DIAG
   USE ED_VARS_GLOBAL
+  USE ED_GSVEC
   USE ED_BATH
   USE ED_AUX_FUNX
   USE ED_GETH
@@ -14,6 +28,8 @@ module ED_DIAG
 
   public :: init_ed_solver
   public :: ed_solver
+
+  real(8),dimension(:,:),allocatable :: H0
 
 contains
 
@@ -108,8 +124,20 @@ contains
   subroutine imp_diag
     integer :: in,is,isloop,idg
     real(8),dimension(Nsect) :: e0 
-    integer                  :: info
+    integer                  :: info,i,j
     integer                  :: lwork
+    real(8),allocatable :: eval(:),evec(:,:)
+    integer :: Nitermax,Neigen,n0,s0,isect0,idg0,izero
+    real(8) :: oldzero,enemin
+    !
+    !#LANCZOS
+    if(.not.allocated(iszero))allocate(iszero(Nsect))
+    if(.not.allocated(groundstate))allocate(groundstate(Nsect))
+    oldzero=1000.d0
+    numzero=0
+    iszero=0
+    !#LANCZOS
+    !
     e0=0.d0
     call msg("Get Hamiltonian:",unit=LOGfile)
     call start_timer
@@ -117,15 +145,117 @@ contains
        call eta(isloop,lastloop,file="ETA_diag.ed")
        idg=deg(isloop)
        call imp_geth(isloop)
+       !
+       !#LANCZOS
+       allocate(H0(idg,idg))
+       H0=espace(isloop)%M
+       !#LANCZOS
+       !
        call matrix_diagonalize(espace(isloop)%M,espace(isloop)%e,'V','U')
        if(isloop >=startloop)e0(isloop)=minval(espace(isloop)%e)
+       !
+       !#LANCZOS
+       if(idg>1)then
+          Neigen=1
+          Nitermax=min(idg,512)
+          allocate(Eval(Neigen),Evec(Idg,Neigen))
+          call lanczos_arpack(Idg,Neigen,Nitermax,eval,evec,HtimesV,.false.)          
+          enemin=eval(1)         
+          if (enemin < oldzero-10.d-9) then
+             numzero=1
+             iszero(numzero)=isloop
+             oldzero=enemin
+             allocate(groundstate(numzero)%vec(idg))
+             groundstate(numzero)%vec(1:idg)=evec(1:idg,1)
+          elseif(abs(enemin-oldzero) <= 1.d-9)then
+             numzero=numzero+1
+             if (numzero > Nsect) stop 'too many gs'
+             iszero(numzero)=isloop
+             oldzero=min(oldzero,enemin)
+             allocate(groundstate(numzero)%vec(idg))
+             groundstate(numzero)%vec(1:idg)=evec(1:idg,1)
+          endif
+          write(*,*)isloop,eval(1),getin(isloop),getis(isloop)
+          deallocate(Eval,Evec)
+       endif
+       deallocate(H0)
+       !#LANCZOS
+       !
     enddo
+
+    !
+    !#LANCZOS    
+    print*,"numzero=",numzero
+    print*,"groundstate sector:"
+    do izero=1,numzero
+       isect0 = iszero(izero)
+       n0 = getin(isect0)
+       s0 = getis(isect0)
+       idg0 = deg(isect0)
+       print*,n0,s0,idg0
+       do j=1,idg0
+          print*,groundstate(izero)%vec(j),espace(isect0)%M(j,1)
+       enddo
+    enddo
+    !#LANCZOS
+    !
     call stop_timer
     call findgs(e0)
+
+    !
+    !#LANCZOS    
+    call lanc_getgf()
+    !#LANCZOS
+    !
     return
   end subroutine imp_diag
 
+  !
+  !#LANCZOS
+  subroutine HtimesV(N,v,Hv)
+    real(8),dimension(N) :: v
+    real(8),dimension(N) :: Hv
+    integer              :: N
+    call dgemv('N',n,n,1.d0,H0,n,v,1,0.d0,Hv,1)
+  end subroutine HtimesV
 
+
+  subroutine lanc_getgf()
+    integer :: i,izero,isect0,jsect0,m
+    integer :: in0,is0,idg0
+    integer :: jn0,js0,jdg0
+    real(8) :: norm0,sgn
+    integer :: ib(N),k,r
+    real(8),allocatable :: vvinit(:)
+    do izero=1,numzero       
+       norm0=sqrt(dot_product(&
+            groundstate(izero)%vec,groundstate(izero)%vec))
+       if(norm0-1.d0>1.d-9)print*,"GS",izero,"is not normalized:",norm0
+
+       isect0 = iszero(izero)
+       in0 = getin(isect0) ; is0 = getis(isect0) ; idg0 = deg(isect0)
+
+       !ADD ONE PARTICLE UP:
+       jsect0 = getCDAGUPloop(isect0);if(jsect0==0)cycle
+       jdg0 = deg(jsect0)
+       print*,'sector C^+_up|gs>',getin(jsect0),getis(jsect0),jdg0
+
+       allocate(vvinit(jdg0))
+       do i=1,idg0
+          m=nmap(isect0,i)
+          call bdecomp(m,ib)
+          if(ib(1)==0)then
+             call cdg(1,k,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r)    
+             vvinit(r) = sgn*groundstate(izero)%vec(i)
+          endif
+       enddo
+       norm0=sqrt(dot_product(vvinit,vvinit))
+       vvinit=vvinit/norm0
+       deallocate(vvinit)
+    enddo
+  end subroutine lanc_getgf
+  !#LANCZOS
+  !
 
 
 
@@ -166,6 +296,15 @@ contains
        getCUPloop(isloop)=jsloop
     enddo
 
+    getCDAGUPloop=0
+    do isloop=1,Nsect
+       if(isloop > getloop(N-1,-1))cycle
+       in=getin(isloop);is=getis(isloop)
+       jn=in+1;js=is+1;if(abs(js) > jn)cycle
+       jsloop=getloop(jn,js)
+       getCDAGUPloop(isloop)=jsloop
+    enddo
+
     getCDWloop=0
     do isloop=1,Nsect
        if(isloop < getloop(2,-2))cycle
@@ -173,6 +312,15 @@ contains
        jn=in-1;js=is+1;if(abs(js) > jn)cycle
        jsloop=getloop(jn,js)
        getCDWloop(isloop)=jsloop
+    enddo
+
+    getCDAGDWloop=0
+    do isloop=1,Nsect
+       if(isloop > getloop(N-1,1))cycle
+       in=getin(isloop);is=getis(isloop)
+       jn=in+1;js=is-1;if(abs(js) > jn)cycle
+       jsloop=getloop(jn,js)
+       getCDAGDWloop(isloop)=jsloop
     enddo
     return
   end subroutine imp_setup
