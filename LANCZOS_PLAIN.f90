@@ -1,4 +1,4 @@
-MODULE LANCZOS_HTIMEV
+MODULE LANCZOS_HTIMESV_INTERFACE
   implicit none
   abstract interface 
      subroutine lanc_htimesv(n,vin,vout)
@@ -7,32 +7,33 @@ MODULE LANCZOS_HTIMEV
        real(8) :: vout(n)
      end subroutine lanc_htimesv
   end interface
-END MODULE LANCZOS_HTIMEV
+END MODULE LANCZOS_HTIMESV_INTERFACE
 
 
-
-MODULE LANCZOS_SIMPLE
-  USE LANCZOS_HTIMEV
+MODULE PLAIN_LANCZOS
+  USE LANCZOS_HTIMESV_INTERFACE
   implicit none
   private
   procedure(lanc_htimesv),pointer :: p_hprod
+
   logical :: verb=.false.
   real(8) :: threshold_=1.d-12
   real(8) :: ncheck_=10
+
   public :: plain_lanczos_set_htimesv
   public :: plain_lanczos_get_groundstate
-  !public :: plain_lanczos_tridiag
+  public :: plain_lanczos_tridiag
   public :: plain_lanczos_iteration
   public :: tql2
 
 contains
+
 
   subroutine plain_lanczos_set_htimesv(Hprod)
     procedure(lanc_htimesv)  :: Hprod
     if(associated(p_hprod))nullify(p_hprod)
     p_hprod=>Hprod
   end subroutine plain_lanczos_set_htimesv
-
 
 
   subroutine plain_lanczos_get_groundstate(ns,nitermax,egs,vect,Nlanc,iverbose,threshold,ncheck)
@@ -131,96 +132,28 @@ contains
 
 
 
-  subroutine plain_lanczos_tridiag(vin,alfa,beta,Nitermax,Nlanc,iverbose,threshold)
-    real(8),dimension(:),intent(inout)          :: vin
-    real(8),dimension(size(vin))                :: vout
-    integer                                     :: i,nitermax,ierr
-    real(8),dimension(nitermax+1),intent(inout) :: alfa,beta 
-    integer                                     :: iter,nlanc
-    real(8)                                     :: a_,b_
-    real(8),optional                            :: threshold
-    logical,optional                            :: iverbose
+  subroutine plain_lanczos_tridiag(vin,alanc,blanc,nitermax,iverbose,threshold)
+    real(8),dimension(:),intent(inout)        :: vin
+    real(8),dimension(size(vin))              :: vout
+    real(8),dimension(nitermax),intent(inout) :: alanc
+    real(8),dimension(nitermax),intent(inout) :: blanc
+    integer                                   :: i,nitermax,ierr
+    integer                                   :: iter,nlanc
+    real(8)                                   :: a_,b_,diff
+    real(8),optional                          :: threshold
+    logical,optional                          :: iverbose
     if(present(iverbose))verb=iverbose
     if(present(threshold))threshold_=threshold
-    if(.not.associated(p_hprod))then
-       print*,"PLAIN_LANCZOS: p_hprod is not set. call plain_lanczos_set_htimesv"
-       stop
-    endif
     a_=0.d0
     b_=0.d0
-    nlanc=0
-    lanc_loop: do iter=1,nitermax
+    do iter=1,nitermax
        call plain_lanczos_iteration(iter,vin,vout,a_,b_)
-       if(verb)then
-          print*,""
-          write(*,*)"Lanczos iteration:",iter
-       endif
-       if(abs(b_)<threshold_)exit lanc_loop
-       nlanc=nlanc+1
-       if(verb)print*,"alfa,beta=",a_,b_
-       alfa(iter)=a_
-       beta(iter+1)=b_
-    enddo lanc_loop
+       if(abs(b_)<threshold_)exit
+       alanc(iter)=a_
+       if(iter<nitermax)blanc(iter+1)=b_
+    enddo
   end subroutine plain_lanczos_tridiag
 
-
-  ! subroutine plain_lanczos_step(vin,vout,alfa,beta,Nitermax,Nlanc,iverbose,threshold,ncheck)
-  !   real(8),dimension(:),intent(inout)        :: vin,vout
-  !   integer                                   :: i,nitermax,ierr
-  !   real(8),dimension(nitermax),intent(inout) :: alfa,beta 
-  !   real(8),optional                          :: threshold
-  !   integer,optional                          :: ncheck
-  !   logical,optional                          :: iverbose
-  !   integer                                   :: iter,nlanc
-  !   real(8)                                   :: a_,b_,diff
-  !   real(8),dimension(Nitermax,Nitermax)      :: Z
-  !   real(8),dimension(Nitermax)               :: diag,subdiag,esave
-  !   !
-  !   if(present(iverbose))verb=iverbose
-  !   if(present(threshold))threshold_=threshold
-  !   if(present(ncheck))ncheck_=ncheck
-  !   !
-  !   a_=0.d0
-  !   b_=0.d0
-  !   nlanc=0
-  !   lanc_loop: do iter=1,nitermax
-  !      call plain_lanczos_iteration(iter,vin,vout,a_,b_)
-  !      if(verb)then
-  !         print*,""
-  !         write(*,*)"Lanczos iteration:",iter
-  !      endif
-  !      if(abs(b_)<threshold_)exit lanc_loop
-  !      nlanc=nlanc+1
-  !      if(verb)print*,"alfa=",a_
-  !      if(verb)print*,"beta=",b_
-  !      alfa(iter)=a_
-  !      beta(iter+1)=b_   
-  !      diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
-  !      forall(i=1:Nlanc)Z(i,i)=1.d0
-  !      diag(1:Nlanc)    = alfa(1:Nlanc)
-  !      subdiag(2:Nlanc) = beta(2:Nlanc)
-  !      call tql2(Nlanc,diag,subdiag,Z,ierr)
-  !      if(verb)then
-  !         print *,'---> lowest eigenvalue  <---'
-  !         write(*,*)"E_lowest    = ",diag(1)
-  !         open(10,file="lanc_eigenvals.dat")
-  !         do i=1,Nlanc
-  !            write(10,*)i,diag(i)
-  !         enddo
-  !         close(10)
-  !      endif
-  !      if(nlanc >= ncheck_)then
-  !         esave(nlanc-(Ncheck_-1))=diag(1)
-  !         if(nlanc >= (Ncheck_+1))then
-  !            diff=esave(Nlanc-(Ncheck_-1))-esave(Nlanc-(Ncheck_-1)-1)
-  !            if(verb)write(*,*)'test deltaE = ',diff
-  !            if(abs(diff).le.threshold_)exit lanc_loop
-  !         endif
-  !      endif
-  !   enddo lanc_loop
-  !   if(.not.verb)write(*,*)'test deltaE lanczos = ',diff
-  !   if(nlanc==nitermax)print*,"LANCZOS_SIMPLE: reach Nitermax"
-  ! end subroutine plain_lanczos_step
 
 
   subroutine plain_lanczos_iteration(iter,vin,vout,a,b)
@@ -469,4 +402,4 @@ contains
     return
   end subroutine r8_swap
 
-END MODULE LANCZOS_SIMPLE
+END MODULE PLAIN_LANCZOS

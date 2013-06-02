@@ -2,8 +2,8 @@
 !PURPOSE  : Diagonalize the Effective Impurity Problem
 !New ordering of the sites:|ImpUP,BathUP;,ImpDW,BathDW >
 !########################################################################
-include "arpack_lanczos.f90"
-include "plain_lanczos.f90" 
+include "LANCZOS_ARPACK.f90"
+include "LANCZOS_PLAIN.f90" 
 module ED_GSVEC
   USE ED_VARS_GLOBAL
   implicit none
@@ -25,7 +25,7 @@ module ED_DIAG
   USE ED_GETH
   USE ED_GETGF
   USE ED_GETOBS
-  use lanczos_simple
+  use PLAIN_LANCZOS
   implicit none
   private
 
@@ -262,7 +262,7 @@ contains
     allocate(wr(Nw))
     wr    = linspace(wini,wfin,Nw)
 
-    Nitermax=25
+    Nitermax=50
     allocate(alfa_(Nitermax),beta_(Nitermax))
 
     factor=real(numzero,8)
@@ -327,8 +327,8 @@ contains
        !Tri-diagonalize w/ Lanczos the resolvant:
        allocate(vout(jdg0))
        vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
-       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax,nlanc)
-       call add_to_lanczos_gf(norm0,groundstate(izero)%egs,nlanc,alfa_,beta_,1,1)
+       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
+       call add_to_lanczos_gf(norm0,groundstate(izero)%egs,nitermax,alfa_,beta_,1,1)
        deallocate(H0,vout,vvinit)
 
 
@@ -353,10 +353,9 @@ contains
        allocate(H0(jdg0,jdg0))
        call imp_geth(jsect0,H0)
        allocate(vout(jdg0))
-       vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
-       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax,nlanc)
-       !call plain_lanczos_step(vvinit,vout,alfa_,beta_,nitermax,nlanc,threshold=0.d0,iverbose=.true.)
-       call add_to_lanczos_gf(norm0,groundstate(izero)%egs,nlanc,alfa_,beta_,-1,1)
+       vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0
+       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
+       call add_to_lanczos_gf(norm0,groundstate(izero)%egs,nitermax,alfa_,beta_,-1,1)
        deallocate(H0,vout,vvinit)
 
     enddo
@@ -385,35 +384,9 @@ contains
   end subroutine lanc_getgf
 
 
-  subroutine plain_lanczos_tridiag(vin,alfa,beta,Nitermax,Nlanc)
-    real(8),dimension(:),intent(inout)        :: vin
-    real(8),dimension(size(vin))              :: vout
-    integer                                   :: i,nitermax,ierr
-    real(8),dimension(nitermax+1),intent(inout) :: alfa,beta 
-    integer                                   :: iter,nlanc
-    real(8)                                   :: a_,b_,diff
-    real(8),dimension(Nitermax,Nitermax)      :: Z
-    real(8),dimension(Nitermax)               :: diag,subdiag,esave
-    a_=0.d0
-    b_=0.d0
-    nlanc=0
-    lanc_loop: do iter=1,nitermax
-       call plain_lanczos_iteration(iter,vin,vout,a_,b_)
-       print*,""
-       write(*,*)"Lanczos iteration:",iter    
-       if(abs(b_)<1.d-12)exit lanc_loop
-       nlanc=nlanc+1
-       print*,"alfa,beta=",a_,b_
-       alfa(iter)=a_
-       beta(iter+1)=b_
-    enddo lanc_loop
-  end subroutine plain_lanczos_tridiag
-
-
-
 
   subroutine add_to_lanczos_gf(vnorm,emin,nlanc,alanc,blanc,isign,ispin)
-    real(8),dimension(:)                         :: alanc,blanc 
+    real(8),dimension(nlanc)                         :: alanc,blanc 
     real(8),dimension(size(alanc),size(alanc))   :: Z
     real(8),dimension(size(alanc))               :: diag,subdiag
     real(8) :: vnorm,emin
