@@ -184,7 +184,7 @@ contains
              groundstate(numzero)%vec(1:idg)=evec(1:idg,1)
              groundstate(numzero)%egs=enemin
           endif
-          write(*,*)isloop,eval(1),getin(isloop),getis(isloop)
+          !write(*,*)isloop,eval(1),getin(isloop),getis(isloop)
           deallocate(Eval,Evec)
        endif
        deallocate(H0)
@@ -205,11 +205,11 @@ contains
        n0 = getin(isect0)
        s0 = getis(isect0)
        idg0 = deg(isect0)
-       print*,n0,s0,idg0
-       do j=1,idg0
-          print*,groundstate(izero)%vec(j),espace(isect0)%M(j,1)
-       enddo
-       print*,groundstate(izero)%egs
+       print*,n0,s0,idg0,groundstate(izero)%egs
+       !do j=1,idg0
+       !   print*,groundstate(izero)%vec(j),espace(isect0)%M(j,1)
+       !enddo
+       !print*,groundstate(izero)%egs
     enddo
     !#LANCZOS
     !
@@ -262,7 +262,7 @@ contains
     allocate(wr(Nw))
     wr    = linspace(wini,wfin,Nw)
 
-    Nitermax=250!min(jdg0,512)
+    Nitermax=25
     allocate(alfa_(Nitermax),beta_(Nitermax))
 
     factor=real(numzero,8)
@@ -276,8 +276,7 @@ contains
 
     do izero=1,numzero   
        !GET THE GROUNDSTATE (make some checks)
-       norm0=sqrt(dot_product(&
-            groundstate(izero)%vec,groundstate(izero)%vec))
+       norm0=sqrt(dot_product(groundstate(izero)%vec,groundstate(izero)%vec))
        if(norm0-1.d0>1.d-9)print*,"GS",izero,"is not normalized:",norm0
        isect0 = iszero(izero)
        in0    = getin(isect0)
@@ -328,21 +327,18 @@ contains
        !Tri-diagonalize w/ Lanczos the resolvant:
        allocate(vout(jdg0))
        vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
-       call plain_lanczos_step(vvinit,vout,alfa_,beta_,nitermax,nlanc)
+       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax,nlanc)
        call add_to_lanczos_gf(norm0,groundstate(izero)%egs,nlanc,alfa_,beta_,1,1)
        deallocate(H0,vout,vvinit)
 
 
        !REMOVE ONE PARTICLE UP:
-       !get c_up sector informations:
        jsect0 = getCUPloop(isect0);if(jsect0==0)cycle
        jdg0   = deg(jsect0)
        jn0    = getin(jsect0)
        js0    = getis(jsect0)
        print*,'sector C_up|gs>',jn0,js0,jdg0
-       !allocate c_up|gs> vector:
        allocate(vvinit(jdg0));vvinit=0.d0
-       !build c_up|gs> vector:
        do m=1,idg0              !loop over |gs> components m
           i=nmap(isect0,m)      !map m to full-Hilbert space state i
           call bdecomp(i,ib)    !decompose i into number representation ib=|1/0,1/0,1/0...>
@@ -352,16 +348,14 @@ contains
              vvinit(j) = sgn*groundstate(izero)%vec(m)             !build the c_up|gs> state
           endif
        enddo
-       !normalize the c_up|gs> state
        norm0=sqrt(dot_product(vvinit,vvinit))
        vvinit=vvinit/norm0
-       !get cdg_up-sector Hamiltonian
        allocate(H0(jdg0,jdg0))
        call imp_geth(jsect0,H0)
-       !Tri-diagonalize w/ Lanczos the resolvant:
        allocate(vout(jdg0))
        vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
-       call plain_lanczos_step(vvinit,vout,alfa_,beta_,nitermax,nlanc)
+       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax,nlanc)
+       !call plain_lanczos_step(vvinit,vout,alfa_,beta_,nitermax,nlanc,threshold=0.d0,iverbose=.true.)
        call add_to_lanczos_gf(norm0,groundstate(izero)%egs,nlanc,alfa_,beta_,-1,1)
        deallocate(H0,vout,vvinit)
 
@@ -389,6 +383,32 @@ contains
     deallocate(wm,wr)
     deallocate(lanc_giw,lanc_gwr)
   end subroutine lanc_getgf
+
+
+  subroutine plain_lanczos_tridiag(vin,alfa,beta,Nitermax,Nlanc)
+    real(8),dimension(:),intent(inout)        :: vin
+    real(8),dimension(size(vin))              :: vout
+    integer                                   :: i,nitermax,ierr
+    real(8),dimension(nitermax+1),intent(inout) :: alfa,beta 
+    integer                                   :: iter,nlanc
+    real(8)                                   :: a_,b_,diff
+    real(8),dimension(Nitermax,Nitermax)      :: Z
+    real(8),dimension(Nitermax)               :: diag,subdiag,esave
+    a_=0.d0
+    b_=0.d0
+    nlanc=0
+    lanc_loop: do iter=1,nitermax
+       call plain_lanczos_iteration(iter,vin,vout,a_,b_)
+       print*,""
+       write(*,*)"Lanczos iteration:",iter    
+       if(abs(b_)<1.d-12)exit lanc_loop
+       nlanc=nlanc+1
+       print*,"alfa,beta=",a_,b_
+       alfa(iter)=a_
+       beta(iter+1)=b_
+    enddo lanc_loop
+  end subroutine plain_lanczos_tridiag
+
 
 
 
