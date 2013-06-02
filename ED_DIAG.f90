@@ -3,12 +3,14 @@
 !New ordering of the sites:|ImpUP,BathUP;,ImpDW,BathDW >
 !########################################################################
 include "arpack_lanczos.f90"
+include "plain_lanczos.f90" 
 module ED_GSVEC
   USE ED_VARS_GLOBAL
   implicit none
   integer :: numzero
   integer,dimension(:),allocatable :: iszero
   type gstate
+     real(8)                      :: egs
      real(8),dimension(:),pointer :: vec
   end type gstate
   type(gstate),dimension(:),allocatable :: groundstate
@@ -23,6 +25,7 @@ module ED_DIAG
   USE ED_GETH
   USE ED_GETGF
   USE ED_GETOBS
+  use lanczos_simple
   implicit none
   private
 
@@ -30,6 +33,8 @@ module ED_DIAG
   public :: ed_solver
 
   real(8),dimension(:,:),allocatable :: H0
+  real(8),dimension(:),allocatable :: wm,tau,wr
+  complex(8),dimension(:,:),allocatable :: lanc_Giw,lanc_Gwr
 
 contains
 
@@ -130,6 +135,8 @@ contains
     integer :: Nitermax,Neigen,n0,s0,isect0,idg0,izero
     real(8) :: oldzero,enemin
     !
+    !
+    !
     !#LANCZOS
     if(.not.allocated(iszero))allocate(iszero(Nsect))
     if(.not.allocated(groundstate))allocate(groundstate(Nsect))
@@ -138,23 +145,23 @@ contains
     iszero=0
     !#LANCZOS
     !
+    !
+    !
     e0=0.d0
     call msg("Get Hamiltonian:",unit=LOGfile)
     call start_timer
     do isloop=startloop,lastloop
        call eta(isloop,lastloop,file="ETA_diag.ed")
        idg=deg(isloop)
-       call imp_geth(isloop)
-       !
-       !#LANCZOS
-       allocate(H0(idg,idg))
-       H0=espace(isloop)%M
-       !#LANCZOS
-       !
+       call imp_geth(isloop,espace(isloop)%M(:,:))
        call matrix_diagonalize(espace(isloop)%M,espace(isloop)%e,'V','U')
        if(isloop >=startloop)e0(isloop)=minval(espace(isloop)%e)
        !
+       !
+       !
        !#LANCZOS
+       allocate(H0(idg,idg))
+       call imp_geth(isloop,H0)
        if(idg>1)then
           Neigen=1
           Nitermax=min(idg,512)
@@ -167,6 +174,7 @@ contains
              oldzero=enemin
              allocate(groundstate(numzero)%vec(idg))
              groundstate(numzero)%vec(1:idg)=evec(1:idg,1)
+             groundstate(numzero)%egs=enemin
           elseif(abs(enemin-oldzero) <= 1.d-9)then
              numzero=numzero+1
              if (numzero > Nsect) stop 'too many gs'
@@ -174,6 +182,7 @@ contains
              oldzero=min(oldzero,enemin)
              allocate(groundstate(numzero)%vec(idg))
              groundstate(numzero)%vec(1:idg)=evec(1:idg,1)
+             groundstate(numzero)%egs=enemin
           endif
           write(*,*)isloop,eval(1),getin(isloop),getis(isloop)
           deallocate(Eval,Evec)
@@ -181,8 +190,12 @@ contains
        deallocate(H0)
        !#LANCZOS
        !
+       !
+       !
     enddo
 
+    !
+    !
     !
     !#LANCZOS    
     print*,"numzero=",numzero
@@ -196,20 +209,29 @@ contains
        do j=1,idg0
           print*,groundstate(izero)%vec(j),espace(isect0)%M(j,1)
        enddo
+       print*,groundstate(izero)%egs
     enddo
     !#LANCZOS
+    !
+    !
     !
     call stop_timer
     call findgs(e0)
 
     !
-    !#LANCZOS    
+    !
+    !
+    !#LANCZOS   
     call lanc_getgf()
     !#LANCZOS
+    !
+    !
     !
     return
   end subroutine imp_diag
 
+  !
+  !
   !
   !#LANCZOS
   subroutine HtimesV(N,v,Hv)
@@ -219,41 +241,179 @@ contains
     call dgemv('N',n,n,1.d0,H0,n,v,1,0.d0,Hv,1)
   end subroutine HtimesV
 
-
   subroutine lanc_getgf()
-    integer :: i,izero,isect0,jsect0,m
+    integer :: i,izero,isect0,jsect0,m,j
     integer :: in0,is0,idg0
     integer :: jn0,js0,jdg0
-    real(8) :: norm0,sgn
-    integer :: ib(N),k,r
-    real(8),allocatable :: vvinit(:)
-    do izero=1,numzero       
+    real(8) :: norm0,sgn,gs,nup,ndw
+    integer :: ib(N),k,r,Nlanc,Nitermax
+    real(8) :: factor
+    real(8),allocatable :: vvinit(:),alfa_(:),beta_(:),vout(:)
+
+    call plain_lanczos_set_htimesv(HtimesV)
+
+    allocate(lanc_giw(Nspin,NL),lanc_gwr(Nspin,Nw))
+    lanc_giw=zero
+    lanc_gwr=zero
+
+    !Freq. arrays
+    allocate(wm(NL))
+    wm    = pi/beta*real(2*arange(1,NL)-1,8)
+    allocate(wr(Nw))
+    wr    = linspace(wini,wfin,Nw)
+
+    Nitermax=250!min(jdg0,512)
+    allocate(alfa_(Nitermax),beta_(Nitermax))
+
+    factor=real(numzero,8)
+
+    nsimp  = 0.d0
+    nupimp = 0.d0
+    ndwimp = 0.d0
+    dimp   = 0.d0
+    magimp = 0.d0
+    m2imp  = 0.d0
+
+    do izero=1,numzero   
+       !GET THE GROUNDSTATE (make some checks)
        norm0=sqrt(dot_product(&
             groundstate(izero)%vec,groundstate(izero)%vec))
        if(norm0-1.d0>1.d-9)print*,"GS",izero,"is not normalized:",norm0
-
        isect0 = iszero(izero)
-       in0 = getin(isect0) ; is0 = getis(isect0) ; idg0 = deg(isect0)
+       in0    = getin(isect0)
+       is0    = getis(isect0)
+       idg0   = deg(isect0)
 
-       !ADD ONE PARTICLE UP:
-       jsect0 = getCDAGUPloop(isect0);if(jsect0==0)cycle
-       jdg0 = deg(jsect0)
-       print*,'sector C^+_up|gs>',getin(jsect0),getis(jsect0),jdg0
 
-       allocate(vvinit(jdg0))
        do i=1,idg0
           m=nmap(isect0,i)
           call bdecomp(m,ib)
-          if(ib(1)==0)then
-             call cdg(1,k,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r)    
-             vvinit(r) = sgn*groundstate(izero)%vec(i)
+          nup=real(ib(1),8)
+          ndw=real(ib(1+Ns),8)
+          gs=groundstate(izero)%vec(i)
+          nsimp  = nsimp  +  (nup+ndw)*gs**2
+          nupimp = nupimp +  (nup)*gs**2
+          ndwimp = ndwimp +  (ndw)*gs**2
+          dimp   = dimp   +  (nup*ndw)*gs**2
+          magimp = magimp +  (nup-ndw)*gs**2
+          m2imp  = m2imp  +  gs**2*(nup-ndw)**2
+       enddo
+
+
+       !ADD ONE PARTICLE UP:
+       !get cdg_up sector informations:
+       jsect0 = getCDGUPloop(isect0);if(jsect0==0)cycle
+       jdg0   = deg(jsect0)
+       jn0    = getin(jsect0)
+       js0    = getis(jsect0)
+       print*,'sector C^+_up|gs>',jn0,js0,jdg0
+       !allocate cdg_ip|gs> vector:
+       allocate(vvinit(jdg0));vvinit=0.d0
+       !build cdg_up|gs> vector:
+       do m=1,idg0              !loop over |gs> components m
+          i=nmap(isect0,m)      !map m to full-Hilbert space state i
+          call bdecomp(i,ib)    !decompose i into number representation ib=|1/0,1/0,1/0...>
+          if(ib(1)==0)then      !if impurity is empty: proceed
+             call cdg(1,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r) !apply cdg_up (1), bring from i to r
+             j=invnmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
+             vvinit(j) = sgn*groundstate(izero)%vec(m)             !build the cdg_up|gs> state
           endif
        enddo
+       !normalize the cdg_up|gs> state
        norm0=sqrt(dot_product(vvinit,vvinit))
        vvinit=vvinit/norm0
-       deallocate(vvinit)
+       !get cdg_up-sector Hamiltonian
+       allocate(H0(jdg0,jdg0))
+       call imp_geth(jsect0,H0)
+       !Tri-diagonalize w/ Lanczos the resolvant:
+       allocate(vout(jdg0))
+       vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
+       call plain_lanczos_step(vvinit,vout,alfa_,beta_,nitermax,nlanc)
+       call add_to_lanczos_gf(norm0,groundstate(izero)%egs,nlanc,alfa_,beta_,1,1)
+       deallocate(H0,vout,vvinit)
+
+
+       !REMOVE ONE PARTICLE UP:
+       !get c_up sector informations:
+       jsect0 = getCUPloop(isect0);if(jsect0==0)cycle
+       jdg0   = deg(jsect0)
+       jn0    = getin(jsect0)
+       js0    = getis(jsect0)
+       print*,'sector C_up|gs>',jn0,js0,jdg0
+       !allocate c_up|gs> vector:
+       allocate(vvinit(jdg0));vvinit=0.d0
+       !build c_up|gs> vector:
+       do m=1,idg0              !loop over |gs> components m
+          i=nmap(isect0,m)      !map m to full-Hilbert space state i
+          call bdecomp(i,ib)    !decompose i into number representation ib=|1/0,1/0,1/0...>
+          if(ib(1)==1)then      !if impurity is empty: proceed
+             call c(1,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r) !apply c_up (1), bring from i to r
+             j=invnmap(jsect0,r)                                   !map r back to c_up sector jsect0
+             vvinit(j) = sgn*groundstate(izero)%vec(m)             !build the c_up|gs> state
+          endif
+       enddo
+       !normalize the c_up|gs> state
+       norm0=sqrt(dot_product(vvinit,vvinit))
+       vvinit=vvinit/norm0
+       !get cdg_up-sector Hamiltonian
+       allocate(H0(jdg0,jdg0))
+       call imp_geth(jsect0,H0)
+       !Tri-diagonalize w/ Lanczos the resolvant:
+       allocate(vout(jdg0))
+       vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
+       call plain_lanczos_step(vvinit,vout,alfa_,beta_,nitermax,nlanc)
+       call add_to_lanczos_gf(norm0,groundstate(izero)%egs,nlanc,alfa_,beta_,-1,1)
+       deallocate(H0,vout,vvinit)
+
     enddo
+
+    nsimp  = nsimp/factor
+    nupimp = nupimp/factor
+    ndwimp = ndwimp/factor
+    dimp   = dimp/factor
+    magimp = magimp/factor
+    m2imp  = m2imp/factor
+    lanc_giw=lanc_giw/factor
+    lanc_gwr=lanc_gwr/factor
+
+    print*,nsimp,dimp
+
+    do i=1,Nw
+       write(200,*)wr(i),-dimag(lanc_gwr(1,i))/pi
+    enddo
+    rewind(200)
+    do i=1,NL
+       write(300,*)wm(i),dimag(lanc_giw(1,i))
+    enddo
+    rewind(300)
+    deallocate(wm,wr)
+    deallocate(lanc_giw,lanc_gwr)
   end subroutine lanc_getgf
+
+
+
+  subroutine add_to_lanczos_gf(vnorm,emin,nlanc,alanc,blanc,isign,ispin)
+    real(8),dimension(:)                         :: alanc,blanc 
+    real(8),dimension(size(alanc),size(alanc))   :: Z
+    real(8),dimension(size(alanc))               :: diag,subdiag
+    real(8) :: vnorm,emin
+    integer :: i,j,isign,ispin,ierr,Nlanc
+    diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
+    forall(i=1:Nlanc)Z(i,i)=1.d0
+    diag(1:Nlanc)    = alanc(1:Nlanc)
+    subdiag(2:Nlanc) = blanc(2:Nlanc)
+    call tql2(Nlanc,diag,subdiag,Z,ierr)
+    do i=1,NL
+       do j=1,nlanc
+          lanc_giw(ispin,i)=lanc_giw(ispin,i) + vnorm**2*Z(1,j)**2/(xi*wm(i) - isign*(diag(j)-emin))
+       enddo
+    enddo
+    do i=1,Nw
+       do j=1,nlanc
+          lanc_gwr(ispin,i)=lanc_gwr(ispin,i) + vnorm**2*Z(1,j)**2/(dcmplx(wr(i),eps)-isign*(diag(j)-emin))
+       enddo
+    enddo
+  end subroutine add_to_lanczos_gf
   !#LANCZOS
   !
 
@@ -296,13 +456,13 @@ contains
        getCUPloop(isloop)=jsloop
     enddo
 
-    getCDAGUPloop=0
+    getCDGUPloop=0
     do isloop=1,Nsect
        if(isloop > getloop(N-1,-1))cycle
        in=getin(isloop);is=getis(isloop)
        jn=in+1;js=is+1;if(abs(js) > jn)cycle
        jsloop=getloop(jn,js)
-       getCDAGUPloop(isloop)=jsloop
+       getCDGUPloop(isloop)=jsloop
     enddo
 
     getCDWloop=0
@@ -314,13 +474,13 @@ contains
        getCDWloop(isloop)=jsloop
     enddo
 
-    getCDAGDWloop=0
+    getCDGDWloop=0
     do isloop=1,Nsect
        if(isloop > getloop(N-1,1))cycle
        in=getin(isloop);is=getis(isloop)
        jn=in+1;js=is-1;if(abs(js) > jn)cycle
        jsloop=getloop(jn,js)
-       getCDAGDWloop(isloop)=jsloop
+       getCDGDWloop(isloop)=jsloop
     enddo
     return
   end subroutine imp_setup

@@ -47,12 +47,13 @@ MODULE ED_VARS_GLOBAL
   !=========================================================
   integer :: NL,Ltau,Nw,Nfit
 
+
   !Some maps between sectors and full Hilbert space (pointers)
   !=========================================================
   integer,allocatable,dimension(:,:) :: nmap,invnmap
   integer,allocatable,dimension(:,:) :: getloop
   integer,allocatable,dimension(:)   :: getCUPloop,getCDWloop
-  integer,allocatable,dimension(:)   :: getCDAGUPloop,getCDAGDWloop
+  integer,allocatable,dimension(:)   :: getCDGUPloop,getCDGDWloop
   integer,allocatable,dimension(:)   :: deg,getin,getis
   integer                            :: startloop,lastloop
 
@@ -270,7 +271,7 @@ contains
     allocate(deg(Nsect),getin(Nsect),getis(Nsect))
     allocate(getloop(N,-N:N))
     allocate(getCUPloop(Nsect),getCDWloop(Nsect))
-    allocate(getCDAGUPloop(Nsect),getCDAGDWloop(Nsect))
+    allocate(getCDGUPloop(Nsect),getCDGDWloop(Nsect))
   end subroutine allocate_system_structure
 
 

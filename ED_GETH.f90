@@ -17,18 +17,21 @@ contains
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine imp_geth(isloop)
+  subroutine imp_geth(isloop,h)
     integer                  :: ib(N)
     integer                  :: idg
     integer                  :: i,j,k,r,m,ms
     integer                  :: kp,isloop
     real(8),dimension(Nbath) :: eup,edw,vup,vdw
     real(8)                  :: ndup,nddw,npup,npdw,nup,ndw,sg1,sg2,tef
-    real(8),pointer          :: h(:,:)
+    real(8)                  :: h(:,:)
 
     idg=deg(isloop)
-    allocate(h(idg,idg))
-    h => espace(isloop)%M
+    if(size(h,1)/=idg)call error("IMP_GETH: wrong dimension 1 of H")
+    if(size(h,2)/=idg)call error("IMP_GETH: wrong dimension 2 of H")
+    !allocate(h(idg,idg))
+    !h => espace(isloop)%M
+
     h=0.d0
 
     eup=ebath(1,:)
@@ -83,6 +86,8 @@ contains
     enddo
     return
   end subroutine imp_geth
+
+
   !*********************************************************************
   !*********************************************************************
   !*********************************************************************

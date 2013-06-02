@@ -5,10 +5,12 @@
 program fullED
   USE DMFT_FULLED
   implicit none
-  integer :: iloop
+  integer :: iloop,Nb
   logical :: converged
   real(8),allocatable    :: wm(:),wr(:)
   real(8)                :: wband,ts
+  !Bath:
+  real(8),allocatable    :: Bath(:)
   !The local hybridization function:
   complex(8),allocatable :: Delta(:)
 
@@ -16,13 +18,18 @@ program fullED
   call read_input("inputED.in")
   call parse_cmd_variable(wband,"wband","D",default=1.d0)
 
-  allocate(delta(NL))
+
   allocate(wm(NL),wr(Nw))
   wm = pi/beta*real(2*arange(1,NL)-1,8)
   wr = linspace(wini,wfin,Nw)
 
-  !Setup solver:
-  call ed_solver(status=-2)
+  !Allocate Weiss Field:
+  allocate(delta(NL))
+
+  !setup solver
+  Nb=get_bath_size()
+  allocate(bath(Nb))
+  call init_ed_solver(bath)
 
   !DMFT loop
   iloop=0;converged=.false.
@@ -31,22 +38,20 @@ program fullED
      call start_loop(iloop,nloop,"DMFT-loop")
 
      !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
-     call ed_solver() 
+     call ed_solver(bath) 
 
      !Get the Weiss field/Delta function to be fitted (user defined)
      call get_delta_bethe
 
      !Perform the SELF-CONSISTENCY by fitting the new bath
-     call chi2_fitgf(delta(:),ebath(1,:),vbath(1,:))
+     call chi2_fitgf(delta(:),bath,ichan=1)
 
      !Check convergence (if required change chemical potential)
      converged = check_convergence(delta(:),eps_error,nsuccess,nloop)
      if(nread/=0.d0)call search_mu(nsimp,converged)
+     if(iloop>nloop)converged=.true.
      call end_loop
   enddo
-
-  !Finalize calculation
-  call ed_solver(status=-1)
 
 
 contains
@@ -61,7 +66,7 @@ contains
 
     do i=1,NL
        iw = xi*wm(i)
-       g0and   = iw + xmu - delta_and(iw,ebath(1,:),vbath(1,:))
+       g0and   = iw + xmu - delta_and(iw,bath,1)
        self(i) = g0and - one/Giw(1,i)
        zita    = iw + xmu - self(i)
        gloc(i) = gfbethe(wm(i),zita,Wband)
@@ -71,7 +76,7 @@ contains
 
     do i=1,Nw
        iw=cmplx(wr(i),eps)
-       g0and    = wr(i) + xmu - delta_and(wr(i)+zero,ebath(1,:),vbath(1,:))
+       g0and    = wr(i) + xmu - delta_and(wr(i)+zero,bath,1)
        selfr(i) = g0and - one/Gwr(1,i)    
        zita     = iw + xmu - selfr(i)
        grloc(i) = gfbether(wr(i),zita,Wband)

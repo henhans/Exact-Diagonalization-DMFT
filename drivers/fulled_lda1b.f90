@@ -3,10 +3,9 @@
 !reading the Hamiltonian model H(k)
 !from a file with the standard
 !wannier90 form.
-!IMPORTANT:
-!The ED solver uses HFmode=.true. by default
-!this means that chemical potential SHOULD NOT
-!include the U/2 shift.
+!IMPORTANT: The ED solver uses HFmode=.true. 
+!by default this means that chemical potential 
+!SHOULD NOT include the U/2 shift.
 program fulled_lda
   USE DMFT_FULLED
   USE FFTGF
@@ -21,6 +20,7 @@ program fulled_lda
   character(len=32)      :: file
   integer                :: ntype
   real(8)                :: nobj
+  logical                :: rerun,bool
   !Bath:
   real(8),allocatable    :: Bath(:)
   !The local hybridization function:
@@ -28,6 +28,40 @@ program fulled_lda
   !Hamiltonian input:
   complex(8),allocatable :: Hk(:,:,:)
   real(8),allocatable    :: fg0(:,:,:)
+
+  !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  call parse_cmd_variable(rerun,"RERUN",default=.false.)
+  if(rerun)then
+     write(*,*)"+RERUN-mode: solve one and exit"
+     call read_input("used.inputED.in")
+     open(10,file=trim(OFILE),status='old')
+     read(10,*)foo,xmu
+     close(10)
+     print*,"mu=",xmu
+     inquire(file=trim(Hfile),exist=BOOL)
+     if(.not.BOOL)then
+        print*,"can't find ",trim(Hfile),". Exiting.."
+        stop
+     endif
+     allocate(wm(NL),wr(Nw),tau(0:Ltau))
+     wm = pi/beta*real(2*arange(1,NL)-1,8)
+     wr = linspace(wini,wfin,Nw)
+     tau = linspace(0.d0,beta,Ltau+1)
+     call read_hk('hkfile.in')
+     !setup solver
+     Nb=get_bath_size()
+     allocate(bath(Nb))
+     call init_ed_solver(bath)
+     !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
+     call ed_solver(bath) 
+     !Get the Weiss field/Delta function to be fitted (user defined)
+     allocate(delta(NL))
+     call get_delta
+     stop
+  endif
+  !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
 
 
   call read_input("inputED.in")
@@ -40,18 +74,8 @@ program fulled_lda
   wr = linspace(wini,wfin,Nw)
   tau = linspace(0.d0,beta,Ltau+1)
 
-  open(50,file=trim(file),status='old')
-  read(50,*)Lk,Norb_d,Norb_p,Nineq,foo
-  Norb=Norb_d+Norb_p
-  allocate(Hk(Norb,Norb,Lk))
-  do ik=1,Lk
-     read(50,"(3(F10.7,1x))")kx,ky,foo
-     do iorb=1,Norb
-        read(50,"(10(2F10.7,1x))")(Hk(iorb,jorb,ik),jorb=1,Norb)
-     enddo
-  enddo
-
-  !Check non-interacting DOS:
+  call read_hk(trim(file))
+  ! !Check non-interacting DOS:
   ! allocate(fg0(NL,Norb,Norb))
   ! do ik=1,Lk
   !    do i=1,NL
@@ -96,6 +120,22 @@ program fulled_lda
 
 contains
 
+
+  subroutine read_hk(file)
+    character(len=*) :: file
+    open(50,file=file,status='old')
+    read(50,*)Lk,Norb_d,Norb_p,Nineq,foo
+    Norb=Norb_d+Norb_p
+    allocate(Hk(Norb,Norb,Lk))
+    do ik=1,Lk
+       read(50,"(3(F10.7,1x))")kx,ky,foo
+       do iorb=1,Norb
+          read(50,"(10(2F10.7,1x))")(Hk(iorb,jorb,ik),jorb=1,Norb)
+       enddo
+    enddo
+  end subroutine read_hk
+
+
   subroutine get_delta
     integer                   :: i,j
     complex(8)                :: iw,zita(2),fg(Norb,Norb)
@@ -127,7 +167,7 @@ contains
 
     do i=1,Nw
        iw=cmplx(wr(i),eps)
-       g0dr(i) = wr(i) + xmu - delta_and(wr(i)+zero,bath,1)
+       g0dr(i) = wr(i) + xmu - delta_and(iw,bath,1)!delta_and(wr(i)+zero,bath,1)
        sdr(i)  = g0dr(i) - one/Gwr(1,i)
        zita(1) = iw + xmu - sdr(i)
        zita(2) = iw + xmu 
