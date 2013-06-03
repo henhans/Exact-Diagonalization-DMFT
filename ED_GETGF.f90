@@ -6,6 +6,9 @@ MODULE ED_GETGF
   USE ED_VARS_GLOBAL
   USE ED_BATH
   USE ED_AUX_FUNX
+  USE ED_GETH
+  USE ED_LANCZOS
+  !
   implicit none
   private 
 
@@ -13,10 +16,119 @@ MODULE ED_GETGF
   !=========================================================
   real(8),dimension(:),allocatable :: wm,tau,wr
 
-  public :: imp_getfunx,imp_getchi
-
+  public :: imp_getfunx
+  public :: lanc_getgf
+  public :: imp_getchi
 
 contains
+
+
+  subroutine lanc_getgf()
+    integer                      :: i,izero,isect0,jsect0,m,j
+    integer                      :: in0,is0,idg0
+    integer                      :: jn0,js0,jdg0
+    real(8)                      :: norm0,sgn,gs,nup,ndw
+    integer                      :: ib(N),k,r,Nlanc,Nitermax
+    real(8)                      :: factor
+    real(8),allocatable          :: vvinit(:),alfa_(:),beta_(:),vout(:)
+
+    call plain_lanczos_set_htimesv(HtimesV)
+    !Initialize some functions
+    Giw   =zero
+    Gwr   =zero
+
+    !Freq. arrays
+    allocate(wm(NL))
+    wm    = pi/beta*real(2*arange(1,NL)-1,8)
+    allocate(wr(Nw))
+    wr    = linspace(wini,wfin,Nw)
+
+    Nitermax=nGFitermax
+
+    allocate(alfa_(Nitermax),beta_(Nitermax))
+    factor=real(numzero,8)
+    do izero=1,numzero   
+       !GET THE GROUNDSTATE (make some checks)
+       norm0=sqrt(dot_product(groundstate(izero)%vec,groundstate(izero)%vec))
+       if(norm0-1.d0>1.d-9)print*,"GS",izero,"is not normalized:",norm0
+       isect0 = iszero(izero)
+       in0    = getin(isect0)
+       is0    = getis(isect0)
+       idg0   = deg(isect0)
+       !ADD ONE PARTICLE UP:
+       !get cdg_up sector informations:
+       jsect0 = getCDGUPloop(isect0);if(jsect0==0)cycle
+       jdg0   = deg(jsect0)
+       jn0    = getin(jsect0)
+       js0    = getis(jsect0)
+       print*,'sector C^+_up|gs>',jn0,js0,jdg0
+       !allocate cdg_ip|gs> vector:
+       allocate(vvinit(jdg0));vvinit=0.d0
+       !build cdg_up|gs> vector:
+       do m=1,idg0              !loop over |gs> components m
+          i=nmap(isect0,m)      !map m to full-Hilbert space state i
+          call bdecomp(i,ib)    !decompose i into number representation ib=|1/0,1/0,1/0...>
+          if(ib(1)==0)then      !if impurity is empty: proceed
+             call cdg(1,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r) !apply cdg_up (1), bring from i to r
+             j=invnmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
+             vvinit(j) = sgn*groundstate(izero)%vec(m)             !build the cdg_up|gs> state
+          endif
+       enddo
+       !normalize the cdg_up|gs> state
+       norm0=sqrt(dot_product(vvinit,vvinit))
+       vvinit=vvinit/norm0
+       !get cdg_up-sector Hamiltonian
+       allocate(H0(jdg0,jdg0))
+       call imp_geth(jsect0,H0)
+       !Tri-diagonalize w/ Lanczos the resolvant:
+       allocate(vout(jdg0))
+       vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
+       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
+       call add_to_lanczos_gf(norm0,groundstate(izero)%egs,nitermax,alfa_,beta_,1,1)
+       deallocate(H0,vout,vvinit)
+
+
+       !REMOVE ONE PARTICLE UP:
+       jsect0 = getCUPloop(isect0);if(jsect0==0)cycle
+       jdg0   = deg(jsect0)
+       jn0    = getin(jsect0)
+       js0    = getis(jsect0)
+       print*,'sector C_up|gs>',jn0,js0,jdg0
+       allocate(vvinit(jdg0));vvinit=0.d0
+       do m=1,idg0              !loop over |gs> components m
+          i=nmap(isect0,m)      !map m to full-Hilbert space state i
+          call bdecomp(i,ib)    !decompose i into number representation ib=|1/0,1/0,1/0...>
+          if(ib(1)==1)then      !if impurity is empty: proceed
+             call c(1,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r) !apply c_up (1), bring from i to r
+             j=invnmap(jsect0,r)                                   !map r back to c_up sector jsect0
+             vvinit(j) = sgn*groundstate(izero)%vec(m)             !build the c_up|gs> state
+          endif
+       enddo
+       norm0=sqrt(dot_product(vvinit,vvinit))
+       vvinit=vvinit/norm0
+       allocate(H0(jdg0,jdg0))
+       call imp_geth(jsect0,H0)
+       allocate(vout(jdg0))
+       vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0
+       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
+       call add_to_lanczos_gf(norm0,groundstate(izero)%egs,nitermax,alfa_,beta_,-1,1)
+       deallocate(H0,vout,vvinit)
+    enddo
+
+    Giw=Giw/factor
+    Gwr=Gwr/factor
+
+    !###########################PRINTING######################################
+    !Print convenience impurity functions:
+    call print_imp_gf
+    deallocate(wm,wr)
+
+  end subroutine lanc_getgf
+
+
+
+
+
 
   !+------------------------------------------------------------------+
   !PURPOSE  : 
@@ -24,14 +136,12 @@ contains
   subroutine imp_getfunx()
     real(8)                      :: cdgmat,matcdg
     integer,dimension(N)         :: ib(N)
-    integer                      :: i,j,k,r,ll,m,in,is,ispin,unit(6)
+    integer                      :: i,j,k,r,ll,m,in,is,ispin
     integer                      :: idg,jdg,isloop,jsloop,ia
     real(8)                      :: Ei,Ej
     real(8)                      :: cc,spin1,peso1
     real(8)                      :: expterm,peso,de,w0,it,chij1
     complex(8)                   :: iw
-    complex(8),dimension(1:2,NL) :: G0iw
-    complex(8),dimension(1:2,Nw) :: G0wr
     !----------------------------------------------
     !<i|C^+|j>=<in,is,idg|C^+|jn,js,jdg>=C^+_{ij} |
     !----------------------------------------------
@@ -147,6 +257,19 @@ contains
 
     !###########################PRINTING######################################
     !Print convenience impurity functions:
+    call print_imp_gf
+    deallocate(wm,tau,wr)
+
+  end subroutine imp_getfunx
+
+
+
+  subroutine print_imp_gf
+    integer                      :: i,j,ispin,unit(6)
+    complex(8)                   :: iw
+    complex(8),dimension(1:2,NL) :: G0iw
+    complex(8),dimension(1:2,Nw) :: G0wr
+
     unit(1)=free_unit()
     open(unit(1),file=trim(GMfile))
     unit(2)=free_unit()
@@ -186,13 +309,8 @@ contains
     do i=1,6
        close(unit(i))
     enddo
-    deallocate(wm,tau,wr)
 
-  end subroutine imp_getfunx
-
-
-
-
+  end subroutine print_imp_gf
 
   !*********************************************************************
   !*********************************************************************
@@ -221,7 +339,6 @@ contains
     tau   = linspace(0.d0,beta,Ltau+1)
     allocate(wr(Nw))
     wr    = linspace(wini,wfin,Nw)
-
 
     chitau=0.d0
     chiw=zero
@@ -264,7 +381,6 @@ contains
     enddo
     call stop_timer
 
-
     !###########################PRINTING######################################
     unit(1)=free_unit()
     open(unit(1),file=trim(CTfile))
@@ -282,9 +398,35 @@ contains
   end subroutine imp_getchi
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine add_to_lanczos_gf(vnorm,emin,nlanc,alanc,blanc,isign,ispin)
+    real(8),dimension(nlanc)                         :: alanc,blanc 
+    real(8),dimension(size(alanc),size(alanc))   :: Z
+    real(8),dimension(size(alanc))               :: diag,subdiag
+    real(8) :: vnorm,emin
+    integer :: i,j,isign,ispin,ierr,Nlanc
+    diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
+    forall(i=1:Nlanc)Z(i,i)=1.d0
+    diag(1:Nlanc)    = alanc(1:Nlanc)
+    subdiag(2:Nlanc) = blanc(2:Nlanc)
+    call tql2(Nlanc,diag,subdiag,Z,ierr)
+    do i=1,NL
+       do j=1,nlanc
+          Giw(ispin,i)=Giw(ispin,i) + vnorm**2*Z(1,j)**2/(xi*wm(i) - isign*(diag(j)-emin))
+       enddo
+    enddo
+    do i=1,Nw
+       do j=1,nlanc
+          Gwr(ispin,i)=Gwr(ispin,i) + vnorm**2*Z(1,j)**2/(dcmplx(wr(i),eps)-isign*(diag(j)-emin))
+       enddo
+    enddo
+  end subroutine add_to_lanczos_gf
+
+
 
 
 end MODULE ED_GETGF

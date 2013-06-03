@@ -39,6 +39,7 @@ MODULE ED_VARS_GLOBAL
   logical :: HFmode         !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
   real(8) :: cutoff         !cutoff for spectral summation
   real(8) :: eps_error      !
+  integer :: nGFitermax     !Max number of iteration in resolvant tri-diagonalization
   integer :: cgNitmax       !Max number of iteration in the fit
   real(8) :: cgFtol         !Tolerance in the cg fit
   integer :: cgType         !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
@@ -145,6 +146,7 @@ contains
     cutoff     = 1.d-9
     eps_error  = 1.d-5
     nsuccess   = 2
+    nGFitermax = 100
     cgNitmax   = 1000
     cgFtol     = 1.d-9
     cgType     = 0
@@ -194,6 +196,7 @@ contains
     call parse_cmd_variable(eps,"EPS")
     call parse_cmd_variable(cutoff,"CUTOFF")
     call parse_cmd_variable(heff,"HEFF")
+    call parse_cmd_variable(nGFitermax,"NGFITERMAX")
     call parse_cmd_variable(cgNitmax,"CGNITMAX")
     call parse_cmd_variable(cgFtol,"CGFTOL")
     call parse_cmd_variable(cgType,"CGTYPE")
