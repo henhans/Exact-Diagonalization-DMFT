@@ -1,24 +1,30 @@
+!########################################################################
+!PROGRAM  : ED_AUX_FUNX
+!AUTHORS  : Adriano Amaricci
+!########################################################################
 MODULE ED_AUX_FUNX
-  !########################################################################
-  !PROGRAM  : FUNCS_GLOBAL
-  !TYPE     : Module
-  !PURPOSE  : Constructs some functions used in other places. 
-  !AUTHORS  : Adriano Amaricci
-  !LAST UPDATE: 10/2009
-  !########################################################################
   USE ED_VARS_GLOBAL
   implicit none
   private
-  public :: imp_sectorns,bdecomp,cdg,c,delta_and
-  public :: init_bath_ed,search_mu
+  public :: imp_sectorns
+  public :: bdecomp
+  public :: c,cdg
+  public :: search_mu
 
 contains
 
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine search_mu(ntmp,convergence)
     logical,intent(inout) :: convergence
     real(8)               :: ntmp
     logical               :: check
     integer,save          :: count=0
+    integer,save          :: nindex=0
+    real(8)               :: ndelta1,nindex1
     if(count==0)then
        inquire(file="searchmu_file.restart",exist=check)
        if(check)then
@@ -37,7 +43,7 @@ contains
     else
        nindex=0
     endif
-    if(nindex1+nindex==0)then !avoid loop forth and back
+    if(nindex1+nindex==0.AND.nindex/=0)then !avoid loop forth and back
        ndelta=ndelta1/2.d0 !decreasing the step       
     else
        ndelta=ndelta1
@@ -49,55 +55,20 @@ contains
     print*,""
     if(abs(ntmp-nread)>nerr)then
        convergence=.false.
-    else
-       convergence=.true.
+       ! else
+       !    convergence=.true.
     endif
     print*,""
     print*,"Convergence:",convergence
     print*,""
-    open(10,file="searchmu_file.restart")
+    open(10,file="searchmu_file.restart.new")
     write(10,*)ndelta,nindex
     close(10)
   end subroutine search_mu
 
-  !+------------------------------------------------------------------+
-  !PURPOSE  : Initialize the DMFT loop, builindg H parameters and/or 
-  !reading previous (converged) solution
-  !+------------------------------------------------------------------+
-  subroutine init_bath_ed
-    integer :: i
-    logical :: IOfile
-    !Initialize the parameter for every mu-loop                  
-    inquire(file=trim(Hfile),exist=IOfile)
-    if(.NOT.IOfile)then
-       write(*,"(A)")bg_red('Generating bath from scratch')
-       call guess_bath_params
-    else
-       write(*,"(A)")bg_red('Reading bath/xmu from file')
-       open(51,file=trim(Hfile))
-       read(51,*)xmu
-       do i=1,Nbath
-          read(51,*)epsiup(i),epsidw(i),vup(i),vdw(i)
-       enddo
-       close(51)
-    endif
-  end subroutine init_bath_ed
 
 
 
-  !+------------------------------------------------------------------+
-  !PURPOSE  : Build the parameters for the Hamiltonian
-  !+------------------------------------------------------------------+
-  subroutine guess_bath_params
-    integer :: i,n2
-    n2=Nbath/2;if(n2==0)n2=1
-    do i=0,Nbath-1            !(1->NC=Nbath/2=#sites in each Bath)
-       epsiup(i+1)=2.d0*dfloat(i-1-n2)/dfloat(n2) !d/2.d0+heff
-       vup(i+1)=dsqrt(1.d0/dfloat(Nbath)) !d**2/4.
-       epsidw(i+1)=epsiup(i+1)
-       vdw(i+1)=vup(i+1)
-    enddo
-  end subroutine guess_bath_params
 
 
 
@@ -141,18 +112,12 @@ contains
     enddo
     return
   end subroutine imp_sectorns
-  !==================================================================
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
 
 
   !+------------------------------------------------------------------+
-  !PROGRAM  : bdecomp
-  !TYPE     : subroutine
   !PURPOSE  : input a state |i> and output a vector ivec(N)
   !with its binary decomposition
   !(corresponds to the decomposition of the number i-1)
@@ -170,17 +135,11 @@ contains
     enddo
     return 
   end subroutine bdecomp
-  !=======================================================================
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
 
   !+-------------------------------------------------------------------+
-  !PROGRAM  : C
-  !TYPE     : subroutine
   !PURPOSE  : input state |i> of the basis and calculates |j>=Cm|i>
   !the sign of j has the phase convention
   !m labels the sites
@@ -206,17 +165,11 @@ contains
     endif
     return
   end subroutine c
-  !=======================================================================
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
 
   !+-------------------------------------------------------------------+
-  !PROGRAM  : CDG
-  !TYPE     : subroutine
   !PURPOSE  : input state |i> of the basis and calculates |j>=Cm+|i>
   !the sign of j has the phase convention
   !m labels the sites
@@ -242,36 +195,17 @@ contains
     endif
     return
   end subroutine cdg
-  !=======================================================================
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
 
-  pure function delta_and(x,epsi,vi) result(fg)
-    complex(8),intent(in)            :: x
-    real(8),dimension(:),intent(in)  :: epsi,vi
-    complex(8)                       :: fg
-    integer                          :: i
-    fg=zero
-    do i=1,size(epsi)
-       fg=fg+vi(i)**2/(x-epsi(i))
-    enddo
-  end function delta_and
 
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
   ! !+------------------------------------------------------------------+
-  ! !PROGRAM  : 
-  ! !TYPE     : subroutine
   ! !PURPOSE  : 
   ! !+------------------------------------------------------------------+
   ! subroutine getloop_range(initloop)
@@ -296,8 +230,5 @@ contains
   !      endif
   !   enddo
   ! end subroutine getloop_range
-  ! !*********************************************************************
-  ! !*********************************************************************
-  ! !*********************************************************************
 
 END MODULE ED_AUX_FUNX

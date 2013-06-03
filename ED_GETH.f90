@@ -5,7 +5,8 @@
 !########################################################################
 MODULE ED_GETH
   USE ED_VARS_GLOBAL
-  USE ED_AUX_FUNX, only: cdg,c,bdecomp
+  USE ED_BATH
+  USE ED_AUX_FUNX
   implicit none
   private
   public :: imp_geth
@@ -14,40 +15,44 @@ MODULE ED_GETH
 contains
 
   !+------------------------------------------------------------------+
-  !PROGRAM  : 
-  !TYPE     : subroutine
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine imp_geth(isloop)
-    !LOCAL VARIABLES
-    !Configuration vector
-    integer :: ib(N)
-    integer :: idg
-    integer :: i,j,k,r,m,ms
-    integer :: kp,isloop
-    integer :: NR
-    real(8) :: ndup,nddw,npup,npdw,nup,ndw,sg1,sg2,tef
-    real(8),pointer :: h(:,:)
+  subroutine imp_geth(isloop,h)
+    integer                  :: ib(N)
+    integer                  :: idg
+    integer                  :: i,j,k,r,m,ms
+    integer                  :: kp,isloop
+    real(8),dimension(Nbath) :: eup,edw,vup,vdw
+    real(8)                  :: ndup,nddw,npup,npdw,nup,ndw,sg1,sg2,tef
+    real(8)                  :: h(:,:)
 
     idg=deg(isloop)
-    allocate(h(idg,idg))
-    h => espace(isloop)%M
+    if(size(h,1)/=idg)call error("IMP_GETH: wrong dimension 1 of H")
+    if(size(h,2)/=idg)call error("IMP_GETH: wrong dimension 2 of H")
+    !allocate(h(idg,idg))
+    !h => espace(isloop)%M
+
     h=0.d0
 
-    NR=Nimp + 1
+    eup=ebath(1,:)
+    vup=vbath(1,:)
+    edw=eup
+    vdw=vup
+    if(Nspin==2)then
+       edw=ebath(2,:)
+       vdw=vbath(2,:)
+    endif
+
     do i=1,idg
        m=nmap(isloop,i)
        call bdecomp(m,ib)
 
        if(Nimp==1)then
-          nup=real(ib(1),8)
-          ndw=real(ib(1+Ns),8)
-          !Diagonal part
-          h(i,i)=(-xmu+ed0)*(nup+ndw) + u*(nup-0.5d0)*(ndw-0.5d0) + heff*(nup-ndw)
-          !energy of the bath=\sum_{n=1,N}\e_l n_l
+          nup=real(ib(1),8) ; ndw=real(ib(1+Ns),8)
+          h(i,i)=-xmu*(nup+ndw) + u*(nup-0.5d0)*(ndw-0.5d0) + heff*(nup-ndw)
           do kp=2,Ns
-             h(i,i)=h(i,i)+epsiup(kp-1)*real(ib(kp),8)
-             h(i,i)=h(i,i)+epsidw(kp-1)*real(ib(kp+Ns),8)
+             h(i,i)=h(i,i)+eup(kp-1)*real(ib(kp),8)
+             h(i,i)=h(i,i)+edw(kp-1)*real(ib(kp+Ns),8)
           enddo
           !NON-Diagonal part
           do ms=2,Ns
@@ -70,20 +75,13 @@ contains
           enddo
 
        elseif(Nimp==2)then
-          ndup=dble(ib(1))
-          nddw=dble(ib(1+Ns))
-          npup=dble(ib(2))
-          npdw=dble(ib(2+Ns))
-          !Diagonal part
-          h(i,i)=(-xmu+ed0)*(ndup+nddw)    &
-               +u*(ndup-0.5d0)*(nddw-0.5d0)&
-               +heff*(ndup-nddw)           &  
-               +(-xmu)*(npup+npdw)         &
-               + heff*(npup-npdw)
-          !energy of the bath=\sum_{n=1,N}\e_l n_l
+          ndup=dble(ib(1)) ; nddw=dble(ib(1+Ns))
+          npup=dble(ib(2)) ; npdw=dble(ib(2+Ns))
+          h(i,i)= -xmu*(ndup+nddw) + u*(ndup-0.5d0)*(nddw-0.5d0) + heff*(ndup-nddw) &
+               + (-xmu+ep0)*(npup+npdw) + heff*(npup-npdw)
           do kp=3,Ns
-             h(i,i)=h(i,i)+epsiup(kp-2)*(dfloat(ib(kp)))
-             h(i,i)=h(i,i)+epsidw(kp-2)*(dfloat(ib(kp+Ns)))
+             h(i,i)=h(i,i)+eup(kp-2)*real(ib(kp),8)
+             h(i,i)=h(i,i)+edw(kp-2)*real(ib(kp+Ns),8)
           enddo
           !NON-Diagonal part       
           !UP-SPIN PART
@@ -129,6 +127,8 @@ contains
     enddo
     return
   end subroutine imp_geth
+
+
   !*********************************************************************
   !*********************************************************************
   !*********************************************************************

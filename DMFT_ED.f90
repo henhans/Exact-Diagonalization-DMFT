@@ -1,0 +1,7 @@
+module DMFT_ED
+  USE ED_VARS_GLOBAL
+  USE ED_BATH
+  USE ED_AUX_FUNX, only: search_mu
+  USE ED_CHI2FIT
+  USE ED_DIAG
+end module DMFT_ED

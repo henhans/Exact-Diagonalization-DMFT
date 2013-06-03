@@ -2,24 +2,55 @@
 !PURPOSE  : Perform the \Chi^2 fit procedure on the Delta function
 !########################################################################
 MODULE ED_CHI2FIT
-  USE CGFIT
   USE ED_VARS_GLOBAL
-  USE ED_AUX_FUNX, ONLY:delta_and
+  USE ED_BATH
+  USE ED_AUX_FUNX
   implicit none
   private
 
   public :: chi2_fitgf
 
+  integer                             :: Ldelta
+  complex(8),dimension(:),allocatable :: Fdelta
+  real(8),dimension(:),allocatable    :: Xdelta
 contains
 
   !+-------------------------------------------------------------+
   !PURPOSE  : 
   !+-------------------------------------------------------------+
-  subroutine chi2_fitgf(fdelta,epsi,vi)
-    complex(8),dimension(:) :: fdelta
-    real(8),dimension(:)    :: epsi,vi
-    call fitgreen(wm(1:Nfit),fdelta(1:Nfit),epsi,vi)
-    call dump_fit_result(fdelta(1:Nfit),epsi,vi)
+  subroutine chi2_fitgf(fg,bath,ichan)
+    complex(8),dimension(:)            :: fg
+    real(8),dimension(:),intent(inout) :: bath
+    integer                            :: ichan
+    real(8),dimension(2*Nbath)         :: a
+    integer                            :: iter
+    real(8)                            :: chi
+    !
+    call msg("FIT Delta function:",unit=LOGfile)
+    call check_bath_dimension(bath)
+    call allocate_bath
+    call set_bath(bath)
+
+    Ldelta = size(fg)
+    allocate(fdelta(Ldelta))
+    allocate(xdelta(Ldelta))
+    Fdelta = fg
+    Xdelta = pi/beta*dble(2*arange(1,Ldelta)-1)
+
+    a(1:Nbath)           = ebath(ichan,:)
+    a(Nbath+1:2*Nbath)   = vbath(ichan,:)
+    !
+    call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cgNitmax,ftol=cgFtol)
+    !
+    ebath(ichan,:) = a(1:Nbath)
+    vbath(ichan,:) = a(Nbath+1:2*Nbath)
+
+    write(*,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
+    print*," "
+    call dump_fit_result(ichan)
+    bath = copy_bath()
+    call deallocate_bath
+    deallocate(Fdelta,Xdelta)
   end subroutine chi2_fitgf
 
 
@@ -28,19 +59,117 @@ contains
   !********************************************************************
 
 
+
+
+  function chi2(x)
+    real(8),dimension(:)  ::  x
+    real(8)               ::  chi2
+    integer               ::  i
+    complex(8)            ::  g0(Ldelta)
+    chi2 = 0.d0 
+    do i=1,Ldelta   !Number of freq. in common to the module
+       g0(i)   = gand(xdelta(i),x)
+    enddo
+    select case(CGtype)
+    case(0)
+       do i=1,Ldelta   !Number of freq. in common to the module
+          chi2 = chi2 + abs(fdelta(i)-g0(i))**2
+       end do
+    case(1)
+       do i=1,Ldelta   !Number of freq. in common to the module
+          chi2 = chi2 + abs(fdelta(i)-g0(i))**2/dble(i)
+       end do
+    case(2)
+       do i=1,Ldelta   !Number of freq. in common to the module
+          chi2 = chi2 + abs(fdelta(i)-g0(i))**2/dble(xdelta(i))
+       end do
+
+    end select
+  end function chi2
+
+  function dchi2(x)
+    real(8),dimension(:)                 :: x
+    real(8),dimension(size(x))           :: dchi2,df
+    integer                              :: i,j
+    complex(8)                           :: g0(Ldelta)
+    complex(8),dimension(Ldelta,size(x)) :: dg0
+    df=0.d0
+    do i=1,Ldelta
+       g0(i)    = gand(xdelta(i),x)
+       dg0(i,:) = grad_gand(xdelta(i),x)
+    enddo
+    select case(CGtype)
+    case(0)
+       do j=1,size(x)
+          do i=1,Ldelta
+             df(j) = df(j)+(dreal(fdelta(i))-dreal(g0(i)))*dreal(dg0(i,j)) + &
+                  (dimag(fdelta(i))-dimag(g0(i)))*dimag(dg0(i,j))
+          enddo
+       enddo
+    case(1)
+       do j=1,size(x)
+          do i=1,Ldelta
+             df(j) = df(j)+(dreal(fdelta(i))-dreal(g0(i)))*dreal(dg0(i,j)) + &
+                  (dimag(fdelta(i))-dimag(g0(i)))*dimag(dg0(i,j))/dble(i)
+          enddo
+       enddo
+    case(2)
+       do j=1,size(x)
+          do i=1,Ldelta
+             df(j) = df(j)+(dreal(fdelta(i))-dreal(g0(i)))*dreal(dg0(i,j)) + &
+                  (dimag(fdelta(i))-dimag(g0(i)))*dimag(dg0(i,j))/dble(xdelta(i))
+          enddo
+       enddo
+    end select
+    dchi2 = -2.d0*df
+  end function dchi2
+
+  function gand(w,a) result(gg)
+    real(8)                :: w
+    real(8),dimension(:)   :: a
+    real(8),dimension(size(a)/2) :: eps,vps
+    complex(8)             :: gg
+    integer                :: i,Nb
+    Nb=size(a)/2
+    eps=a(1:Nb)
+    vps=a(Nb+1:2*Nb)
+    gg=zero
+    do i=1,Nb
+       gg=gg+vps(i)**2/(xi*w-eps(i))
+    enddo
+  end function gand
+
+  function grad_gand(w,a) result(dgz)
+    real(8)                         :: w
+    real(8),dimension(:)            :: a
+    real(8),dimension(size(a)/2)    :: eps,vps
+    complex(8),dimension(size(a))   :: dgz
+    integer                         :: i,Nb
+    dgz=zero
+    Nb=size(a)/2
+    eps=a(1:Nb)
+    vps=a(Nb+1:2*Nb)
+    do i=1,Nb
+       dgz(i)    = vps(i)*vps(i)/(xi*w-eps(i))**2
+       dgz(i+Nb) = 2.d0*vps(i)/(xi*w-eps(i))
+    enddo
+  end function grad_gand
+
+
+
   !+-------------------------------------------------------------+
   !PURPOSE  : 
   !+-------------------------------------------------------------+
-  subroutine dump_fit_result(fg,epsi,vi)
-    complex(8),dimension(:)        :: fg
-    complex(8),dimension(size(fg)) :: fgand
-    real(8),dimension(:)    :: epsi,vi
-    integer                 :: i,j
+  subroutine dump_fit_result(ichan)
+    complex(8),dimension(Ldelta) :: fgand
+    integer                      :: ichan,i,j,Lw
+    real(8)                      :: w
     fgand=zero
-    do i=1,Nfit
-       fgand(i) = delta_and(xi*wm(i),epsi,vi)
+    do i=1,Ldelta
+       w=Xdelta(i)
+       fgand(i) = delta_bath(xi*w,ichan)
     enddo
-    call splot("fit_delta.ed",wm(1:Nfit),aimag(fg(1:Nfit)),aimag(fgand(1:Nfit)),real(fg(1:Nfit)),real(fgand(1:Nfit)))
+    call splot("fit_delta.ed",Xdelta,dimag(Fdelta),dimag(fgand),dreal(Fdelta),dreal(fgand))
   end subroutine dump_fit_result
 
 
@@ -48,71 +177,6 @@ contains
   !*********************************************************************
   !*********************************************************************
   !*********************************************************************
-
-
-
-
-
-  ! !+-------------------------------------------------------------+
-  ! !PROGRAM  : 
-  ! !TYPE     : subroutine
-  ! !PURPOSE  :On INPUT Delta = Impurity Green function 
-  ! !+-------------------------------------------------------------+
-  ! subroutine mix_gf_std(loop)
-  !   integer :: loop
-  !   if(trim(order)=="lro")then    !LRO ordering:
-  !      select case(lat_label)
-  !      case default
-  !         if(.not.allocated(goldu))allocate(goldu(NL))
-  !         if(.not.allocated(goldd))allocate(goldd(NL))
-  !         if(loop > 1)then
-  !            deltaup=weigth*deltaup+(1.d0-weigth)*goldu(1:size(deltaup))
-  !            deltadw=weigth*deltadw+(1.d0-weigth)*goldd(1:size(deltadw))
-  !         endif
-  !         goldu(1:size(deltaup))=deltaup
-  !         goldd(1:size(deltadw))=deltadw
-  !      case("A")
-  !         if(.not.allocated(gaoldu))allocate(gaoldu(NL))
-  !         if(.not.allocated(gaoldd))allocate(gaoldd(NL))
-  !         if(iloop > 1)then
-  !            deltaup=weigth*deltaup+(1.d0-weigth)*gaoldu(1:size(deltaup))
-  !            deltadw=weigth*deltadw+(1.d0-weigth)*gaoldd(1:size(deltadw))
-  !         endif
-  !         gaoldu(1:size(deltaup))=deltaup
-  !         gaoldd(1:size(deltadw))=deltadw
-  !      case("B")
-  !         if(.not.allocated(gboldu))allocate(gboldu(NL))
-  !         if(.not.allocated(gboldd))allocate(gboldd(NL))
-  !         if(iloop > 1)then
-  !            deltaup=weigth*deltaup+(1.d0-weigth)*gboldu(1:size(deltaup))
-  !            deltadw=weigth*deltadw+(1.d0-weigth)*gboldd(1:size(deltadw))
-  !         endif
-  !         gboldu(1:size(deltaup))=deltaup
-  !         gboldd(1:size(deltadw))=deltadw
-  !      end select
-  !   else                          !NO LRO ordering
-  !      select case(lat_label)
-  !      case default
-  !         if(.not.allocated(gold))allocate(gold(NL))
-  !         if(loop > 1)delta=weigth*delta+(1.d0-weigth)*gold(1:size(delta))
-  !         gold(1:size(delta))=delta
-  !      case("A")
-  !         if(.not.allocated(gaold))allocate(gaold(NL))     
-  !         if(loop > 1)delta=weigth*delta+(1.d0-weigth)*gaold(1:size(delta)) !mix delta functions
-  !         gaold(1:size(delta))=delta
-  !      case("B")
-  !         if(.not.allocated(gbold))allocate(gbold(NL))
-  !         if(loop > 1)delta=weigth*delta+(1.d0-weigth)*gbold(1:size(delta)) !mix 
-  !         gbold(1:size(delta))=delta
-  !      end select
-  !   endif
-  ! end subroutine mix_gf_std
-  ! !*********************************************************************
-  ! !*********************************************************************
-  ! !*********************************************************************
-
-
-
 
 
 end MODULE ED_CHI2FIT
