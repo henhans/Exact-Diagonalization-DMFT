@@ -10,8 +10,18 @@ MODULE ED_AUX_FUNX
   public :: bdecomp
   public :: c,cdg
   public :: search_mu
+  public :: HtimesV
 
 contains
+
+
+
+  subroutine HtimesV(N,v,Hv)
+    real(8),dimension(N) :: v
+    real(8),dimension(N) :: Hv
+    integer              :: N
+    call dgemv('N',n,n,1.d0,H0,n,v,1,0.d0,Hv,1)
+  end subroutine HtimesV
 
 
 

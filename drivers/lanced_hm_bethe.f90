@@ -4,6 +4,8 @@
 !###################################################################
 program lancED
   USE DMFT_ED
+  USE FUNCTIONS
+  USE TOOLS
   implicit none
   integer :: iloop,Nb
   logical :: converged
@@ -28,7 +30,7 @@ program lancED
   !setup solver
   Nb=get_bath_size()
   allocate(bath(Nb))
-  call init_lanc_solver(bath)
+  call init_lanc_ed_solver(bath)
 
   !DMFT loop
   iloop=0;converged=.false.
@@ -37,7 +39,7 @@ program lancED
      call start_loop(iloop,nloop,"DMFT-loop")
 
      !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
-     call lanc_solver(bath) 
+     call lanc_ed_solver(bath) 
 
      !Get the Weiss field/Delta function to be fitted (user defined)
      call get_delta_bethe

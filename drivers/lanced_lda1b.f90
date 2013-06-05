@@ -9,6 +9,7 @@
 program fulled_lda
   USE DMFT_ED
   USE FFTGF
+  USE TOOLS
   implicit none
   integer                :: i,ik,iorb,jorb,iloop,Lk,Nb
   integer                :: Norb_d,Norb_p,Norb,Nineq
@@ -51,9 +52,9 @@ program fulled_lda
      !setup solver
      Nb=get_bath_size()
      allocate(bath(Nb))
-     call init_lanc_solver(bath)
+     call init_lanc_ed_solver(bath)
      !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
-     call lanc_solver(bath) 
+     call lanc_ed_solver(bath) 
      !Get the Weiss field/Delta function to be fitted (user defined)
      allocate(delta(NL))
      call get_delta
@@ -93,7 +94,7 @@ program fulled_lda
   !setup solver
   Nb=get_bath_size()
   allocate(bath(Nb))
-  call init_lanc_solver(bath)
+  call init_lanc_ed_solver(bath)
 
   !DMFT loop
   iloop=0;converged=.false.
@@ -102,7 +103,7 @@ program fulled_lda
      call start_loop(iloop,nloop,"DMFT-loop")
 
      !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
-     call lanc_solver(bath) 
+     call lanc_ed_solver(bath) 
 
      !Get the Weiss field/Delta function to be fitted (user defined)
      call get_delta

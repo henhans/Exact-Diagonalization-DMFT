@@ -4,10 +4,14 @@ MODULE ED_VARS_GLOBAL
   USE TIMER
   USE PARSE_CMD
   USE IOTOOLS
-  USE FUNCTIONS
-  USE MATRIX
+  USE MATRIX, only: matrix_diagonalize
   USE OPTIMIZE
-  USE TOOLS
+  USE TOOLS, only: arange,linspace
+  !
+  USE EIGEN_SPACE
+  USE PLAIN_LANCZOS
+  !USE ARPACK_LANCZOS
+  !USE MATRIX_SPARSE
   implicit none
 
   !GIT VERSION
@@ -49,6 +53,7 @@ MODULE ED_VARS_GLOBAL
   integer :: NL,Ltau,Nw,Nfit
 
 
+
   !Some maps between sectors and full Hilbert space (pointers)
   !=========================================================
   integer,allocatable,dimension(:,:) :: Hmap,invHmap
@@ -61,11 +66,20 @@ MODULE ED_VARS_GLOBAL
 
   !Eigenvalues,Eigenvectors 
   !=========================================================
-  type eigenspace
-     real(8),dimension(:),pointer   :: e
-     real(8),dimension(:,:),pointer :: M
-  end type eigenspace
   type(eigenspace),dimension(:),allocatable :: espace
+
+
+  !Ground state variables
+  !=========================================================
+  integer                                 :: numzero
+  integer,dimension(:),allocatable        :: iszero
+  ! type gstate
+  !    real(8)                            :: egs
+  !    real(8),dimension(:),pointer       :: vec
+  ! end type gstate
+  ! type(gstate),dimension(:),allocatable :: groundstate
+  type(eig_space)                         :: groundstate
+  real(8),dimension(:,:),allocatable      :: H0
 
   !Partition function
   !=========================================================

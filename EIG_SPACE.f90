@@ -8,7 +8,7 @@ module EIGEN_SPACE
   end type eigenspace
 
   type,public :: eig_object
-     integer                      :: in,is
+     integer                      :: sector
      real(8)                      :: e
      real(8),dimension(:),pointer :: vec
   end type eig_object
@@ -64,8 +64,8 @@ module EIGEN_SPACE
   public :: es_get_size_state
   !
   public :: es_get_component
-  public :: es_get_in
-  public :: es_get_is
+  public :: es_get_sector
+  public :: es_get_energy
   public :: es_get_vector
   !
   public :: operator(<)
@@ -104,6 +104,13 @@ contains        !some routine to perform simple operation on the lists
     end do
     deallocate(space%root)
   end subroutine es_destroy_espace
+
+
+
+  !*********************************************************************
+  !*********************************************************************
+  !*********************************************************************
+
 
   subroutine es_free_espace(space)
     type(eig_space),intent(inout) :: space
@@ -150,11 +157,17 @@ contains        !some routine to perform simple operation on the lists
     end if
   end subroutine insert_element_obj
 
-  subroutine insert_element_components(space,e,vec,in,is)
+
+  !*********************************************************************
+  !*********************************************************************
+  !*********************************************************************
+
+
+  subroutine insert_element_components(space,e,vec,sector)
     type(eig_space),intent(inout)  :: space
     real(8),intent(in)             :: e
     real(8),dimension(:),intent(in):: vec
-    integer,intent(in)             :: in,is
+    integer,intent(in)             :: sector
     type(eig_object)               :: obj
     type(eig_state),pointer        :: p,c
     p => space%root
@@ -170,8 +183,7 @@ contains        !some routine to perform simple operation on the lists
     obj%e=e
     allocate(obj%vec(size(vec)))
     obj%vec=vec
-    obj%in=in
-    obj%is=is
+    obj%sector=sector
     p%next%obj = obj
     space%size = space%size+1
     !
@@ -214,6 +226,13 @@ contains        !some routine to perform simple operation on the lists
        space%size=space%size-1
     endif
   end subroutine remove_element_obj
+
+
+
+  !*********************************************************************
+  !*********************************************************************
+  !*********************************************************************
+
 
   subroutine remove_element_components(space,n,e,found)
     type(eig_space),intent(inout)        :: space
@@ -303,6 +322,7 @@ contains        !some routine to perform simple operation on the lists
     end do
   end function es_get_size_state
 
+
   function es_get_component(space,n) result(obj)
     type(eig_space),intent(in)   :: space
     integer,intent(in)           :: n
@@ -317,51 +337,51 @@ contains        !some routine to perform simple operation on the lists
     end do
   end function es_get_component
 
-  function es_get_in(space,n) result(in)
-    type(eig_space),intent(in)   :: space
-    integer,intent(in)           :: n
-    integer                      :: in
-    type(eig_state),pointer      :: c
-    integer                      :: i
-    c => space%root%next   !assume is associated,ie list exists
-    do i=1,n
-       if(.not.associated(c))exit
-       in = c%obj%in
-       c => c%next  !traverse list
-    end do
-  end function es_get_in
 
-  function es_get_is(space,n) result(is)
+  function es_get_sector(space,n) result(sector)
     type(eig_space),intent(in)   :: space
     integer,intent(in)           :: n
-    integer                      :: is
+    integer                      :: sector
     type(eig_state),pointer      :: c
     integer                      :: i
     c => space%root%next   !assume is associated,ie list exists
     do i=1,n
        if(.not.associated(c))exit
-       is = c%obj%is
+       sector = c%obj%sector
        c => c%next  !traverse list
     end do
-  end function es_get_is
+  end function es_get_sector
+
+
+  function es_get_energy(space,n) result(egs)
+    type(eig_space),intent(in)   :: space
+    integer,intent(in)           :: n
+    real(8)                      :: egs
+    type(eig_state),pointer      :: c
+    integer                      :: i
+    c => space%root%next   !assume is associated,ie list exists
+    do i=1,n
+       if(.not.associated(c))exit
+       egs = c%obj%e
+       c => c%next  !traverse list
+    end do
+  end function es_get_energy
 
   function es_get_vector(space,n) result(vector)
     type(eig_space),intent(in)   :: space
     integer,intent(in)           :: n
     real(8),dimension(:),pointer :: vector
     type(eig_state),pointer      :: c
-    integer                      :: i,ndim
+    integer                      :: i
     c => space%root   !assume is associated,ie list exists
     do i=1,n
        c => c%next  !traverse list
        if(.not.associated(c))exit
-       ndim=size(c%obj%vec)
     end do
-    allocate(vector(ndim))
-    vector = c%obj%vec
+    vector => c%obj%vec
   end function es_get_vector
 
-  
+
 
 
 

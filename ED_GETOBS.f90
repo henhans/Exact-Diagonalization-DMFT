@@ -4,7 +4,7 @@
 MODULE ED_GETOBS
   USE ED_VARS_GLOBAL
   USE ED_AUX_FUNX, only:bdecomp
-  USE ED_LANCZOS
+  !USE ED_LANCZOS
   implicit none
   private
 
@@ -113,16 +113,17 @@ contains
   !PURPOSE  : Evaluate and print out many interesting physical qties
   !+-------------------------------------------------------------------+
   subroutine lanc_ed_getobs()
-    integer,dimension(N) :: ib
-    integer              :: i,j
-    integer              :: k,r
-    integer              :: izero,isect0,jsect0,m
-    integer              :: in0,is0,dim0,ispin
-    integer              :: jn0,js0,jdg0
-    real(8)              :: gs
-    real(8)              :: wm1,wm2
-    real(8)              :: norm0,sgn,nup,ndw
-    real(8)              :: factor
+    integer,dimension(N)         :: ib
+    integer                      :: i,j
+    integer                      :: k,r
+    integer                      :: izero,isect0,jsect0,m
+    integer                      :: in0,is0,dim0,ispin
+    integer                      :: jn0,js0,jdg0
+    real(8)                      :: gs
+    real(8)                      :: wm1,wm2
+    real(8)                      :: norm0,sgn,nup,ndw
+    real(8)                      :: factor
+    real(8),dimension(:),pointer :: vec
 
     factor=real(numzero,8)
     nsimp  = 0.d0
@@ -134,16 +135,18 @@ contains
 
     do izero=1,numzero   
        !GET THE GROUNDSTATE (make some checks)
+       isect0 = es_get_sector(groundstate,izero);print*,isect0
        isect0 = iszero(izero)
        in0    = getin(isect0)
        is0    = getis(isect0)
        dim0   = getdim(isect0)
+       vec    => es_get_vector(groundstate,izero)
        do i=1,dim0
           m=Hmap(isect0,i)
           call bdecomp(m,ib)
           nup=real(ib(1),8)
           ndw=real(ib(1+Ns),8)
-          gs=groundstate(izero)%vec(i)
+          gs=vec(i)
           nsimp  = nsimp  +  (nup+ndw)*gs**2
           nupimp = nupimp +  (nup)*gs**2
           ndwimp = ndwimp +  (ndw)*gs**2

@@ -9,7 +9,6 @@ module ED_DIAG
   USE ED_GETH
   USE ED_GETGF
   USE ED_GETOBS
-  USE ED_LANCZOS
   implicit none
   private
 
@@ -48,7 +47,6 @@ contains
     call deallocate_bath
     call msg("SET STATUS TO 0 in ED_SOLVER",unit=LOGfile)
   end subroutine init_full_ed_solver
-
 
   !+------------------------------------------------------------------+
   !PURPOSE  : 
@@ -146,13 +144,22 @@ contains
   ! GS, build the Green's functions calling all the necessary routines
   !+------------------------------------------------------------------+
   subroutine lanc_ed_diag
-    integer                  :: in,is,isector,dim
-    integer                  :: info,i,j
-    real(8),allocatable      :: eval(:),evec(:,:)
-    integer                  :: Nitermax,Neigen,n0,s0,isect0,dim0,izero
-    real(8)                  :: oldzero,enemin
+    integer             :: in,is,isector,dim
+    integer             :: n0,s0,isect0,dim0,izero
+    integer             :: info,i,j
+
+    integer             :: Nitermax,Neigen
+    real(8)             :: oldzero,enemin,egs
+
+    real(8),allocatable :: eig_values(:)
+    real(8),allocatable :: eig_basis(:,:)
+    real(8),dimension(:),pointer :: vec
+
     if(.not.allocated(iszero))allocate(iszero(Nsect))
-    if(.not.allocated(groundstate))allocate(groundstate(Nsect))
+    !if(.not.allocated(groundstate))allocate(groundstate(Nsect))
+    if(.not.groundstate%status)groundstate=es_init_espace()
+    call es_free_espace(groundstate)
+
     oldzero=1000.d0
     numzero=0
     iszero=0
@@ -160,35 +167,53 @@ contains
     call start_timer
     do isector=startloop,lastloop
        call eta(isector,lastloop,file="ETA_diag.ed")
+
+       !Get Hamiltonian (to be changed)
        dim=getdim(isector)
        allocate(H0(dim,dim))
        call full_ed_geth(isector,H0)
-       if(dim>1)then
+
+       select case(dim)
+       case default
           Neigen=1
           Nitermax=min(dim,512)
-          allocate(Eval(Neigen),Evec(Dim,Neigen))
-          call lanczos_arpack(Dim,Neigen,Nitermax,eval,evec,HtimesV,.false.)
-          enemin=eval(1)         
-          if (enemin < oldzero-10.d-9) then
-             numzero=1
-             iszero(numzero)=isector
-             oldzero=enemin
-             allocate(groundstate(numzero)%vec(dim))
-             groundstate(numzero)%vec(1:dim)=evec(1:dim,1)
-             groundstate(numzero)%egs=enemin
-          elseif(abs(enemin-oldzero) <= 1.d-9)then
-             numzero=numzero+1
-             if (numzero > Nsect) stop 'too many gs'
-             iszero(numzero)=isector
-             oldzero=min(oldzero,enemin)
-             allocate(groundstate(numzero)%vec(dim))
-             groundstate(numzero)%vec(1:dim)=evec(1:dim,1)
-             groundstate(numzero)%egs=enemin
-          endif
-          deallocate(Eval,Evec)
+          allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
+          call lanczos_arpack(dim,Neigen,Nitermax,eig_values,eig_basis,HtimesV,.false.)
+
+       case (1)
+          allocate(eig_values(dim),eig_basis(dim,dim))
+          eig_values(1) =H0(1,1)
+          eig_basis(1,1)=1.d0
+
+       end select
+
+       enemin=eig_values(1)  
+       if (enemin < oldzero-10.d-9) then
+          numzero=1
+          iszero(numzero)=isector
+          oldzero=enemin
+          call es_free_espace(groundstate)
+          !allocate(groundstate(numzero)%vec(dim))
+          !groundstate(numzero)%vec(1:dim)=eig_basis(1:dim,1)
+          !groundstate(numzero)%egs=enemin
+          call es_insert_state(groundstate,enemin,eig_basis(1:dim,1),isector)
+
+       elseif(abs(enemin-oldzero) <= 1.d-9)then
+          numzero=numzero+1
+          if (numzero > Nsect)call error('too many gs')
+          iszero(numzero)=isector
+          oldzero=min(oldzero,enemin)
+          ! allocate(groundstate(numzero)%vec(dim))
+          ! groundstate(numzero)%vec(1:dim)=eig_basis(1:dim,1)
+          ! groundstate(numzero)%egs=enemin
+          call es_insert_state(groundstate,enemin,eig_basis(1:dim,1),isector)
        endif
+
+       deallocate(eig_values,eig_basis)
        deallocate(H0)
+
     enddo
+
     print*,"numzero=",numzero
     print*,"groundstate sector:"
     do izero=1,numzero
@@ -196,7 +221,13 @@ contains
        n0 = getin(isect0)
        s0 = getis(isect0)
        dim0 = getdim(isect0)
-       print*,n0,s0,dim0,groundstate(izero)%egs
+       isect0=es_get_sector(groundstate,izero)
+       !vec => es_get_vector(groundstate,izero)
+       egs = es_get_energy(groundstate,izero)
+       n0 = getin(isect0)
+       s0 = getis(isect0)
+       dim0 = getdim(isect0)
+       print*,n0,s0,dim0,egs
     enddo
     call stop_timer
   end subroutine lanc_ed_diag

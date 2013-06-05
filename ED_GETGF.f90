@@ -7,7 +7,7 @@ MODULE ED_GETGF
   USE ED_BATH
   USE ED_AUX_FUNX
   USE ED_GETH
-  USE ED_LANCZOS
+  !USE ED_LANCZOS
   !
 
   implicit none
@@ -288,34 +288,45 @@ contains
     real(8)                      :: norm0,sgn,gs,nup,ndw
     integer                      :: ib(N),k,r,Nlanc,Nitermax
     real(8)                      :: factor
+    real(8),dimension(:),pointer :: vec
+    real(8)                      :: egs
     real(8),allocatable          :: vvinit(:),alfa_(:),beta_(:),vout(:)
+
     call plain_lanczos_set_htimesv(HtimesV)
     !Initialize some functions
     Giw   =zero
     Gwr   =zero
+
     !Freq. arrays
     allocate(wm(NL))
     wm    = pi/beta*real(2*arange(1,NL)-1,8)
     allocate(wr(Nw))
     wr    = linspace(wini,wfin,Nw)
+
     Nitermax=nGFitermax
     allocate(alfa_(Nitermax),beta_(Nitermax))
+
     factor=real(numzero,8)
+
     do izero=1,numzero   
        !GET THE GROUNDSTATE (make some checks)
-       norm0=sqrt(dot_product(groundstate(izero)%vec,groundstate(izero)%vec))
-       if(norm0-1.d0>1.d-9)print*,"GS",izero,"is not normalized:",norm0
+       isect0=es_get_sector(groundstate,izero)
        isect0 = iszero(izero)
        in0    = getin(isect0)
        is0    = getis(isect0)
-       idim0   = getdim(isect0)
+       idim0  = getdim(isect0)
+       vec => es_get_vector(groundstate,izero)
+       egs =  es_get_energy(groundstate,izero)
+       norm0=sqrt(dot_product(vec,vec))
+       if(norm0-1.d0>1.d-9)print*,"GS",izero,"is not normalized:",norm0
+
        !ADD ONE PARTICLE UP:
        !get cdg_up sector informations:
        jsect0 = getCDGUPsector(isect0);if(jsect0==0)cycle
        jdim0   = getdim(jsect0)
        jn0    = getin(jsect0)
        js0    = getis(jsect0)
-       print*,'sector C^+_up|gs>',jn0,js0,jdim0
+       print*,'GetGF: sector C^+_up|gs>',jn0,js0,jdim0
        !allocate cdg_ip|gs> vector:
        allocate(vvinit(jdim0));vvinit=0.d0
        !build cdg_up|gs> vector:
@@ -325,7 +336,7 @@ contains
           if(ib(1)==0)then      !if impurity is empty: proceed
              call cdg(1,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r) !apply cdg_up (1), bring from i to r
              j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             vvinit(j) = sgn*groundstate(izero)%vec(m)             !build the cdg_up|gs> state
+             vvinit(j) = sgn*vec(m)                                !build the cdg_up|gs> state
           endif
        enddo
        !normalize the cdg_up|gs> state
@@ -338,22 +349,24 @@ contains
        allocate(vout(jdim0))
        vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
        call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
-       call add_to_lanczos_gf(norm0,groundstate(izero)%egs,nitermax,alfa_,beta_,1,1)
+       call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,1,1)
        deallocate(H0,vout,vvinit)
+
+
        !REMOVE ONE PARTICLE UP:
        jsect0 = getCUPsector(isect0);if(jsect0==0)cycle
        jdim0   = getdim(jsect0)
        jn0    = getin(jsect0)
        js0    = getis(jsect0)
-       print*,'sector C_up|gs>',jn0,js0,jdim0
-       allocate(vvinit(jdim0));vvinit=0.d0
+       print*,'GetGF: sector C_up|gs>',jn0,js0,jdim0
+       allocate(vvinit(jdim0)) ; vvinit=0.d0
        do m=1,idim0              !loop over |gs> components m
           i=Hmap(isect0,m)      !map m to full-Hilbert space state i
           call bdecomp(i,ib)    !decompose i into number representation ib=|1/0,1/0,1/0...>
           if(ib(1)==1)then      !if impurity is empty: proceed
              call c(1,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r) !apply c_up (1), bring from i to r
-             j=invHmap(jsect0,r)                                   !map r back to c_up sector jsect0
-             vvinit(j) = sgn*groundstate(izero)%vec(m)             !build the c_up|gs> state
+             j=invHmap(jsect0,r)                                 !map r back to c_up sector jsect0
+             vvinit(j) = sgn*vec(m)                              !build the c_up|gs> state
           endif
        enddo
        norm0=sqrt(dot_product(vvinit,vvinit))
@@ -363,15 +376,20 @@ contains
        allocate(vout(jdim0))
        vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0
        call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
-       call add_to_lanczos_gf(norm0,groundstate(izero)%egs,nitermax,alfa_,beta_,-1,1)
+       call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,-1,1)
        deallocate(H0,vout,vvinit)
+
+
     enddo
+
     Giw=Giw/factor
     Gwr=Gwr/factor
+
     !###########################PRINTING######################################
     !Print convenience impurity functions:
     call print_imp_gf
     deallocate(wm,wr)
+
   end subroutine lanc_ed_getgf
 
   !+------------------------------------------------------------------+

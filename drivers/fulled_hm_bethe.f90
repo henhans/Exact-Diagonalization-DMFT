@@ -3,7 +3,9 @@
 !AUTHORS  : A. Amaricci
 !###################################################################
 program fullED
-  USE DMFT_FULLED
+  USE DMFT_ED
+  USE FUNCTIONS
+  USE TOOLS
   implicit none
   integer :: iloop,Nb
   logical :: converged
@@ -29,7 +31,7 @@ program fullED
   !setup solver
   Nb=get_bath_size()
   allocate(bath(Nb))
-  call init_ed_solver(bath)
+  call init_full_ed_solver(bath)
 
   !DMFT loop
   iloop=0;converged=.false.
@@ -38,7 +40,7 @@ program fullED
      call start_loop(iloop,nloop,"DMFT-loop")
 
      !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
-     call ed_solver(bath) 
+     call full_ed_solver(bath) 
 
      !Get the Weiss field/Delta function to be fitted (user defined)
      call get_delta_bethe
