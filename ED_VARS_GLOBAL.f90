@@ -51,11 +51,11 @@ MODULE ED_VARS_GLOBAL
 
   !Some maps between sectors and full Hilbert space (pointers)
   !=========================================================
-  integer,allocatable,dimension(:,:) :: nmap,invnmap
-  integer,allocatable,dimension(:,:) :: getloop
-  integer,allocatable,dimension(:)   :: getCUPloop,getCDWloop
-  integer,allocatable,dimension(:)   :: getCDGUPloop,getCDGDWloop
-  integer,allocatable,dimension(:)   :: deg,getin,getis
+  integer,allocatable,dimension(:,:) :: Hmap,invHmap
+  integer,allocatable,dimension(:,:) :: getsector
+  integer,allocatable,dimension(:)   :: getCUPsector,getCDWsector
+  integer,allocatable,dimension(:)   :: getCDGUPsector,getCDGDWsector
+  integer,allocatable,dimension(:)   :: getdim,getin,getis
   integer                            :: startloop,lastloop
 
 
@@ -216,7 +216,7 @@ contains
     write(*,nml=EDvars)
     write(*,*)"--------------------------------------------"
     write(*,*)'| Total number of sites/spin   = ',Ns
-    write(*,*)'| Maximum degeneracy           = ',NP
+    write(*,*)'| Maximum dimension            = ',NP
     write(*,*)'| Number of impurities         = ',Nimp
     write(*,*)'| Bath`s number of sites/spin  = ',Nbath
     write(*,*)'| Total size, Hilber space dim.= ',N,NN
@@ -270,11 +270,11 @@ contains
     N     = 2*Ns
     NN    = 2**N
     Nsect = ((Ns+1)*(Ns+1) - 1)
-    allocate(nmap(Nsect,NP),invnmap(Nsect,NN))
-    allocate(deg(Nsect),getin(Nsect),getis(Nsect))
-    allocate(getloop(N,-N:N))
-    allocate(getCUPloop(Nsect),getCDWloop(Nsect))
-    allocate(getCDGUPloop(Nsect),getCDGDWloop(Nsect))
+    allocate(Hmap(Nsect,NP),invHmap(Nsect,NN))
+    allocate(getdim(Nsect),getin(Nsect),getis(Nsect))
+    allocate(getsector(N,-N:N))
+    allocate(getCUPsector(Nsect),getCDWsector(Nsect))
+    allocate(getCDGUPsector(Nsect),getCDGDWsector(Nsect))
   end subroutine allocate_system_structure
 
 

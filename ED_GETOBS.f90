@@ -8,8 +8,8 @@ MODULE ED_GETOBS
   implicit none
   private
 
-  public       :: imp_getobs
-  public       :: lanc_getobs
+  public       :: full_ed_getobs
+  public       :: lanc_ed_getobs
 
   logical,save :: iolegend=.true.
   integer,save :: loop=0
@@ -20,15 +20,104 @@ MODULE ED_GETOBS
 
 contains 
 
+  !####################################################################
+  !                    FULL DIAGONALIZATION
+  !####################################################################
   !+-------------------------------------------------------------------+
   !PURPOSE  : Evaluate and print out many interesting physical qties
   !+-------------------------------------------------------------------+
-  subroutine lanc_getobs()
+  subroutine full_ed_getobs()
+    !Configuration vector
+    integer,dimension(N)     :: ib
+    integer                  :: i,j,ia,isector
+    integer                  :: dim
+    real(8)                  :: gs
+    real(8)                  :: wm1,wm2
+    real(8)                  :: Ei,nup,ndw,peso
+    real(8)                  :: w
+    complex(8)               :: iw,alpha,greend0,selfd,zita
+    complex(8),dimension(NL) :: dummy
+    real(8),dimension(0:NL)  :: dummyt
+    logical                  :: last
+    nsimp   =0.d0
+    nupimp =0.d0
+    ndwimp =0.d0
+    dimp   =0.d0
+    magimp =0.d0
+    m2imp  =0.d0
+
+    freenimp=0.d0
+
+    do isector=startloop,lastloop
+       dim=getdim(isector)
+       do i=1,dim
+          Ei=espace(isector)%e(i)
+          peso=exp(-beta*Ei)/zeta_function
+          if(peso < cutoff)cycle
+          do j=1,dim
+             ia=Hmap(isector,j)
+             gs=espace(isector)%M(j,i)
+             call bdecomp(ia,ib)
+             nup=real(ib(1),8)
+             ndw=real(ib(1+Ns),8)
+             nsimp  = nsimp  +  (nup+ndw)*peso*gs**2
+             nupimp = nupimp +  (nup)*peso*gs**2
+             ndwimp = ndwimp +  (ndw)*peso*gs**2
+             dimp   = dimp   +  (nup*ndw)*peso*gs**2
+             magimp = magimp +  (nup-ndw)*peso*gs**2
+             m2imp  = m2imp  +  gs**2*peso*(nup-ndw)**2
+          enddo
+       enddo
+    enddo
+
+    freenimp=-(1.d0/beta)*log(zeta_function)
+    wm1 = pi/beta ; wm2=3.d0*pi/beta
+    supimp   = dimag(Siw(1,1)) - wm1*(dimag(Siw(1,2))-dimag(Siw(1,1)))/(wm2-wm1)
+    zupimp   = 1.d0/( 1.d0 + abs( dimag(Siw(1,1))/wm1 ))
+    rupimp   = dimag(Giw(1,1)) - wm1*(dimag(Giw(1,2))-dimag(Giw(1,1)))/(wm2-wm1)
+    if(Nspin==2)then
+       sdwimp   = dimag(Siw(2,1)) - wm1*(dimag(Siw(2,2))-dimag(Siw(2,1)))/(wm2-wm1)
+       zdwimp   = 1.d0/( 1.d0 + abs( dimag(Siw(2,1))/wm1 ))
+       rdwimp   = dimag(Giw(2,1)) - wm1*(dimag(Giw(2,2))-dimag(Giw(2,1)))/(wm2-wm1)
+    endif
+
+    if(iolegend)call write_legend
+
+    loop=loop+1
+    open(10,file=trim(Ofile)//".all",access="append")
+    call write_to_unit_column(10)
+    close(10)
+
+    open(20,file=trim(Ofile))
+    call write_to_unit_column(20)
+    close(20)
+
+    call msg("Main observables:",unit=LOGfile)
+    write(LOGfile,"(A,f18.10)")"nimp=  ",nsimp
+    write(LOGfile,"(A,f18.12)")"docc=  ",dimp
+    write(LOGfile,"(A,f18.12)")"mom2=  ",m2imp
+    if(Nspin==2)then
+       write(LOGfile,"(A,f18.12)")"mag=   ",magimp
+    endif
+    write(LOGfile,*)""
+  end subroutine full_ed_getobs
+
+
+
+
+
+  !####################################################################
+  !                    LANCZOS DIAGONALIZATION (T=0, GS only)
+  !####################################################################
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : Evaluate and print out many interesting physical qties
+  !+-------------------------------------------------------------------+
+  subroutine lanc_ed_getobs()
     integer,dimension(N) :: ib
     integer              :: i,j
     integer              :: k,r
     integer              :: izero,isect0,jsect0,m
-    integer              :: in0,is0,idg0,ispin
+    integer              :: in0,is0,dim0,ispin
     integer              :: jn0,js0,jdg0
     real(8)              :: gs
     real(8)              :: wm1,wm2
@@ -48,9 +137,9 @@ contains
        isect0 = iszero(izero)
        in0    = getin(isect0)
        is0    = getis(isect0)
-       idg0   = deg(isect0)
-       do i=1,idg0
-          m=nmap(isect0,i)
+       dim0   = getdim(isect0)
+       do i=1,dim0
+          m=Hmap(isect0,i)
           call bdecomp(m,ib)
           nup=real(ib(1),8)
           ndw=real(ib(1+Ns),8)
@@ -95,90 +184,17 @@ contains
     endif
     write(LOGfile,*)""
 
-  end subroutine lanc_getobs
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : Evaluate and print out many interesting physical qties
-  !+-------------------------------------------------------------------+
-  subroutine imp_getobs()
-    !Configuration vector
-    integer,dimension(N)     :: ib
-    integer                  :: i,j,ia,isloop
-    integer                  :: idg
-    real(8)                  :: gs
-    real(8)                  :: wm1,wm2
-    real(8)                  :: Ei,nup,ndw,peso
-    real(8)                  :: w
-    complex(8)               :: iw,alpha,greend0,selfd,zita
-    complex(8),dimension(NL) :: dummy
-    real(8),dimension(0:NL)  :: dummyt
-    logical                  :: last
-    nsimp   =0.d0
-    nupimp =0.d0
-    ndwimp =0.d0
-    dimp   =0.d0
-    magimp =0.d0
-    m2imp  =0.d0
-
-    freenimp=0.d0
-
-    do isloop=startloop,lastloop
-       idg=deg(isloop)
-       do i=1,idg
-          Ei=espace(isloop)%e(i)
-          peso=exp(-beta*Ei)/zeta_function
-          if(peso < cutoff)cycle
-          do j=1,idg
-             ia=nmap(isloop,j)
-             gs=espace(isloop)%M(j,i)
-             call bdecomp(ia,ib)
-             nup=real(ib(1),8)
-             ndw=real(ib(1+Ns),8)
-             nsimp  = nsimp  +  (nup+ndw)*peso*gs**2
-             nupimp = nupimp +  (nup)*peso*gs**2
-             ndwimp = ndwimp +  (ndw)*peso*gs**2
-             dimp   = dimp   +  (nup*ndw)*peso*gs**2
-             magimp = magimp +  (nup-ndw)*peso*gs**2
-             m2imp  = m2imp  +  gs**2*peso*(nup-ndw)**2
-          enddo
-       enddo
-    enddo
-
-    freenimp=-(1.d0/beta)*log(zeta_function)
-    wm1 = pi/beta ; wm2=3.d0*pi/beta
-    supimp   = dimag(Siw(1,1)) - wm1*(dimag(Siw(1,2))-dimag(Siw(1,1)))/(wm2-wm1)
-    zupimp   = 1.d0/( 1.d0 + abs( dimag(Siw(1,1))/wm1 ))
-    rupimp   = dimag(Giw(1,1)) - wm1*(dimag(Giw(1,2))-dimag(Giw(1,1)))/(wm2-wm1)
-    if(Nspin==2)then
-       sdwimp   = dimag(Siw(2,1)) - wm1*(dimag(Siw(2,2))-dimag(Siw(2,1)))/(wm2-wm1)
-       zdwimp   = 1.d0/( 1.d0 + abs( dimag(Siw(2,1))/wm1 ))
-       rdwimp   = dimag(Giw(2,1)) - wm1*(dimag(Giw(2,2))-dimag(Giw(2,1)))/(wm2-wm1)
-    endif
-
-    if(iolegend)call write_legend
-
-    loop=loop+1
-    open(10,file=trim(Ofile)//".all",access="append")
-    call write_to_unit_column(10)
-    close(10)
-
-    open(20,file=trim(Ofile))
-    call write_to_unit_column(20)
-    close(20)
-
-    call msg("Main observables:",unit=LOGfile)
-    write(LOGfile,"(A,f18.10)")"nimp=  ",nsimp
-    write(LOGfile,"(A,f18.12)")"docc=  ",dimp
-    write(LOGfile,"(A,f18.12)")"mom2=  ",m2imp
-    if(Nspin==2)then
-       write(LOGfile,"(A,f18.12)")"mag=   ",magimp
-    endif
-    write(LOGfile,*)""
-  end subroutine imp_getobs
+  end subroutine lanc_ed_getobs
 
 
 
 
+
+
+
+  !####################################################################
+  !                    COMPUTATIONAL ROUTINES
+  !####################################################################
   subroutine write_legend()
     if(Nspin==1)then            
        open(unit=50,file="columns_info.ed")

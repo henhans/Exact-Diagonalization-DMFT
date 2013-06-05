@@ -6,7 +6,7 @@ MODULE ED_AUX_FUNX
   USE ED_VARS_GLOBAL
   implicit none
   private
-  public :: imp_sectorns
+  public :: build_sector_ns
   public :: bdecomp
   public :: c,cdg
   public :: search_mu
@@ -78,7 +78,7 @@ contains
   !ordering definition of the sub-basis within each sector
   !+------------------------------------------------------------------+
   !|ImpUP,BathUP;,ImpDW,BathDW >
-  subroutine imp_sectorns(in,is,idg,imap,invmap)
+  subroutine build_sector_ns(in,is,idg,imap,invmap)
     integer :: i,j,in,is,idg,NR
     integer :: ibn,ibs
     integer :: imap(:),invmap(:)
@@ -95,11 +95,11 @@ contains
        ibn=0
        ibs=ib2(1) - ib2(1+Ns) 
        ibn=ib2(1) + ib2(1+Ns) 
-       if(Nimp==2)then
-          ibs=ibs + ib2(2) - ib2(2+Ns)
-          ibn=ibn + ib2(2) + ib2(2+Ns)
-       endif
-       !add more if Nimp>2
+       ! if(Nimp==2)then
+       !    ibs=ibs + ib2(2) - ib2(2+Ns)
+       !    ibn=ibn + ib2(2) + ib2(2+Ns)
+       ! endif
+       ! !add more if Nimp>2
        do j=NR,Ns
           ibs=ibs+ib2(j)-ib2(j+Ns)
           ibn=ibn+ib2(j)+ib2(j+Ns)
@@ -111,7 +111,7 @@ contains
        endif
     enddo
     return
-  end subroutine imp_sectorns
+  end subroutine build_sector_ns
 
 
 
@@ -165,9 +165,6 @@ contains
     endif
     return
   end subroutine c
-
-
-
 
   !+-------------------------------------------------------------------+
   !PURPOSE  : input state |i> of the basis and calculates |j>=Cm+|i>
