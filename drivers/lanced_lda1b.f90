@@ -10,6 +10,7 @@ program fulled_lda
   USE DMFT_ED
   USE FFTGF
   USE TOOLS
+  USE FUNCTIONS
   implicit none
   integer                :: i,ik,iorb,jorb,iloop,Lk,Nb
   integer                :: Norb_d,Norb_p,Nopd,Nineq
@@ -29,6 +30,8 @@ program fulled_lda
   !Hamiltonian input:
   complex(8),allocatable :: Hk(:,:,:)
   real(8),allocatable    :: fg0(:,:,:)
+  real(8),allocatable    :: dos_wt(:)
+  logical                :: fbethe
 
   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   call parse_cmd_variable(rerun,"RERUN",default=.false.)
@@ -68,6 +71,7 @@ program fulled_lda
   call read_input("inputED.in")
   call parse_cmd_variable(file,"FILE",default="hkfile.in")
   call parse_cmd_variable(ntype,"NTYPE",default=0)
+  call parse_cmd_variable(fbethe,"FBETHE",default=.false.)
 
   !Allocate:
   allocate(wm(NL),wr(Nw),tau(0:Ltau))
@@ -76,17 +80,6 @@ program fulled_lda
   tau = linspace(0.d0,beta,Ltau+1)
 
   call read_hk(trim(file))
-  ! !Check non-interacting DOS:
-  ! allocate(fg0(NL,Nopd,Nopd))
-  ! do ik=1,Lk
-  !    do i=1,NL
-  !       iw = cmplx(wr(i),eps,8)+xmu
-  !       fg0(i,:,:)=fg0(i,:,:) - dimag(inverse_g0k(iw,Hk(:,:,ik)))/pi/real(Lk,8)
-  !    enddo
-  ! enddo
-  ! call splot("dosU0.ed",wr,fg0(:,1,1),fg0(:,2,2))
-  ! deallocate(fg0)
-
 
   !Allocate Weiss Field:
   allocate(delta(NL))
@@ -124,16 +117,28 @@ contains
 
   subroutine read_hk(file)
     character(len=*) :: file
+    integer :: ik
+    real(8) :: de,e
     open(50,file=file,status='old')
     read(50,*)Lk,Norb_d,Norb_p,Nineq,foo
     Nopd=Norb_d+Norb_p
     allocate(Hk(Nopd,Nopd,Lk))
+    allocate(dos_wt(Lk))
     do ik=1,Lk
        read(50,"(3(F10.7,1x))")kx,ky,foo
        do iorb=1,Nopd
           read(50,"(10(2F10.7,1x))")(Hk(iorb,jorb,ik),jorb=1,Nopd)
        enddo
     enddo
+    dos_wt(ik)=1.d0/dfloat(Lk)
+    if(fbethe)then
+       de=2.d0/dfloat(Lk)
+       do ik=1,Lk
+          e = -1.d0 + dfloat(ik-1)*de
+          dos_wt(ik)=dens_bethe(e,1.d0)*de
+          write(10,*)e,dos_wt(ik)
+       enddo
+    endif
   end subroutine read_hk
 
 
@@ -152,10 +157,10 @@ contains
        zita(2)= iw + xmu 
        fg=zero
        do ik=1,Lk
-          fg=fg+inverse_gk(zita,Hk(:,:,ik))
+          fg=fg+inverse_gk(zita,Hk(:,:,ik))*dos_wt(ik)
        enddo
-       gp(i)  = fg(2,2)/dble(Lk)
-       gd(i)  = fg(1,1)/dble(Lk)
+       gp(i)  = fg(2,2)
+       gd(i)  = fg(1,1)
        !
        delta(i) = iw+xmu-one/gd(i)-sd(i)
        !
@@ -168,16 +173,16 @@ contains
 
     do i=1,Nw
        iw=cmplx(wr(i),eps)
-       g0dr(i) = wr(i) + xmu - delta_and(iw,bath,1)!delta_and(wr(i)+zero,bath,1)
+       g0dr(i) = wr(i) + xmu - delta_and(iw,bath,1)
        sdr(i)  = g0dr(i) - one/Gwr(1,i)
        zita(1) = iw + xmu - sdr(i)
        zita(2) = iw + xmu 
        fg=zero
        do ik=1,Lk
-          fg=fg+inverse_gk(zita,Hk(:,:,ik))
+          fg=fg+inverse_gk(zita,Hk(:,:,ik))*dos_wt(ik)
        enddo
-       gpr(i)  = fg(2,2)/dble(Lk) 
-       gdr(i)  = fg(1,1)/dble(Lk)
+       gpr(i)  = fg(2,2)
+       gdr(i)  = fg(1,1)
     enddo
     !Print:
     call splot("Delta_iw.ed",wm,delta(:))
