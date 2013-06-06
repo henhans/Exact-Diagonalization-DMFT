@@ -12,7 +12,7 @@ MODULE ED_CHI2FIT
 
   integer                             :: Ldelta
   complex(8),dimension(:),allocatable :: Fdelta
-  real(8),dimension(:),allocatable    :: Xdelta
+  real(8),dimension(:),allocatable    :: Xdelta,Wdelta
 contains
 
   !+-------------------------------------------------------------+
@@ -21,7 +21,7 @@ contains
   subroutine chi2_fitgf(fg,bath,ichan)
     complex(8),dimension(:)            :: fg
     real(8),dimension(:),intent(inout) :: bath
-    integer                            :: ichan
+    integer                            :: i,ichan
     real(8),dimension(2*Nbath)         :: a
     integer                            :: iter
     real(8)                            :: chi
@@ -32,10 +32,19 @@ contains
     call set_bath(bath)
 
     Ldelta = size(fg)
-    allocate(fdelta(Ldelta))
-    allocate(xdelta(Ldelta))
+    allocate(Fdelta(Ldelta))
+    allocate(Xdelta(Ldelta))
+    allocate(Wdelta(Ldelta))
     Fdelta = fg
     Xdelta = pi/beta*dble(2*arange(1,Ldelta)-1)
+    select case(CGtype)
+    case(0)
+       Wdelta=(/(1.d0,i=1,Ldelta)/)
+    case(1)
+       Wdelta=(/(dble(i),i=1,Ldelta)/)
+    case(2)
+       Wdelta=xdelta
+    end select
 
     a(1:Nbath)           = ebath(ichan,:)
     a(Nbath+1:2*Nbath)   = vbath(ichan,:)
@@ -50,7 +59,7 @@ contains
     call dump_fit_result(ichan)
     bath = copy_bath()
     call deallocate_bath
-    deallocate(Fdelta,Xdelta)
+    deallocate(Fdelta,Xdelta,Wdelta)
   end subroutine chi2_fitgf
 
 
@@ -62,29 +71,15 @@ contains
 
 
   function chi2(x)
-    real(8),dimension(:)  ::  x
-    real(8)               ::  chi2
-    integer               ::  i
-    complex(8)            ::  g0(Ldelta)
+    real(8),dimension(:) ::  x
+    real(8)              ::  chi2
+    integer              ::  i
+    complex(8)           ::  g0(Ldelta)    
     chi2 = 0.d0 
     do i=1,Ldelta   !Number of freq. in common to the module
        g0(i)   = gand(xdelta(i),x)
     enddo
-    select case(CGtype)
-    case(0)
-       do i=1,Ldelta   !Number of freq. in common to the module
-          chi2 = chi2 + abs(fdelta(i)-g0(i))**2
-       end do
-    case(1)
-       do i=1,Ldelta   !Number of freq. in common to the module
-          chi2 = chi2 + abs(fdelta(i)-g0(i))**2/dble(i)
-       end do
-    case(2)
-       do i=1,Ldelta   !Number of freq. in common to the module
-          chi2 = chi2 + abs(fdelta(i)-g0(i))**2/dble(xdelta(i))
-       end do
-
-    end select
+    chi2=sum(abs(fdelta(:)-g0(:))**2/Wdelta(:))
   end function chi2
 
   function dchi2(x)
@@ -98,29 +93,10 @@ contains
        g0(i)    = gand(xdelta(i),x)
        dg0(i,:) = grad_gand(xdelta(i),x)
     enddo
-    select case(CGtype)
-    case(0)
-       do j=1,size(x)
-          do i=1,Ldelta
-             df(j) = df(j)+(dreal(fdelta(i))-dreal(g0(i)))*dreal(dg0(i,j)) + &
-                  (dimag(fdelta(i))-dimag(g0(i)))*dimag(dg0(i,j))
-          enddo
-       enddo
-    case(1)
-       do j=1,size(x)
-          do i=1,Ldelta
-             df(j) = df(j)+(dreal(fdelta(i))-dreal(g0(i)))*dreal(dg0(i,j)) + &
-                  (dimag(fdelta(i))-dimag(g0(i)))*dimag(dg0(i,j))/dble(i)
-          enddo
-       enddo
-    case(2)
-       do j=1,size(x)
-          do i=1,Ldelta
-             df(j) = df(j)+(dreal(fdelta(i))-dreal(g0(i)))*dreal(dg0(i,j)) + &
-                  (dimag(fdelta(i))-dimag(g0(i)))*dimag(dg0(i,j))/dble(xdelta(i))
-          enddo
-       enddo
-    end select
+    do j=1,size(x)
+       df(j)=sum( dreal(fdelta(:)-g0(:))*dreal(dg0(:,j))/Wdelta(:) ) + &
+            sum(  dimag(fdelta(:)-g0(:))*dimag(dg0(:,j))/Wdelta(:) )
+    enddo
     dchi2 = -2.d0*df
   end function dchi2
 

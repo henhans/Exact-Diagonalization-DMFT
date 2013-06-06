@@ -5,7 +5,7 @@ include sfmake.inc
 EXE=lanced_lda1b
 #EXE =fulled_pam_2dsquare
 #EXE=fulled_pam_bethe
-#EXE=fulled_hm_bethe
+EXE=fulled_hm_bethe
 #EXE=lanced_hm_bethe
 DIR =drivers
 DIREXE=$(HOME)/.bin
