@@ -10,19 +10,8 @@ MODULE ED_AUX_FUNX
   public :: bdecomp
   public :: c,cdg
   public :: search_mu
-  public :: HtimesV
 
 contains
-
-
-
-  subroutine HtimesV(N,v,Hv)
-    real(8),dimension(N) :: v
-    real(8),dimension(N) :: Hv
-    integer              :: N
-    call dgemv('N',n,n,1.d0,H0,n,v,1,0.d0,Hv,1)
-  end subroutine HtimesV
-
 
 
   !+------------------------------------------------------------------+
@@ -89,31 +78,19 @@ contains
   !+------------------------------------------------------------------+
   !|ImpUP,BathUP;,ImpDW,BathDW >
   subroutine build_sector_ns(in,is,idg,imap,invmap)
-    integer :: i,j,in,is,idg,NR
+    integer :: i,j,in,is,idg
     integer :: ibn,ibs
     integer :: imap(:),invmap(:)
-    integer :: ib2(N)
+    integer :: ib2(Ntot)
     idg=0
     imap=0
     invmap=0
     if(size(invmap)/=NN)stop "ERROR1 in imp_sectorns"
     if(size(imap)/=NP)stop "ERROR2 in imp_sectorns"
-    NR=Nimp+1
     do i=1,NN
        call bdecomp(i,ib2)
-       ibs=0
-       ibn=0
-       ibs=ib2(1) - ib2(1+Ns) 
-       ibn=ib2(1) + ib2(1+Ns) 
-       ! if(Nimp==2)then
-       !    ibs=ibs + ib2(2) - ib2(2+Ns)
-       !    ibn=ibn + ib2(2) + ib2(2+Ns)
-       ! endif
-       ! !add more if Nimp>2
-       do j=NR,Ns
-          ibs=ibs+ib2(j)-ib2(j+Ns)
-          ibn=ibn+ib2(j)+ib2(j+Ns)
-       enddo
+       ibn = sum(ib2)
+       ibs = sum(ib2(1:Ns)) - sum(ib2(Ns+1:2*Ns))
        if(ibn==in.AND.ibs==is)then
           idg=idg+1           !count the states in the sector (n,s)
           imap(idg)=i         !build the map to full space states
@@ -128,17 +105,17 @@ contains
 
 
   !+------------------------------------------------------------------+
-  !PURPOSE  : input a state |i> and output a vector ivec(N)
+  !PURPOSE  : input a state |i> and output a vector ivec(Ntot)
   !with its binary decomposition
   !(corresponds to the decomposition of the number i-1)
   !+------------------------------------------------------------------+
   subroutine bdecomp(i,ivec)
-    integer :: ivec(N)         
+    integer :: ivec(Ntot)         
     integer :: l,i
     logical :: busy
-    !this is the configuration vector |1,..,Ns,Ns+1,...,N>
-    !obtained from binary decomposition of the state/number i\in 2^N
-    do l=0,N-1                  !loop sul numero di "siti"
+    !this is the configuration vector |1,..,Ns,Ns+1,...,Ntot>
+    !obtained from binary decomposition of the state/number i\in 2^Ntot
+    do l=0,Ntot-1                  !loop sul numero di "siti"
        busy=btest(i-1,l)
        ivec(l+1)=0
        if(busy)ivec(l+1)=1
@@ -155,7 +132,7 @@ contains
   !m labels the sites
   !+-------------------------------------------------------------------+
   subroutine c(m,i,j)
-    integer :: ib(N)
+    integer :: ib(Ntot)
     integer :: i,j,m,km,k
     integer :: isg
     call bdecomp(i,ib)
@@ -176,13 +153,15 @@ contains
     return
   end subroutine c
 
+
+
   !+-------------------------------------------------------------------+
   !PURPOSE  : input state |i> of the basis and calculates |j>=Cm+|i>
   !the sign of j has the phase convention
   !m labels the sites
   !+-------------------------------------------------------------------+
   subroutine cdg(m,i,j)
-    integer :: ib(N)
+    integer :: ib(Ntot)
     integer :: i,j,m,km,k
     integer :: isg
     call bdecomp(i,ib)

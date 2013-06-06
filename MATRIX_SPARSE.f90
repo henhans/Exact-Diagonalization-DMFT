@@ -1,6 +1,8 @@
 MODULE MATRIX_SPARSE
   implicit none
   private
+
+
   type,public :: sparse_element
      private
      real(8)                    :: val  !value of the entry
@@ -8,11 +10,13 @@ MODULE MATRIX_SPARSE
      type(sparse_element),pointer   :: next !link to next entry in the row
   end type sparse_element
 
+
   type,public :: sparse_row
      private
      integer                      :: size !size of the list
      type(sparse_element),pointer :: root !head/root of the list\== list itself
   end type sparse_row
+
 
   type,public :: sparse_matrix
      integer                               :: size
@@ -20,46 +24,62 @@ MODULE MATRIX_SPARSE
      type(sparse_row),dimension(:),pointer :: row
   end type sparse_matrix
 
+
   interface sp_matrix_vector_product
      module procedure sp_matrix_vector_product_d, sp_matrix_vector_product_c
   end interface sp_matrix_vector_product
 
+
+
   public :: sp_init_matrix
   public :: sp_delete_matrix
+  public :: sp_load_matrix
+  public :: sp_dump_matrix
+  public :: sp_print_matrix
   public :: sp_insert_element
   public :: sp_delete_element
-  public :: sp_load_matrix
-  public :: sp_dump_sparse
-  public :: sp_print_matrix
+  public :: sp_get_element
+
   public :: sp_matrix_vector_product
-  ! public :: get_value
-  ! public :: get_node
-  ! public :: print_list,dump_list
 
 contains       
 
 
-  subroutine sp_init_matrix(matrix,N)
-    type(sparse_matrix),intent(inout) :: matrix
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine sp_init_matrix(sparse,N)
+    type(sparse_matrix),intent(inout) :: sparse
     integer                           :: i,N
     !put here a delete statement to avoid problems
-    matrix%size=N
-    matrix%status=.true.
-    allocate(matrix%row(N))
+    sparse%size=N
+    sparse%status=.true.
+    allocate(sparse%row(N))
     do i=1,N
-       allocate(matrix%row(i)%root)
-       matrix%row(i)%root%next => null()
-       matrix%row(i)%size=0
+       allocate(sparse%row(i)%root)
+       sparse%row(i)%root%next => null()
+       sparse%row(i)%size=0
     end do
   end subroutine sp_init_matrix
 
-  subroutine sp_insert_element(matrix,value,i,j)
-    type(sparse_matrix),intent(inout) :: matrix
-    real(8),intent(in)    :: value
-    integer,intent(in)    :: i,j
-    call insert_element_in_row(matrix%row(i),value,j)
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine sp_insert_element(sparse,value,i,j)
+    type(sparse_matrix),intent(inout) :: sparse
+    real(8),intent(in)                :: value
+    integer,intent(in)                :: i,j
+    call insert_element_in_row(sparse%row(i),value,j)
   end subroutine sp_insert_element
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine insert_element_in_row(row,value,column)
     type(sparse_row),intent(inout)    :: row
     real(8) ,intent(in)               :: value
@@ -89,6 +109,42 @@ contains
 
 
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  function sp_get_element(sparse,i,j) result(value)
+    type(sparse_matrix),intent(inout) :: sparse    
+    integer,intent(in)                :: i,j
+    real(8)                           :: value
+    call get_element_from_row(sparse%row(i),value,j)
+  end function sp_get_element
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine get_element_from_row(row,value,column)
+    type(sparse_row),intent(inout)    :: row
+    real(8)                           :: value
+    integer, intent(in)               :: column
+    type(sparse_element),pointer      :: c
+    c => row%root%next
+    do                            !traverse the list
+       if(.not.associated(c))exit !empty list or end of the list
+       if(c%col == column)exit
+       c => c%next
+    end do
+    !
+    value = c%val
+  end subroutine get_element_from_row
+
+
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine sp_delete_matrix(matrix)    
     type(sparse_matrix),intent(inout) :: matrix
     integer                           :: i,Ndim
@@ -101,12 +157,43 @@ contains
     matrix%status=.false.
   end subroutine sp_delete_matrix
 
+
+
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine delete_row(row)
+    type(sparse_row),intent(inout) :: row
+    type(sparse_element),pointer   :: p,c
+    integer :: i,Ndim
+    Ndim=row%size
+    do
+       p => row%root
+       c => p%next
+       if(.not.associated(c))exit  !empty list
+       p%next => c%next !
+       c%next=>null()
+       deallocate(c)
+    end do
+  end subroutine delete_row
+
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine sp_delete_element(matrix,i,j)
     type(sparse_matrix),intent(inout) :: matrix
     integer,intent(in)                :: i,j
     call delete_element_from_row(matrix%row(i),col=j)
   end subroutine sp_delete_element
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine delete_element_from_row(row,n,col)
     type(sparse_row),intent(inout)    :: row
     integer,optional                  :: n
@@ -146,20 +233,6 @@ contains
     endif
   end subroutine delete_element_from_row
 
-  subroutine delete_row(row)
-    type(sparse_row),intent(inout) :: row
-    type(sparse_element),pointer   :: p,c
-    integer :: i,Ndim
-    Ndim=row%size
-    do
-       p => row%root
-       c => p%next
-       if(.not.associated(c))exit  !empty list
-       p%next => c%next !
-       c%next=>null()
-       deallocate(c)
-    end do
-  end subroutine delete_row
 
 
 
@@ -167,7 +240,9 @@ contains
 
 
 
-
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine sp_load_matrix(matrix,sparse)
     real(8),dimension(:,:),intent(in)  :: matrix
     type(sparse_matrix),intent(inout)  :: sparse    
@@ -186,7 +261,13 @@ contains
     enddo
   end subroutine sp_load_matrix
 
-  subroutine sp_dump_sparse(sparse,matrix)
+
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine sp_dump_matrix(sparse,matrix)
     type(sparse_matrix),intent(in)        :: sparse
     real(8),dimension(:,:),intent(inout)  :: matrix
     type(sparse_element),pointer          :: c
@@ -207,10 +288,14 @@ contains
           c => c%next  !traverse list
        enddo
     enddo
-  end subroutine sp_dump_sparse
+  end subroutine sp_dump_matrix
 
 
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine sp_print_matrix(sparse,unit,fmt)
     type(sparse_matrix),intent(in) :: sparse
     integer,optional :: unit
@@ -225,6 +310,11 @@ contains
     write(unit_,*)
   end subroutine sp_print_matrix
 
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine print_row(row,unit,fmt)
     type(sparse_row),intent(in)   :: row
     type(sparse_element),pointer  :: c
@@ -249,61 +339,71 @@ contains
 
 
 
-  subroutine sp_matrix_vector_product_d(r,sparse,q)
-    real(8),dimension(:),intent(inout)    :: r
-    type(sparse_matrix),intent(in)           :: sparse
-    real(8),dimension(size(r)),intent(in) :: q
-    type(sparse_element),pointer             :: c
-    integer  :: i,Ndim
-    if(.not.sparse%status)then
-       print*,"Error SPARSE/matrix_vector_product: sparse matrix not allocated."
-       stop
-    endif
-    Ndim=size(r)
-    if(Ndim/=sparse%size)then
-       print*,"Error SPARSE/matrix_vector_product: wrong dimensions matrix vector."
-       stop
-    endif
-    !r=0.d0
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine sp_matrix_vector_product_d(Ndim,sparse,vin,vout)
+    integer                               :: Ndim
+    type(sparse_matrix),intent(in)        :: sparse
+    real(8),dimension(Ndim),intent(in)    :: vin
+    real(8),dimension(Ndim),intent(inout) :: vout
+    type(sparse_element),pointer          :: c
+    integer                               :: i
+    ! if(.not.sparse%status)then
+    !    print*,"Error SPARSE/matrix_vector_product: sparse matrix not allocated."
+    !    stop
+    ! endif
+    ! if(Ndim/=sparse%size)then
+    !    print*,"Error SPARSE/matrix_vector_product: wrong dimensions matrix vector."
+    !    stop
+    ! endif
+    vout=0.d0
     do i=1,Ndim
        c => sparse%row(i)%root%next       
        matmul: do  
           if(.not.associated(c))exit matmul
-          if(c%col > size(r))then
-             print*,"Error SPARSE_MATRIX/sp_matrix_vector_product: column index > size(vector)!"
-             stop
-          endif
-          r(i) = r(i) + c%val*q(c%col)
+          ! if(c%col > Ndim)then
+          !    print*,"Error SPARSE_MATRIX/sp_matrix_vector_product: column index > size(vector)!"
+          !    stop
+          ! endif
+          vout(i) = vout(i) + c%val*vin(c%col)
           c => c%next  !traverse list
        end do matmul
     end do
   end subroutine sp_matrix_vector_product_d
 
-  subroutine sp_matrix_vector_product_c(r,sparse,q)
-    complex(8),dimension(:),intent(inout)    :: r
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine sp_matrix_vector_product_c(Ndim,sparse,vin,vout)!r,sparse,vin)
+    integer                                  :: Ndim
     type(sparse_matrix),intent(in)           :: sparse
-    complex(8),dimension(size(r)),intent(in) :: q
+    complex(8),dimension(Ndim),intent(in)    :: vin
+    complex(8),dimension(Ndim),intent(inout) :: vout
     type(sparse_element),pointer             :: c
-    integer  :: i,Ndim
+    integer                                  :: i
     if(.not.sparse%status)then
        print*,"Error SPARSE/matrix_vector_product: sparse matrix not allocated."
        stop
     endif
-    Ndim=size(r)
     if(Ndim/=sparse%size)then
        print*,"Error SPARSE/matrix_vector_product: wrong dimensions matrix vector."
        stop
     endif
-    !r=cmplx(0.d0,0.d0)
+    vout=cmplx(0.d0,0.d0,8)
     do i=1,Ndim
        c => sparse%row(i)%root%next       
        matmul: do  
           if(.not.associated(c))exit matmul
-          if(c%col > size(r))then
+          if(c%col > ndim)then
              print*,"Error SPARSE_MATRIX/sp_matrix_vector_product: column index > size(vector)!"
              stop
           endif
-          r(i) = r(i) + c%val*q(c%col)
+          vout(i) = vout(i) + c%val*vin(c%col)
           c => c%next  !traverse list
        end do matmul
     end do

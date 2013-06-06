@@ -1,17 +1,17 @@
 MODULE ED_VARS_GLOBAL
-  USE COMMON_VARS
   USE SCIFOR_VERSION
+  USE COMMON_VARS
   USE TIMER
   USE PARSE_CMD
   USE IOTOOLS
   USE MATRIX, only: matrix_diagonalize
   USE OPTIMIZE
   USE TOOLS, only: arange,linspace
-  !
+  !LOCAL
+  USE MATRIX_SPARSE
   USE EIGEN_SPACE
   USE PLAIN_LANCZOS
   !USE ARPACK_LANCZOS
-  !USE MATRIX_SPARSE
   implicit none
 
   !GIT VERSION
@@ -20,12 +20,12 @@ MODULE ED_VARS_GLOBAL
   !SIZE OF THE PROBLEM (as PARAMETERS to allocate in the stack)
   !VARIABLES and DEFINITIONS in common to every subroutine
   !Ns=numero di siti del sistema (ogni sito puo' contenere 2e^-)
-  !N=2*Ns=numero totale di particelle
+  !Ntot=2*Ns=numero totale di particelle
   !Lo spazio di Hilbert e' dato dal prodotto tensore 2^Ns * 2^Ns=2^N =NN (LARGE)
   !Nbath=Ns-1=numero di siti del bagno (sistema - impurezza)
   !NP=dimensione del sottospazio piu' grande (settore).
   !=========================================================
-  integer :: Ns,Nimp,Nspin,Nbath,NP,N,NN,Nsect
+  integer :: Ns,Norb,Nspin,Nbath,NP,Ntot,NN,Nsect
 
 
   !Global variables
@@ -43,6 +43,7 @@ MODULE ED_VARS_GLOBAL
   logical :: HFmode         !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
   real(8) :: cutoff         !cutoff for spectral summation
   real(8) :: eps_error      !
+  integer :: nLancitermax   !Max number of Lanczos iterations
   integer :: nGFitermax     !Max number of iteration in resolvant tri-diagonalization
   integer :: cgNitmax       !Max number of iteration in the fit
   real(8) :: cgFtol         !Tolerance in the cg fit
@@ -56,30 +57,34 @@ MODULE ED_VARS_GLOBAL
 
   !Some maps between sectors and full Hilbert space (pointers)
   !=========================================================
-  integer,allocatable,dimension(:,:) :: Hmap,invHmap
+  type HSmap
+     integer,dimension(:),pointer :: map
+  end type HSmap
+  type(HSmap),dimension(:),allocatable :: Hmap
+  integer,allocatable,dimension(:,:) :: invHmap
   integer,allocatable,dimension(:,:) :: getsector
-  integer,allocatable,dimension(:)   :: getCUPsector,getCDWsector
-  integer,allocatable,dimension(:)   :: getCDGUPsector,getCDGDWsector
+  integer,allocatable,dimension(:,:) :: getCsector
+  integer,allocatable,dimension(:,:) :: getCDGsector
+  integer,allocatable,dimension(:)   :: minCsector
+  integer,allocatable,dimension(:)   :: minCDGsector
+  integer,allocatable,dimension(:,:) :: impIndex
   integer,allocatable,dimension(:)   :: getdim,getin,getis
   integer                            :: startloop,lastloop
 
 
-  !Eigenvalues,Eigenvectors 
+
+  !Eigenvalues,Eigenvectors FULL DIAGONALIZATION
   !=========================================================
   type(eigenspace),dimension(:),allocatable :: espace
 
 
-  !Ground state variables
+  !Ground state variables LANCZOS DIAGONALIZATINO
   !=========================================================
   integer                                 :: numzero
-  integer,dimension(:),allocatable        :: iszero
-  ! type gstate
-  !    real(8)                            :: egs
-  !    real(8),dimension(:),pointer       :: vec
-  ! end type gstate
-  ! type(gstate),dimension(:),allocatable :: groundstate
   type(eig_space)                         :: groundstate
-  real(8),dimension(:,:),allocatable      :: H0
+  ! real(8),dimension(:,:),allocatable      :: H0
+  type(sparse_matrix)                     :: spH0
+
 
   !Partition function
   !=========================================================
@@ -100,7 +105,7 @@ MODULE ED_VARS_GLOBAL
 
   !Qties needed to get energy
   !=========================================================
-  real(8) ::  nsimp,dimp,nupimp,ndwimp,magimp,m2imp
+  real(8) ::  nimp,dimp,nupimp,ndwimp,magimp,m2imp
 
 
   !NML READ/WRITE UNITS
@@ -112,13 +117,14 @@ MODULE ED_VARS_GLOBAL
   character(len=32) :: USEDinput
 
 
-  namelist/EDvars/Ns,Nimp,Nspin,&       
+  namelist/EDvars/Ns,Norb,Nspin,&       
        beta,xmu,nloop,u,        &
        eps,wini,wfin,heff,      &
        NL,Nw,Ltau,Nfit,         &
        nread,nerr,ndelta,       &
        chiflag,cutoff,HFmode,   &
        eps_error,Nsuccess,      &
+       nLancitermax,nGFitermax,&
        cgNitmax,cgFtol,cgType,   &
        Hfile,Ofile,GMfile,GRfile,CTfile,CWfile,LOGfile
 
@@ -136,7 +142,7 @@ contains
 
     !ModelConf
     Ns         = 5
-    Nimp       = 1
+    Norb       = 1
     Nspin      = 1
     u          = 2.d0
     xmu        = 0.d0
@@ -160,6 +166,7 @@ contains
     cutoff     = 1.d-9
     eps_error  = 1.d-5
     nsuccess   = 2
+    nLancitermax = 512
     nGFitermax = 100
     cgNitmax   = 1000
     cgFtol     = 1.d-9
@@ -188,7 +195,7 @@ contains
     endif
 
     call parse_cmd_variable(Ns,"NS")
-    call parse_cmd_variable(Nimp,"NIMP")
+    call parse_cmd_variable(Norb,"NORB")
     call parse_cmd_variable(Nspin,"NSPIN")
     call parse_cmd_variable(beta,"BETA")
     call parse_cmd_variable(xmu,"XMU")
@@ -211,6 +218,7 @@ contains
     call parse_cmd_variable(cutoff,"CUTOFF")
     call parse_cmd_variable(heff,"HEFF")
     call parse_cmd_variable(nGFitermax,"NGFITERMAX")
+    call parse_cmd_variable(nLancitermax,"NLANCITERMAX")
     call parse_cmd_variable(cgNitmax,"CGNITMAX")
     call parse_cmd_variable(cgFtol,"CGFTOL")
     call parse_cmd_variable(cgType,"CGTYPE")
@@ -231,9 +239,9 @@ contains
     write(*,*)"--------------------------------------------"
     write(*,*)'| Total number of sites/spin   = ',Ns
     write(*,*)'| Maximum dimension            = ',NP
-    write(*,*)'| Number of impurities         = ',Nimp
+    write(*,*)'| Number of impurities         = ',Norb
     write(*,*)'| Bath`s number of sites/spin  = ',Nbath
-    write(*,*)'| Total size, Hilber space dim.= ',N,NN
+    write(*,*)'| Total size, Hilber space dim.= ',Ntot,NN
     write(*,*)'| Number of sectors            = ',Nsect
     write(*,*)"--------------------------------------------"
     write(*,*)'| mu       = ',xmu
@@ -247,8 +255,8 @@ contains
 
     !Some check:
     if(Nfit>NL)Nfit=NL
-    if(Nimp>1)call abort("Norb > 1 is not yet supported!")
-    if(Ns>8)call abort("Ns > 8 is too big!")
+    if(Norb>1)call abort("Norb > 1 is not yet supported!")
+    !if(Ns>8)call abort("Ns > 8 is too big!")
     if(nerr > eps_error) nerr=eps_error
 
     !allocate functions
@@ -266,6 +274,8 @@ contains
   !PURPOSE  : 
   !+-------------------------------------------------------------------+
   subroutine allocate_system_structure()
+    !Get maximum dimensions of the sector (half-filling)
+    !NP= (Ntot!/NS!/NS!)**2
     select case(Ns)
     case (3)
        NP=9
@@ -279,16 +289,27 @@ contains
        NP=1225
     case (8)
        NP=4900
+    case (9)
+       NP=15876
+    case (10)
+       NP=63504
+    case (11)
+       NP=213444
+    case (12)
+       NP=853776
     end select
-    Nbath = Ns-Nimp
-    N     = 2*Ns
-    NN    = 2**N
+    Nbath = Ns-Norb
+    Ntot  = 2*Ns
+    NN    = 2**Ntot
     Nsect = ((Ns+1)*(Ns+1) - 1)
-    allocate(Hmap(Nsect,NP),invHmap(Nsect,NN))
+    allocate(impIndex(Norb,2))
+    allocate(Hmap(Nsect),invHmap(Nsect,NN))
     allocate(getdim(Nsect),getin(Nsect),getis(Nsect))
-    allocate(getsector(N,-N:N))
-    allocate(getCUPsector(Nsect),getCDWsector(Nsect))
-    allocate(getCDGUPsector(Nsect),getCDGDWsector(Nsect))
+    allocate(getsector(Ntot,-Ntot:Ntot))
+    allocate(getCsector(2,Nsect))
+    allocate(getCDGsector(2,Nsect))
+    allocate(minCsector(2))
+    allocate(minCDGsector(2))
   end subroutine allocate_system_structure
 
 

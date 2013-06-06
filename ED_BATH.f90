@@ -122,7 +122,7 @@ contains
        a1=1+(ispin-1)*2*Nbath
        b1=Nbath+(ispin-1)*2*Nbath
        a2=1+Nbath+(ispin-1)*2*Nbath
-       b2=2*Nbath+(ispin-1)*2*N
+       b2=2*Nbath+(ispin-1)*2*Ntot
        ebath(ispin,:) = bath(a1:b1)  
        vbath(ispin,:) = bath(a2:b2)
     enddo
@@ -140,7 +140,7 @@ contains
        a1=1+(ispin-1)*2*Nbath
        b1=Nbath+(ispin-1)*2*Nbath
        a2=1+Nbath+(ispin-1)*2*Nbath
-       b2=2*Nbath+(ispin-1)*2*N
+       b2=2*Nbath+(ispin-1)*2*Ntot
        bath(a1:b1) = ebath(ispin,1:Nbath)
        bath(a2:b2) = vbath(ispin,1:Nbath)
     enddo
@@ -154,12 +154,17 @@ contains
   !+------------------------------------------------------------------+
   subroutine guess_bath_params
     integer :: i,ispin,n2
+    real(8) :: ran(Nbath)
     if(.not.bath_status)call error("DUMP_BATH: bath not allocated")
-    n2=Nbath/2;if(n2==0)n2=1
+    !n2=Nbath/2;if(n2==0)n2=1
+    call random_number(ran(:))
     do ispin=1,Nspin
-       do i=0,Nbath-1
-          ebath(ispin,i+1)=2.d0*dfloat(i-1-n2)/dfloat(n2)
-          vbath(ispin,i+1)=dsqrt(1.d0/dfloat(Nbath))
+       do i=1,Nbath
+          !i=0,Nbath-1
+          !ebath(ispin,i+1)=2.d0*dfloat(i-1-n2)/dfloat(n2)
+          !vbath(ispin,i+1)=dsqrt(1.d0/dfloat(Nbath))
+          ebath(ispin,i)=(2.d0*ran(i)-1.d0)*real(Nbath,8)/2.d0
+          vbath(ispin,i)=1.d0/sqrt(real(Nbath,8))
        enddo
     enddo
   end subroutine guess_bath_params
@@ -179,7 +184,7 @@ contains
     a1=1+(ichan-1)*2*Nbath
     b1=Nbath+(ichan-1)*2*Nbath
     a2=1+Nbath+(ichan-1)*2*Nbath
-    b2=2*Nbath+(ichan-1)*2*N
+    b2=2*Nbath+(ichan-1)*2*Ntot
     ee(1:Nbath) = bath(a1:b1)  
     vv(1:Nbath) = bath(a2:b2)
     fg=zero

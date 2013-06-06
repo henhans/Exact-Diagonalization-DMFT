@@ -146,8 +146,10 @@ contains
     if(present(threshold))threshold_=threshold
     a_=0.d0
     b_=0.d0
+    vout=0.d0
     do iter=1,nitermax
        call plain_lanczos_iteration(iter,vin,vout,a_,b_)
+       if(verb)print*,iter,a_,b_
        if(abs(b_)<threshold_)exit
        alanc(iter)=a_
        if(iter<nitermax)blanc(iter+1)=b_
@@ -160,12 +162,13 @@ contains
     real(8),dimension(:),intent(inout)         :: vin
     real(8),dimension(size(vin)),intent(inout) :: vout
     real(8),dimension(size(vin))               :: dummy,tmp
-    real(8),intent(inout)              :: a,b
-    integer                            :: i,iter,ns_
-    real(8)                            :: norm
+    real(8),intent(inout)                      :: a,b
+    integer                                    :: i,iter,ns_
+    real(8)                                    :: norm
     ns_=size(vin)
     if(iter==1)then
        norm=sqrt(dot_product(vin,vin))
+       if(norm==0.d0)stop "plain_lanczos_iteration: norm =0!!"
        vin=vin/norm
        b=0.d0
     end if
