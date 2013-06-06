@@ -7,7 +7,6 @@ MODULE ED_GETGF
   USE ED_BATH
   USE ED_AUX_FUNX
   USE ED_GETH
-  !USE ED_LANCZOS
   !
 
   implicit none
@@ -31,8 +30,8 @@ contains
   !+------------------------------------------------------------------+
   subroutine full_ed_getgf()
     real(8)                      :: cdgmat,matcdg
-    integer,dimension(N)         :: ib(N)
-    integer                      :: i,j,k,r,ll,m,in,is,ispin
+    integer,dimension(Ntot)      :: ib
+    integer                      :: i,j,k,r,ll,m,in,is,ispin,iorb
     integer                      :: idim,jdim,isector,jsector,ia
     real(8)                      :: Ei,Ej
     real(8)                      :: cc,spin1,peso1
@@ -53,124 +52,29 @@ contains
     Giw   =zero
     Gwr   =zero
 
-    !Paramagnetic .OR. spin=UP :
-    !==========================================================================
-    call msg("Evaluating G_imp_s1",unit=LOGfile)
-    call start_timer
-    ispin=1
-    do isector=startloop,lastloop
-       if(isector < getsector(2,0))cycle
-       jsector=getCUPsector(isector);if(jsector==0)cycle
-       call eta(isector,lastloop,file="ETA_Gimp_s1.ed")
-       idim=getdim(isector)     !i-th sector dimension
-       jdim=getdim(jsector)     !j-th sector dimension
-       do i=1,idim          !loop over the states in the i-th sect.
-          do j=1,jdim       !loop over the states in the j-th sect.
-             cdgmat=0.d0
-             expterm=exp(-beta*espace(isector)%e(i))+exp(-beta*espace(jsector)%e(j))
-             if(expterm > cutoff)then
-                do ll=1,jdim   !loop over the component of |j> (IN state!)
-                   m=Hmap(jsector,ll) !map from IN state (j) 2 full Hilbert space
-                   call bdecomp(m,ib)
-                   if(ib(1) == 0)then
-                      call cdg(1,m,k);cc=dble(k)/dble(abs(k));k=abs(k)
-                      r=invHmap(isector,k) !map back to OUT sector (i)
-                      cdgmat=cdgmat+&
-                           espace(isector)%M(r,i)*cc*espace(jsector)%M(ll,j)
-                   endif
-                enddo
-                Ei=espace(isector)%e(i)
-                Ej=espace(jsector)%e(j)
-                de=Ej-Ei
-                peso=expterm/zeta_function
-                matcdg=peso*cdgmat**2
-                !
-                do m=1,NL
-                   iw=xi*wm(m)
-                   Giw(ispin,m)=Giw(ispin,m)+matcdg/(iw+de)
-                enddo
-                do m=1,Nw 
-                   w0=wr(m);iw=cmplx(w0,eps)
-                   Gwr(ispin,m)=Gwr(ispin,m)+matcdg/(iw+de)
-                enddo
-                !
-             endif
-          enddo
+    do iorb=1,Norb
+       do ispin=1,Nspin
+          call full_ed_buildgf(iorb,ispin)
        enddo
     enddo
-    call stop_timer
 
-
-    !spin=DW :
-    !==========================================================================
-    if(Nspin==2)then
-       call msg("Evaluating Gimp_s2",unit=LOGfile)
-       call start_timer
-       ispin=2
-       do isector=startloop,lastloop
-          call eta(isector,lastloop,file="ETA_Gimp_s2.ed")
-          if(isector < getsector(2,-2))cycle
-          jsector=getCDWsector(isector);if(jsector==0)cycle
-          idim=getdim(isector)     !i-th sector dimension
-          jdim=getdim(jsector)     !j-th sector dimension
-          do i=1,idim          !loop over the states in the i-th sect.
-             do j=1,jdim       !loop over the states in the j-th sect.
-                cdgmat=0.d0
-                expterm=exp(-beta*espace(isector)%e(i))+exp(-beta*espace(jsector)%e(j))     
-                if(expterm < cutoff)cycle
-                !
-                do ll=1,jdim   !loop over the component of |j> (IN state!)
-                   m=Hmap(jsector,ll) !map from IN state (j) 2 full Hilbert space
-                   call bdecomp(m,ib)
-                   if(ib(1+Ns) == 0)then
-                      call cdg(1+Ns,m,k);cc=dble(k)/dble(abs(k));k=abs(k)
-                      r=invHmap(isector,k) !map back to OUT sector (i)
-                      cdgmat=cdgmat+&
-                           espace(isector)%M(r,i)*cc*espace(jsector)%M(ll,j)
-                   endif
-                enddo
-                Ei=espace(isector)%e(i)
-                Ej=espace(jsector)%e(j)
-                de=Ej-Ei
-                peso=expterm/zeta_function
-                matcdg=peso*cdgmat**2
-                !
-                do m=1,NL
-                   iw=xi*wm(m)
-                   Giw(ispin,m)=Giw(ispin,m)+matcdg/(iw+de)
-                enddo
-                do m=1,Nw 
-                   w0=wr(m);iw=cmplx(w0,eps)
-                   Gwr(ispin,m)=Gwr(ispin,m)+matcdg/(iw+de)
-                enddo
-                !
-             enddo
-          enddo
-       enddo
-       call stop_timer
-    endif
-    !###########################PRINTING######################################
-    !Print convenience impurity functions:
     call print_imp_gf
     deallocate(wm,tau,wr)
   end subroutine full_ed_getgf
-
-
 
 
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
   subroutine full_ed_getchi()
-    USE STATISTICS
+    ! USE STATISTICS
     real(8)                  :: cdgmat,matcdg
-    integer,dimension(N)     :: ib(N),ibi(N),ibj(N)
+    integer,dimension(Ntot)  :: ib,ibi,ibj
     integer                  :: i,j,k,r,ll,m,in,is,ispin,kk
     integer                  :: idim,jdim,isector,jsector,ia,unit(2)
     real(8)                  :: cc,spin,peso,chij,weigth
     real(8)                  :: de,w0,it,Ei,Ej,expterm,Pchi(Nsect),totPchi
     complex(8)               :: iw
-    type(histogram)      :: hist
     !Freq. arrays
     allocate(wm(NL))
     wm    = pi/beta*real(2*arange(1,NL)-1,8)
@@ -180,12 +84,7 @@ contains
     wr    = linspace(wini,wfin,Nw)
     chitau=0.d0
     chiw=zero
-
-    hist = histogram_allocate(50)
-
-
-
-    !Imaginary time susceptibility \X(tau). |<i|S_z|j>|^2
+    !Spin susceptibility \X(tau). |<i|S_z|j>|^2
     call msg("Evaluating Chi_Sz",unit=LOGfile)
     call start_timer
     do isector=1,Nsect !loop over <i| total particle number
@@ -194,45 +93,37 @@ contains
        is=getis(isector)
        idim=getdim(isector)
        Pchi(isector)=0.d0
-       ! call histogram_reset(hist)
-       ! call histogram_set_range_uniform(hist, 0.d0, 10.d0)
        do i=1,idim 
           do j=1,idim
              chij=0.d0
              expterm=exp(-beta*espace(isector)%e(j))
              if(expterm<cutoff)cycle
              do ll=1,idim 
-                ia=Hmap(isector,ll)
+                ia=Hmap(isector)%map(ll)
                 call bdecomp(ia,ib)
                 spin=real(ib(1),8)-real(ib(1+Ns),8) !nup - ndw
                 chij=chij+espace(isector)%M(ll,i)*spin*espace(isector)%M(ll,j)
              enddo
-
-
-
              Pchi(isector)=Pchi(isector)+chij**2
              Ei=espace(isector)%e(i)
              Ej=espace(isector)%e(j)
              de=Ej-Ei
-             if(chij**2 > 1.d-1)then
-                ia=Hmap(isector,i)
-                call bdecomp(ia,ibi)
-                ia=Hmap(isector,j)
-                call bdecomp(ia,ibj)
-                write(300,"(4I5,2F15.9,2x,14I1,2x,14I1)")in,is,i,j,chij**2,de,&
-                     (ibi(kk),kk=1,N),(ibj(kk),kk=1,N)
-
-             endif
+             ! if(chij**2 > 1.d-1)then
+             !    ia=Hmap(isector)%map(i)
+             !    call bdecomp(ia,ibi)
+             !    ia=Hmap(isector)%map(j)!Hmap(isector,j)
+             !    call bdecomp(ia,ibj)
+             !    write(300,"(4I5,2F15.9,2x,14I1,2x,14I1)")in,is,i,j,chij**2,de,&
+             !         (ibi(kk),kk=1,Ntot),(ibj(kk),kk=1,Ntot)
+             ! endif
              peso=chij**2/zeta_function
-             !
-             ! call histogram_accumulate(hist,abs(de),chij**2)
-             !
+             !Imaginary time:
              do m=0,Ltau 
                 it=tau(m)
                 chitau(m)=chitau(m) + exp(-it*espace(isector)%e(i))*&
                      exp(-(beta-it)*espace(isector)%e(j))*peso
              enddo
-             !
+             !Real-frequency
              do m=1,Nw
                 w0=wr(m);iw=cmplx(w0,eps,8)
                 chiw(m)=chiw(m)-exp(-beta*espace(isector)%e(j))*&
@@ -240,15 +131,10 @@ contains
              enddo
           enddo
        enddo
-       ! call histogram_print(hist,200)
-       ! write(200,*)""
-       ! write(201,*)isector,in,is
     enddo
     call stop_timer
-    ! rewind(200)
-    ! rewind(201)
-    rewind(300)
-    !###########################PRINTING######################################
+    !rewind(300)
+
     unit(1)=free_unit()
     open(unit(1),file=trim(CTfile))
     unit(2)=free_unit()
@@ -275,6 +161,12 @@ contains
 
 
 
+
+
+
+
+
+
   !####################################################################
   !                    LANCZOS DIAGONALIZATION (T=0, GS only)
   !####################################################################
@@ -283,124 +175,214 @@ contains
   !+------------------------------------------------------------------+
   subroutine lanc_ed_getgf()
     integer                      :: i,izero,isect0,jsect0,m,j
+    integer                      :: iorb,ispin
     integer                      :: in0,is0,idim0
     integer                      :: jn0,js0,jdim0
     real(8)                      :: norm0,sgn,gs,nup,ndw
-    integer                      :: ib(N),k,r,Nlanc,Nitermax
-    real(8)                      :: factor
+    integer                      :: ib(Ntot),k,r,Nlanc,Nitermax
     real(8),dimension(:),pointer :: vec
     real(8)                      :: egs
-    real(8),allocatable          :: vvinit(:),alfa_(:),beta_(:),vout(:)
-
-    call plain_lanczos_set_htimesv(HtimesV)
+    real(8),allocatable          :: vvinit(:),alfa_(:),beta_(:)
+    !
+    !SET THE LANCZOS H*v method:
+    call plain_lanczos_set_htimesv(spHtimesV)
     !Initialize some functions
     Giw   =zero
     Gwr   =zero
-
     !Freq. arrays
     allocate(wm(NL))
     wm    = pi/beta*real(2*arange(1,NL)-1,8)
     allocate(wr(Nw))
     wr    = linspace(wini,wfin,Nw)
-
+    !Set Max GF iterations
     Nitermax=nGFitermax
     allocate(alfa_(Nitermax),beta_(Nitermax))
+    !Zeta:
+    zeta_function=real(numzero,8)
 
-    factor=real(numzero,8)
-
-    do izero=1,numzero   
-       !GET THE GROUNDSTATE (make some checks)
-       isect0=es_get_sector(groundstate,izero)
-       isect0 = iszero(izero)
+    call start_timer
+    do izero=1,numzero 
+       !get gs-sector information
+       isect0 = es_get_sector(groundstate,izero)
        in0    = getin(isect0)
        is0    = getis(isect0)
        idim0  = getdim(isect0)
        vec => es_get_vector(groundstate,izero)
        egs =  es_get_energy(groundstate,izero)
        norm0=sqrt(dot_product(vec,vec))
-       if(norm0-1.d0>1.d-9)print*,"GS",izero,"is not normalized:",norm0
-
-       !ADD ONE PARTICLE UP:
-       !get cdg_up sector informations:
-       jsect0 = getCDGUPsector(isect0);if(jsect0==0)cycle
-       jdim0   = getdim(jsect0)
-       jn0    = getin(jsect0)
-       js0    = getis(jsect0)
-       print*,'GetGF: sector C^+_up|gs>',jn0,js0,jdim0
-       !allocate cdg_ip|gs> vector:
-       allocate(vvinit(jdim0));vvinit=0.d0
-       !build cdg_up|gs> vector:
-       do m=1,idim0              !loop over |gs> components m
-          i=Hmap(isect0,m)      !map m to full-Hilbert space state i
-          call bdecomp(i,ib)    !decompose i into number representation ib=|1/0,1/0,1/0...>
-          if(ib(1)==0)then      !if impurity is empty: proceed
-             call cdg(1,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r) !apply cdg_up (1), bring from i to r
-             j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             vvinit(j) = sgn*vec(m)                                !build the cdg_up|gs> state
-          endif
+       if(abs(norm0-1.d0)>1.d-9)call warning("GS"//txtfy(izero)//"is not normalized:"//txtfy(norm0))
+       !
+       do iorb=1,Norb
+          do ispin=1,Nspin
+             call msg("Evaluating G_imp_Orb"//trim(txtfy(iorb))//&
+                  "_Spin"//trim(txtfy(ispin))//&
+                  "_Sect0"//trim(txtfy(izero)),unit=LOGfile)
+             call lanc_ed_buildgf(iorb,ispin)
+          enddo
        enddo
-       !normalize the cdg_up|gs> state
-       norm0=sqrt(dot_product(vvinit,vvinit))
-       vvinit=vvinit/norm0
-       !get cdg_up-sector Hamiltonian
-       allocate(H0(jdim0,jdim0))
-       call full_ed_geth(jsect0,H0)
-       !Tri-diagonalize w/ Lanczos the resolvant:
-       allocate(vout(jdim0))
-       vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
-       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
-       call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,1,1)
-       deallocate(H0,vout,vvinit)
-
-
-       !REMOVE ONE PARTICLE UP:
-       jsect0 = getCUPsector(isect0);if(jsect0==0)cycle
-       jdim0   = getdim(jsect0)
-       jn0    = getin(jsect0)
-       js0    = getis(jsect0)
-       print*,'GetGF: sector C_up|gs>',jn0,js0,jdim0
-       allocate(vvinit(jdim0)) ; vvinit=0.d0
-       do m=1,idim0              !loop over |gs> components m
-          i=Hmap(isect0,m)      !map m to full-Hilbert space state i
-          call bdecomp(i,ib)    !decompose i into number representation ib=|1/0,1/0,1/0...>
-          if(ib(1)==1)then      !if impurity is empty: proceed
-             call c(1,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r) !apply c_up (1), bring from i to r
-             j=invHmap(jsect0,r)                                 !map r back to c_up sector jsect0
-             vvinit(j) = sgn*vec(m)                              !build the c_up|gs> state
-          endif
-       enddo
-       norm0=sqrt(dot_product(vvinit,vvinit))
-       vvinit=vvinit/norm0
-       allocate(H0(jdim0,jdim0))
-       call full_ed_geth(jsect0,H0)
-       allocate(vout(jdim0))
-       vout= 0.d0 ; alfa_=0.d0 ; beta_=0.d0
-       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
-       call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,-1,1)
-       deallocate(H0,vout,vvinit)
-
-
+       !
     enddo
+    call stop_timer
 
-    Giw=Giw/factor
-    Gwr=Gwr/factor
+    Giw=Giw/zeta_function
+    Gwr=Gwr/zeta_function
 
-    !###########################PRINTING######################################
     !Print convenience impurity functions:
     call print_imp_gf
     deallocate(wm,wr)
 
+  contains
+
+    subroutine lanc_ed_buildgf(iorb,ispin)
+      integer :: iorb,ispin,isite
+      isite=impIndex(iorb,ispin)
+      !get sector informations:
+      jsect0 = getCDGsector(ispin,isect0)
+      if(jsect0/=0)then 
+         jdim0  = getdim(jsect0)
+         jn0    = getin(jsect0)
+         js0    = getis(jsect0)
+         write(*,"(A,2I3,I15)")'GetGF sector:',jn0,js0,jdim0
+         allocate(vvinit(jdim0));vvinit=0.d0
+         do m=1,idim0                                                !loop over |gs> components m
+            i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
+            call bdecomp(i,ib)                                       !decompose i into binary representation
+            if(ib(isite)==0)then                                     !if impurity is empty: proceed
+               call cdg(isite,i,r)
+               sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
+               j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
+               vvinit(j) = sgn*vec(m)                                !build the cdg_up|gs> state
+            endif
+         enddo
+         norm0=sqrt(dot_product(vvinit,vvinit))
+         vvinit=vvinit/norm0
+         ! !##IF SPARSE_MATRIX:
+         call sp_init_matrix(spH0,jdim0)
+         call lanc_ed_geth(jsect0)
+         ! !##ELSE DIRECT H*V PRODUCT:
+         ! call set_Hsector(jsect0)
+         alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
+         call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
+         call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,1,ispin)
+         deallocate(vvinit)
+         ! !##IF SPARSE_MATRIX:
+         call sp_delete_matrix(spH0)
+      endif
+      !REMOVE ONE PARTICLE UP:
+      jsect0 = getCsector(ispin,isect0)
+      if(jsect0/=0)then
+         jdim0  = getdim(jsect0)
+         jn0    = getin(jsect0)
+         js0    = getis(jsect0)
+         write(*,"(A,2I3,I15)")'GetGF: sector:',jn0,js0,jdim0
+         allocate(vvinit(jdim0)) ; vvinit=0.d0
+         do m=1,idim0                                                !loop over |gs> components m
+            i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
+            call bdecomp(i,ib)                                       !decompose i into binary representation
+            if(ib(isite)==1)then                                     !if impurity is empty: proceed
+               call c(isite,i,r)
+               sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
+               j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
+               vvinit(j) = sgn*vec(m)                                !build the cdg_up|gs> state
+            endif
+         enddo
+         norm0=sqrt(dot_product(vvinit,vvinit))
+         vvinit=vvinit/norm0
+         call sp_init_matrix(spH0,jdim0)
+         call lanc_ed_geth(jsect0)
+         ! !##ELSE DIRECT H*V PRODUCT:
+         ! call set_Hsector(jsect0)
+         alfa_=0.d0 ; beta_=0.d0
+         call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
+         call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,-1,ispin)
+         deallocate(vvinit)
+         ! !##IF SPARSE_MATRIX:
+         call sp_delete_matrix(spH0)
+      endif
+    end subroutine lanc_ed_buildgf
+
+
   end subroutine lanc_ed_getgf
+
+
+
+
+
+
+
+
+
+
+
+  !####################################################################
+  !                    COMPUTATIONAL ROUTINES
+  !####################################################################
+
+  subroutine full_ed_buildgf(iorb,ispin)
+    integer                 :: iorb,ispin,isite
+    real(8)                 :: cdgmat,matcdg
+    integer,dimension(Ntot) :: ib
+    integer                 :: i,j,k,r,ll,m,in,is
+    integer                 :: idim,jdim,isector,jsector,ia
+    real(8)                 :: Ei,Ej
+    real(8)                 :: cc,spin1,peso1
+    real(8)                 :: expterm,peso,de,w0,it,chij1
+    complex(8)              :: iw
+    isite=impIndex(iorb,ispin)
+    call msg("Evaluating G_imp_Orb"//trim(txtfy(iorb))//"_Spin"//trim(txtfy(ispin)),unit=LOGfile)
+    call start_timer
+    do isector=startloop,lastloop
+       if(isector < minCsector(ispin))cycle
+       jsector=getCsector(1,isector);if(jsector==0)cycle
+       call eta(isector,lastloop,file="ETA_GF_Orb"//trim(txtfy(iorb))//"_Spin"//trim(txtfy(ispin))//".ed")
+       idim=getdim(isector)     !i-th sector dimension
+       jdim=getdim(jsector)     !j-th sector dimension
+       do i=1,idim          !loop over the states in the i-th sect.
+          do j=1,jdim       !loop over the states in the j-th sect.
+             cdgmat=0.d0
+             expterm=exp(-beta*espace(isector)%e(i))+exp(-beta*espace(jsector)%e(j))
+             if(expterm > cutoff)then
+                do ll=1,jdim              !loop over the component of |j> (IN state!)
+                   m=Hmap(jsector)%map(ll)!map from IN state (j) 2 full Hilbert space
+                   call bdecomp(m,ib)
+                   if(ib(isite) == 0)then
+                      call cdg(isite,m,k);cc=dble(k)/dble(abs(k));k=abs(k)
+                      r=invHmap(isector,k)
+                      cdgmat=cdgmat+espace(isector)%M(r,i)*cc*espace(jsector)%M(ll,j)
+                   endif
+                enddo
+                Ei=espace(isector)%e(i)
+                Ej=espace(jsector)%e(j)
+                de=Ej-Ei
+                peso=expterm/zeta_function
+                matcdg=peso*cdgmat**2
+                !build Matsubara GF
+                do m=1,NL
+                   iw=xi*wm(m)
+                   Giw(ispin,m)=Giw(ispin,m)+matcdg/(iw+de)
+                enddo
+                !build Real-freq. GF
+                do m=1,Nw 
+                   w0=wr(m);iw=cmplx(w0,eps)
+                   Gwr(ispin,m)=Gwr(ispin,m)+matcdg/(iw+de)
+                enddo
+             endif
+          enddo
+       enddo
+    enddo
+    call stop_timer
+  end subroutine full_ed_buildgf
+
 
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
   subroutine add_to_lanczos_gf(vnorm,emin,nlanc,alanc,blanc,isign,ispin)
-    real(8),dimension(nlanc)                         :: alanc,blanc 
+    real(8),dimension(nlanc)                     :: alanc,blanc 
     real(8),dimension(size(alanc),size(alanc))   :: Z
     real(8),dimension(size(alanc))               :: diag,subdiag
-    real(8) :: vnorm,emin
-    integer :: i,j,isign,ispin,ierr,Nlanc
+    real(8)                                      :: vnorm,emin
+    integer                                      :: i,j,isign,ispin,ierr,Nlanc
     diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
     forall(i=1:Nlanc)Z(i,i)=1.d0
     diag(1:Nlanc)    = alanc(1:Nlanc)
@@ -419,12 +401,6 @@ contains
   end subroutine add_to_lanczos_gf
 
 
-
-
-
-  !####################################################################
-  !                    COMPUTATIONAL ROUTINES
-  !####################################################################
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+

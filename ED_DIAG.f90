@@ -121,7 +121,6 @@ contains
     call msg("SET STATUS TO 0 in ED_SOLVER",unit=LOGfile)
   end subroutine init_lanc_ed_solver
 
-
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
@@ -138,7 +137,6 @@ contains
     call deallocate_bath
   end subroutine lanc_ed_solver
 
-
   !+-------------------------------------------------------------------+
   !PURPOSE  : Setup the Hilbert space, create the Hamiltonian, get the
   ! GS, build the Green's functions calling all the necessary routines
@@ -147,90 +145,74 @@ contains
     integer             :: in,is,isector,dim
     integer             :: n0,s0,isect0,dim0,izero
     integer             :: info,i,j
-
     integer             :: Nitermax,Neigen
     real(8)             :: oldzero,enemin,egs
-
     real(8),allocatable :: eig_values(:)
     real(8),allocatable :: eig_basis(:,:)
-    real(8),dimension(:),pointer :: vec
-
-    if(.not.allocated(iszero))allocate(iszero(Nsect))
-    !if(.not.allocated(groundstate))allocate(groundstate(Nsect))
     if(.not.groundstate%status)groundstate=es_init_espace()
     call es_free_espace(groundstate)
-
     oldzero=1000.d0
     numzero=0
-    iszero=0
     call msg("Get Hamiltonian:",unit=LOGfile)
     call start_timer
     do isector=startloop,lastloop
        call eta(isector,lastloop,file="ETA_diag.ed")
-
        !Get Hamiltonian (to be changed)
        dim=getdim(isector)
-       allocate(H0(dim,dim))
-       call full_ed_geth(isector,H0)
-
+       ! !##IF SPARSE_MATRIX:
+       call sp_init_matrix(spH0,dim)
+       call lanc_ed_geth(isector)
+       ! !##ELSE DIRECT H*V PRODUCT:
+       ! call set_Hsector(isector)
        select case(dim)
        case default
           Neigen=1
-          Nitermax=min(dim,512)
+          Nitermax=min(dim,nLancitermax)
           allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
-          call lanczos_arpack(dim,Neigen,Nitermax,eig_values,eig_basis,HtimesV,.false.)
-
+          call lanczos_arpack(dim,Neigen,Nitermax,eig_values,eig_basis,spHtimesV,.false.)
        case (1)
           allocate(eig_values(dim),eig_basis(dim,dim))
-          eig_values(1) =H0(1,1)
+          ! !##IF SPARSE_MATRIX:
+          eig_values(dim) =sp_get_element(spH0,dim,dim)
+          ! !##ELSE DIRECT H*V PRODUCT:
+          ! call full_ed_geth(isector,eig_basis)
+          ! eig_values(dim)=eig_basis(dim,dim)
           eig_basis(1,1)=1.d0
-
        end select
-
        enemin=eig_values(1)  
        if (enemin < oldzero-10.d-9) then
           numzero=1
-          iszero(numzero)=isector
           oldzero=enemin
           call es_free_espace(groundstate)
-          !allocate(groundstate(numzero)%vec(dim))
-          !groundstate(numzero)%vec(1:dim)=eig_basis(1:dim,1)
-          !groundstate(numzero)%egs=enemin
           call es_insert_state(groundstate,enemin,eig_basis(1:dim,1),isector)
-
        elseif(abs(enemin-oldzero) <= 1.d-9)then
           numzero=numzero+1
           if (numzero > Nsect)call error('too many gs')
-          iszero(numzero)=isector
           oldzero=min(oldzero,enemin)
-          ! allocate(groundstate(numzero)%vec(dim))
-          ! groundstate(numzero)%vec(1:dim)=eig_basis(1:dim,1)
-          ! groundstate(numzero)%egs=enemin
           call es_insert_state(groundstate,enemin,eig_basis(1:dim,1),isector)
        endif
-
        deallocate(eig_values,eig_basis)
-       deallocate(H0)
-
+       !Delete Hamiltonian matrix:
+       ! !##IF SPARSE_MATRIX:
+       call sp_delete_matrix(spH0)
     enddo
-
-    print*,"numzero=",numzero
-    print*,"groundstate sector:"
+    !
+    write(LOGfile,"(A)")"groundstate sector(s):"
     do izero=1,numzero
-       isect0 = iszero(izero)
-       n0 = getin(isect0)
-       s0 = getis(isect0)
-       dim0 = getdim(isect0)
-       isect0=es_get_sector(groundstate,izero)
-       !vec => es_get_vector(groundstate,izero)
-       egs = es_get_energy(groundstate,izero)
-       n0 = getin(isect0)
-       s0 = getis(isect0)
-       dim0 = getdim(isect0)
-       print*,n0,s0,dim0,egs
+       isect0= es_get_sector(groundstate,izero)
+       egs   = es_get_energy(groundstate,izero)
+       n0    = getin(isect0)
+       s0    = getis(isect0)
+       dim0  = getdim(isect0)
+       write(LOGfile,"(A,f18.12,2I4)")'egs =',egs,n0,s0
     enddo
+    write(LOGfile,"(A,f18.12)")'Z   =',dble(numzero)
+    open(3,file='egs.ed',access='append')
+    write(3,*)egs
+    close(3)
     call stop_timer
   end subroutine lanc_ed_diag
+
 
 
 
@@ -246,74 +228,75 @@ contains
   !+------------------------------------------------------------------+
   subroutine setup_pointers
     integer                          :: in,is,dim,isector,jn,js,jsector
-    integer                          :: ism
+    integer                          :: ism,Nup,Ndw
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
+    call msg("Setting up pointers:")
     allocate(imap(NP),invmap(NN))
     isector=0
-    do in=1,N
+    call start_timer
+    do in=1,Ntot
        ism=in
-       if(in.gt.Ns)ism=N-in
+       if(in>Ns)ism=Ntot-in
        do is=-ism,ism,2
           isector=isector+1
-          call build_sector_ns(in,is,dim,imap,invmap)
           getsector(in,is)=isector
           getin(isector)=in
           getis(isector)=is
+          call build_sector_ns(in,is,dim,imap,invmap)
           getdim(isector)=dim
-          Hmap(isector,:)=imap
+          allocate(Hmap(isector)%map(dim))
+          Hmap(isector)%map(1:dim)=imap(1:dim)
           invHmap(isector,:)=invmap
        enddo
     enddo
+    call stop_timer
     deallocate(imap,invmap)
 
-    getCUPsector=0
+    do in=1,Norb
+       impIndex(in,1)=in
+       impIndex(in,2)=in+Ns
+    enddo
+
+    minCsector(1)=getsector(2,0)
+    minCsector(2)=getsector(2,-2)
+    getCsector=0
     do isector=1,Nsect
-       if(isector < getsector(2,0))cycle
+       if(isector < minCsector(1))cycle
        in=getin(isector);is=getis(isector)
        jn=in-1;js=is-1;if(abs(js) > jn)cycle
        jsector=getsector(jn,js)
-       getCUPsector(isector)=jsector
+       getCsector(1,isector)=jsector
     enddo
-
-    getCDGUPsector=0
+    !
     do isector=1,Nsect
-       if(isector > getsector(N-1,-1))cycle
-       in=getin(isector);is=getis(isector)
-       jn=in+1;js=is+1;if(abs(js) > jn)cycle
-       jsector=getsector(jn,js)
-       getCDGUPsector(isector)=jsector
-    enddo
-
-    getCDWsector=0
-    do isector=1,Nsect
-       if(isector < getsector(2,-2))cycle
+       if(isector < minCsector(2))cycle
        in=getin(isector);is=getis(isector)
        jn=in-1;js=is+1;if(abs(js) > jn)cycle
        jsector=getsector(jn,js)
-       getCDWsector(isector)=jsector
+       getCsector(2,isector)=jsector
     enddo
 
-    getCDGDWsector=0
+    minCDGsector(1)=getsector(Ntot-1,-1)
+    minCDGsector(2)=getsector(Ntot-1,1)
+    getCDGsector=0
     do isector=1,Nsect
-       if(isector > getsector(N-1,1))cycle
+       if(isector > minCDGsector(1))cycle
+       in=getin(isector);is=getis(isector)
+       jn=in+1;js=is+1;if(abs(js) > jn)cycle
+       jsector=getsector(jn,js)
+       getCDGsector(1,isector)=jsector
+    enddo
+    !
+    do isector=1,Nsect
+       if(isector > minCDGsector(2))cycle
        in=getin(isector);is=getis(isector)
        jn=in+1;js=is-1;if(abs(js) > jn)cycle
        jsector=getsector(jn,js)
-       getCDGDWsector(isector)=jsector
+       getCDGsector(2,isector)=jsector
     enddo
 
     startloop=1;lastloop=Nsect
-    do isector=startloop,lastloop
-       jsector=getCUPsector(isector)
-       if(jsector==0)cycle
-       if(startloop > jsector)startloop=jsector     
-    enddo
-    do isector=startloop,lastloop
-       jsector=getCDWsector(isector)
-       if(jsector==0)cycle
-       if(startloop > jsector)startloop=jsector     
-    enddo
   end subroutine setup_pointers
 
 

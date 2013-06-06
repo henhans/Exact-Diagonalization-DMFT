@@ -4,7 +4,6 @@
 MODULE ED_GETOBS
   USE ED_VARS_GLOBAL
   USE ED_AUX_FUNX, only:bdecomp
-  !USE ED_LANCZOS
   implicit none
   private
 
@@ -28,7 +27,7 @@ contains
   !+-------------------------------------------------------------------+
   subroutine full_ed_getobs()
     !Configuration vector
-    integer,dimension(N)     :: ib
+    integer,dimension(Ntot)     :: ib
     integer                  :: i,j,ia,isector
     integer                  :: dim
     real(8)                  :: gs
@@ -36,10 +35,8 @@ contains
     real(8)                  :: Ei,nup,ndw,peso
     real(8)                  :: w
     complex(8)               :: iw,alpha,greend0,selfd,zita
-    complex(8),dimension(NL) :: dummy
-    real(8),dimension(0:NL)  :: dummyt
     logical                  :: last
-    nsimp   =0.d0
+    nimp   =0.d0
     nupimp =0.d0
     ndwimp =0.d0
     dimp   =0.d0
@@ -55,12 +52,12 @@ contains
           peso=exp(-beta*Ei)/zeta_function
           if(peso < cutoff)cycle
           do j=1,dim
-             ia=Hmap(isector,j)
+             ia=Hmap(isector)%map(j)!Hmap(isector,j)
              gs=espace(isector)%M(j,i)
              call bdecomp(ia,ib)
              nup=real(ib(1),8)
              ndw=real(ib(1+Ns),8)
-             nsimp  = nsimp  +  (nup+ndw)*peso*gs**2
+             nimp  = nimp  +  (nup+ndw)*peso*gs**2
              nupimp = nupimp +  (nup)*peso*gs**2
              ndwimp = ndwimp +  (ndw)*peso*gs**2
              dimp   = dimp   +  (nup*ndw)*peso*gs**2
@@ -93,7 +90,7 @@ contains
     close(20)
 
     call msg("Main observables:",unit=LOGfile)
-    write(LOGfile,"(A,f18.10)")"nimp=  ",nsimp
+    write(LOGfile,"(A,f18.10)")"nimp=  ",nimp
     write(LOGfile,"(A,f18.12)")"docc=  ",dimp
     write(LOGfile,"(A,f18.12)")"mom2=  ",m2imp
     if(Nspin==2)then
@@ -113,7 +110,7 @@ contains
   !PURPOSE  : Evaluate and print out many interesting physical qties
   !+-------------------------------------------------------------------+
   subroutine lanc_ed_getobs()
-    integer,dimension(N)         :: ib
+    integer,dimension(Ntot)      :: ib
     integer                      :: i,j
     integer                      :: k,r
     integer                      :: izero,isect0,jsect0,m
@@ -126,7 +123,7 @@ contains
     real(8),dimension(:),pointer :: vec
 
     factor=real(numzero,8)
-    nsimp  = 0.d0
+    nimp  = 0.d0
     nupimp = 0.d0
     ndwimp = 0.d0
     dimp   = 0.d0
@@ -135,19 +132,18 @@ contains
 
     do izero=1,numzero   
        !GET THE GROUNDSTATE (make some checks)
-       isect0 = es_get_sector(groundstate,izero);print*,isect0
-       isect0 = iszero(izero)
+       isect0 = es_get_sector(groundstate,izero)
        in0    = getin(isect0)
        is0    = getis(isect0)
        dim0   = getdim(isect0)
        vec    => es_get_vector(groundstate,izero)
        do i=1,dim0
-          m=Hmap(isect0,i)
+          m=Hmap(isect0)%map(i)!Hmap(isect0,i)
           call bdecomp(m,ib)
           nup=real(ib(1),8)
           ndw=real(ib(1+Ns),8)
           gs=vec(i)
-          nsimp  = nsimp  +  (nup+ndw)*gs**2
+          nimp  = nimp  +  (nup+ndw)*gs**2
           nupimp = nupimp +  (nup)*gs**2
           ndwimp = ndwimp +  (ndw)*gs**2
           dimp   = dimp   +  (nup*ndw)*gs**2
@@ -155,7 +151,7 @@ contains
           m2imp  = m2imp  +  gs**2*(nup-ndw)**2
        enddo
     enddo
-    nsimp  = nsimp/factor
+    nimp  = nimp/factor
     nupimp = nupimp/factor
     ndwimp = ndwimp/factor
     dimp   = dimp/factor
@@ -179,7 +175,7 @@ contains
     close(20)
 
     call msg("Main observables:",unit=LOGfile)
-    write(LOGfile,"(A,f18.10)")"nimp=  ",nsimp
+    write(LOGfile,"(A,f18.10)")"nimp=  ",nimp
     write(LOGfile,"(A,f18.12)")"docc=  ",dimp
     write(LOGfile,"(A,f18.12)")"mom2=  ",m2imp
     if(Nspin==2)then
@@ -215,16 +211,16 @@ contains
   subroutine write_to_unit_column(unit)
     integer :: unit
     if(Nspin==1)then
-       write(unit,"(3f18.12,I7,8f18.12)")u,xmu,beta,loop,nsimp,dimp,magimp,m2imp,zupimp,supimp,rupimp,freenimp
+       write(unit,"(3f18.12,I7,8f18.12)")u,xmu,beta,loop,nimp,dimp,magimp,m2imp,zupimp,supimp,rupimp,freenimp
     else
-       write(unit,"(3f18.12,I7,14f18.12)")u,xmu,beta,loop,nsimp,nupimp,ndwimp,dimp,magimp,m2imp,zupimp,zdwimp,supimp,sdwimp,&
+       write(unit,"(3f18.12,I7,14f18.12)")u,xmu,beta,loop,nimp,nupimp,ndwimp,dimp,magimp,m2imp,zupimp,zdwimp,supimp,sdwimp,&
             rupimp,rdwimp,freenimp
     endif
   end subroutine write_to_unit_column
 
   subroutine write_to_unit_list(unit)
     integer :: unit
-    write(unit,"(A,f18.12)")"nimp=  ",nsimp
+    write(unit,"(A,f18.12)")"nimp=  ",nimp
     write(unit,"(A,f18.12)")"docc=  ",dimp
     write(unit,"(A,f18.12)")"mom2=  ",m2imp
     if(Nspin==1)then

@@ -12,9 +12,9 @@ program fulled_lda
   USE TOOLS
   implicit none
   integer                :: i,ik,iorb,jorb,iloop,Lk,Nb
-  integer                :: Norb_d,Norb_p,Norb,Nineq
+  integer                :: Norb_d,Norb_p,Nopd,Nineq
   logical                :: converged
-  real(8)                :: kx,ky,foo,ntot,npimp
+  real(8)                :: kx,ky,foo,ntotal,npimp
   real(8),allocatable    :: wm(:),wr(:),tau(:)
   complex(8)             :: iw
   !variables for the model:
@@ -77,7 +77,7 @@ program fulled_lda
 
   call read_hk(trim(file))
   ! !Check non-interacting DOS:
-  ! allocate(fg0(NL,Norb,Norb))
+  ! allocate(fg0(NL,Nopd,Nopd))
   ! do ik=1,Lk
   !    do i=1,NL
   !       iw = cmplx(wr(i),eps,8)+xmu
@@ -126,12 +126,12 @@ contains
     character(len=*) :: file
     open(50,file=file,status='old')
     read(50,*)Lk,Norb_d,Norb_p,Nineq,foo
-    Norb=Norb_d+Norb_p
-    allocate(Hk(Norb,Norb,Lk))
+    Nopd=Norb_d+Norb_p
+    allocate(Hk(Nopd,Nopd,Lk))
     do ik=1,Lk
        read(50,"(3(F10.7,1x))")kx,ky,foo
-       do iorb=1,Norb
-          read(50,"(10(2F10.7,1x))")(Hk(iorb,jorb,ik),jorb=1,Norb)
+       do iorb=1,Nopd
+          read(50,"(10(2F10.7,1x))")(Hk(iorb,jorb,ik),jorb=1,Nopd)
        enddo
     enddo
   end subroutine read_hk
@@ -139,7 +139,7 @@ contains
 
   subroutine get_delta
     integer                   :: i,j
-    complex(8)                :: iw,zita(2),fg(Norb,Norb)
+    complex(8)                :: iw,zita(2),fg(Nopd,Nopd)
     complex(8),dimension(NL)  :: gp,gd,sp,sd,g0d
     complex(8),dimension(Nw)  :: gpr,gdr,spr,sdr,g0dr
     real(8),dimension(0:Ltau) :: gptau,gdtau
@@ -164,7 +164,7 @@ contains
     call fftgf_iw2tau(gp,gptau,beta)
     call fftgf_iw2tau(gd,gdtau,beta)
     npimp=-2.d0*gptau(Ltau)
-    ntot=nsimp+npimp
+    ntotal=nimp+npimp
 
     do i=1,Nw
        iw=cmplx(wr(i),eps)
@@ -194,15 +194,15 @@ contains
     call splot("Sigmadd_realw.ed",wr,sdr)
 
     call splot("G_tau_ddpp.ed",tau,gdtau,gptau)
-    call splot("np.ntot.ed.all",npimp,ntot,append=.true.)
-    call splot("np.ntot.ed",npimp,ntot)
+    call splot("np.ntot.ed.all",npimp,ntotal,append=.true.)
+    call splot("np.ntot.ed",npimp,ntotal)
 
     if(ntype==1)then
-       nobj=nsimp
+       nobj=nimp
     elseif(ntype==2)then
        nobj=npimp
     else
-       nobj=ntot
+       nobj=ntotal
     endif
 
   end subroutine get_delta

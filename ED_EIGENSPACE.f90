@@ -77,6 +77,9 @@ module EIGEN_SPACE
 contains        !some routine to perform simple operation on the lists
 
 
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   function es_init_espace() result(space)
     type(eig_space) :: space
     allocate(space%root)
@@ -86,11 +89,9 @@ contains        !some routine to perform simple operation on the lists
   end function es_init_espace
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
-
-
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine es_destroy_espace(space)
     type(eig_space),intent(inout) :: space
     type(eig_state),pointer       :: p,c
@@ -107,11 +108,9 @@ contains        !some routine to perform simple operation on the lists
 
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
-
-
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine es_free_espace(space)
     type(eig_space),intent(inout) :: space
     type(eig_state),pointer       :: p,c
@@ -127,12 +126,13 @@ contains        !some routine to perform simple operation on the lists
   end subroutine es_free_espace
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine insert_element_obj(space,obj)
     type(eig_space),intent(inout) :: space
     type(eig_object),intent(in)   :: obj
@@ -158,11 +158,12 @@ contains        !some routine to perform simple operation on the lists
   end subroutine insert_element_obj
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine insert_element_components(space,e,vec,sector)
     type(eig_space),intent(inout)  :: space
     real(8),intent(in)             :: e
@@ -195,11 +196,12 @@ contains        !some routine to perform simple operation on the lists
   end subroutine insert_element_components
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine remove_element_obj(space,obj,found)
     type(eig_space),intent(inout)        :: space
     type(eig_object),optional,intent(in) :: obj
@@ -229,11 +231,12 @@ contains        !some routine to perform simple operation on the lists
 
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine remove_element_components(space,n,e,found)
     type(eig_space),intent(inout)        :: space
     integer,optional,intent(in)          :: n
@@ -261,7 +264,6 @@ contains        !some routine to perform simple operation on the lists
           deallocate(c)           !free link
           space%size=space%size-1
        endif
-
     else
        do i=1,pos 
           if(.not.associated(c))return
@@ -275,11 +277,12 @@ contains        !some routine to perform simple operation on the lists
   end subroutine remove_element_components
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine es_print_espace(space)
     type(eig_space),intent(in) :: space
     type(eig_state),pointer      :: c
@@ -302,12 +305,12 @@ contains        !some routine to perform simple operation on the lists
 
 
 
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
 
 
 
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   function es_get_size_state(space,n) result(nsize)
     type(eig_space),intent(in) :: space
     integer,intent(in)         :: n
@@ -323,6 +326,10 @@ contains        !some routine to perform simple operation on the lists
   end function es_get_size_state
 
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   function es_get_component(space,n) result(obj)
     type(eig_space),intent(in)   :: space
     integer,intent(in)           :: n
@@ -338,6 +345,10 @@ contains        !some routine to perform simple operation on the lists
   end function es_get_component
 
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   function es_get_sector(space,n) result(sector)
     type(eig_space),intent(in)   :: space
     integer,intent(in)           :: n
@@ -353,6 +364,11 @@ contains        !some routine to perform simple operation on the lists
   end function es_get_sector
 
 
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   function es_get_energy(space,n) result(egs)
     type(eig_space),intent(in)   :: space
     integer,intent(in)           :: n
@@ -367,6 +383,11 @@ contains        !some routine to perform simple operation on the lists
     end do
   end function es_get_energy
 
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   function es_get_vector(space,n) result(vector)
     type(eig_space),intent(in)   :: space
     integer,intent(in)           :: n
@@ -384,14 +405,9 @@ contains        !some routine to perform simple operation on the lists
 
 
 
-
-  !*********************************************************************
-  !*********************************************************************
-  !*********************************************************************
-
-
-
-
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   function less_than_obj(O1,O2) result(boolean)
     type(eig_object),intent(in) :: O1,O2
     logical                      :: boolean
@@ -430,5 +446,6 @@ contains        !some routine to perform simple operation on the lists
        write(*,"(A25,f18.9)")"Vec:",obj%vec(i)
     enddo
   end subroutine print_obj
+
 
 end module EIGEN_SPACE

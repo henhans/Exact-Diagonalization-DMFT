@@ -10,8 +10,11 @@ MODULE ED_GETH
   implicit none
   private
   public :: full_ed_geth
-  ! public :: lanc_ed_geth
-  save
+  public :: lanc_ed_geth
+  public :: HtimesV,spHtimesV
+  public :: set_Hsector
+
+  integer :: Hsector
 
 contains
 
@@ -20,7 +23,7 @@ contains
   !+------------------------------------------------------------------+
   subroutine full_ed_geth(isector,h)
     real(8)                  :: h(:,:)
-    integer                  :: ib(N)
+    integer                  :: ib(Ntot)
     integer                  :: dim
     integer                  :: i,j,k,r,m,ms
     integer                  :: kp,isector
@@ -28,8 +31,8 @@ contains
     real(8)                  :: ndup,nddw,npup,npdw,nup,ndw,sg1,sg2,tef
 
     dim=getdim(isector)
-    if(size(h,1)/=dim)call error("IMP_GETH: wrong dimension 1 of H")
-    if(size(h,2)/=dim)call error("IMP_GETH: wrong dimension 2 of H")
+    if(size(h,1)/=dim)call error("FULL_ED_GETH: wrong dimension 1 of H")
+    if(size(h,2)/=dim)call error("FULL_ED_GETH: wrong dimension 2 of H")
 
     h=0.d0
 
@@ -43,7 +46,7 @@ contains
     endif
 
     do i=1,dim
-       m=Hmap(isector,i)
+       m=Hmap(isector)%map(i)!Hmap(isector,i)
        call bdecomp(m,ib)
 
        nup=real(ib(1),8)
@@ -57,7 +60,7 @@ contains
           h(i,i)= -(xmu+U/2d0)*(nup+ndw) + U*nup*ndw + heff*(nup-ndw)
        end select
 
-       !energy of the bath=\sum_{n=1,N}\e_l n_l
+       !energy of the bath=\sum_{n=1,Ntot}\e_l n_l
        do kp=2,Ns
           h(i,i)=h(i,i)+eup(kp-1)*real(ib(kp),8)
           h(i,i)=h(i,i)+edw(kp-1)*real(ib(kp+Ns),8)
@@ -93,72 +96,188 @@ contains
 
 
 
-  ! !+------------------------------------------------------------------+
-  ! !PURPOSE  : 
-  ! !+------------------------------------------------------------------+
-  ! subroutine lanc_ed_geth(isect)
-  !   integer :: isect
-  !   integer :: ib(N)
-  !   integer :: idg
-  !   integer :: i,j,k,r,m,ms,ispin
-  !   integer :: kp
-  !   integer :: iimp,ibath
-  !   real(8) :: ndup,nddw,npup,npdw,nup,ndw,sg1,sg2,tef,htmp
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine lanc_ed_geth(isector)
+    integer                  :: isector
+    integer                  :: ib(Ntot)
+    integer                  :: dim
+    integer                  :: i,j,k,r,m,ms,ispin
+    integer                  :: kp
+    integer                  :: iimp,ibath
+    real(8),dimension(Nbath) :: eup,edw,vup,vdw
+    real(8)                  :: ndup,nddw,npup,npdw,nup,ndw,sg1,sg2,tef,htmp
 
-  !   idg=deg(isect)
-  !   call sp_init_matrix(Ham,idg)
+    dim=getdim(isector)
+    if(.not.spH0%status)call error("LANC_ED_GETH: spH0 not initialized at sector:"//txtfy(isector))
 
-  !   do i=1,idg
-  !      m=nmap(isect,i)
-  !      call bdecomp(m,ib)
-  !      nup=real(ib(1),8)
-  !      ndw=real(ib(1+Ns),8)
+    eup=ebath(1,:)
+    vup=vbath(1,:)
+    edw=eup
+    vdw=vup
+    if(Nspin==2)then
+       edw=ebath(2,:)
+       vdw=vbath(2,:)
+    endif
 
-  !      !Diagonal part
-  !      !local part of the impurity Hamiltonian: (-mu+\e0)*n + U*(n_up-0.5)*(n_dw-0.5) + heff*mag
-  !      !+ energy of the bath=\sum_{n=1,N}\e_l n_l
-  !      htmp=0.d0
-  !      htmp=(-xmu+ed0)*(nup+ndw) + u*(nup-0.5d0)*(ndw-0.5d0) + heff*(nup-ndw)
-  !      do kp=2,Ns
-  !         htmp=htmp+ebath(1,kp-1)*real(ib(kp),8) + ebath(Nspin,kp-1)*real(ib(kp+Ns),8)
-  !      enddo
-  !      call sp_insert_element(Ham,htmp,i,i)
+    do i=1,dim
+       m=Hmap(isector)%map(i)!Hmap(isector,i)
+       call bdecomp(m,ib)
+       nup=real(ib(1),8)
+       ndw=real(ib(1+Ns),8)
+
+       !Diagonal part
+       !local part of the impurity Hamiltonian: (-mu+\e0)*n + U*(n_up-0.5)*(n_dw-0.5) + heff*mag
+       !+ energy of the bath=\sum_{n=1,N}\e_l n_l
+       htmp=0.d0
+       select case(hfmode)
+       case(.true.)
+          htmp = -xmu*(nup+ndw) + U*(nup-0.5d0)*(ndw-0.5d0) + heff*(nup-ndw)
+       case (.false.)
+          htmp = -(xmu+U/2d0)*(nup+ndw) + U*nup*ndw + heff*(nup-ndw)
+       end select
+       !energy of the bath=\sum_{n=1,N}\e_l n_l
+       do kp=2,Ns
+          htmp=htmp + eup(kp-1)*real(ib(kp),8)
+          htmp=htmp + edw(kp-1)*real(ib(kp+Ns),8)
+       enddo
+
+       call sp_insert_element(spH0,htmp,i,i)
 
 
-  !      !Non-Diagonal part
-
-  !      do ms=2,Ns
-
-  !         if(ib(1) == 1 .AND. ib(ms) == 0)then
-  !            call c(1,m,k,sg1)
-  !            call cdg(ms,k,r,sg2)
-  !            j=invnmap(isect,r)
-  !            tef=vbath(1,ms-1)
-  !            htmp=tef*sg1*sg2
-  !            call sp_insert_element(Ham,htmp,i,j)
-  !            call sp_insert_element(Ham,htmp,j,i)
-  !         endif
-
-  !         if(ib(1+Ns) == 1 .AND. ib(ms+Ns) == 0)then
-  !            call c(1+Ns,m,k,sg1)
-  !            call cdg(ms+Ns,k,r,sg2)
-  !            j=invnmap(isect,r)
-  !            tef=vbath(Nspin,ms-1)
-  !            htmp=tef*sg1*sg2
-  !            call sp_insert_element(Ham,htmp,i,j)
-  !            call sp_insert_element(Ham,htmp,j,i)
-  !         endif
-
-  !      enddo
-  !   enddo
-  !   return
-  ! end subroutine lanc_ed_geth
-
+       !Non-Diagonal part
+       do ms=2,Ns
+          if(ib(1)==1 .AND. ib(ms)==0)then
+             call c(1,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
+             call cdg(ms,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(isector,r)
+             tef=vup(ms-1)
+             htmp = tef*sg1*sg2
+             !
+             call sp_insert_element(spH0,htmp,i,j)
+             call sp_insert_element(spH0,htmp,j,i)
+          endif
+          if(ib(1+Ns)==1 .AND. ib(ms+Ns)==0)then
+             call c(1+Ns,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
+             call cdg(ms+Ns,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)           
+             j=invHmap(isector,r)
+             tef=vdw(ms-1)   
+             htmp=tef*sg1*sg2
+             call sp_insert_element(spH0,htmp,i,j)
+             call sp_insert_element(spH0,htmp,j,i)
+          endif
+       enddo
+    enddo
+    return
+  end subroutine lanc_ed_geth
 
 
   !*********************************************************************
   !*********************************************************************
   !*********************************************************************
+
+
+  subroutine  set_Hsector(isector)
+    integer :: isector
+    Hsector=isector
+  end subroutine set_Hsector
+
+
+  subroutine spHtimesV(N,v,Hv)
+    integer              :: N
+    real(8),dimension(N) :: v
+    real(8),dimension(N) :: Hv
+    ! if(.not.spH0%status)call error("Error LANCZOS/HtimesV: sparse matrix not allocated.")
+    ! if(N /= spH0%size)call error("Error in LANCZOS/HtimesV: wrong dimensions")  
+    Hv=zero
+    call sp_matrix_vector_product(N,spH0,v,Hv)
+  end subroutine SpHtimesV
+
+
+  ! subroutine HtimesV(N,v,Hv)
+  !   integer              :: N
+  !   real(8),dimension(N) :: v
+  !   real(8),dimension(N) :: Hv
+  !   call dgemv('N',n,n,1.d0,H0,n,v,1,0.d0,Hv,1)
+  ! end subroutine HtimesV
+
+
+  subroutine HtimesV(Nv,v,Hv)
+    integer              :: Nv
+    real(8),dimension(Nv) :: v
+    real(8),dimension(Nv) :: Hv
+    integer                  :: isector
+    integer                  :: ib(Ntot)
+    integer                  :: dim
+    integer                  :: i,j,k,r,m,ms,ispin
+    integer                  :: kp
+    integer                  :: iimp,ibath
+    real(8),dimension(Nbath) :: eup,edw,vup,vdw
+    real(8)                  :: ndup,nddw,npup,npdw,nup,ndw,sg1,sg2,tef,htmp
+
+    isector=Hsector
+    dim=getdim(isector)
+    eup=ebath(1,:)
+    vup=vbath(1,:)
+    edw=eup
+    vdw=vup
+    if(Nspin==2)then
+       edw=ebath(2,:)
+       vdw=vbath(2,:)
+    endif
+
+    if(Nv/=dim)call error("HtimesV error in dimensions")
+    Hv=0.d0
+
+    do i=1,dim
+       m=Hmap(isector)%map(i)!Hmap(isector,i)
+       call bdecomp(m,ib)
+       nup=real(ib(1),8)
+       ndw=real(ib(1+Ns),8)
+
+       !Diagonal part
+       !local part of the impurity Hamiltonian: (-mu+\e0)*n + U*(n_up-0.5)*(n_dw-0.5) + heff*mag
+       !+ energy of the bath=\sum_{n=1,N}\e_l n_l
+       htmp=0.d0
+       select case(hfmode)
+       case(.true.)
+          htmp = -xmu*(nup+ndw) + U*(nup-0.5d0)*(ndw-0.5d0) + heff*(nup-ndw)
+       case (.false.)
+          htmp = -(xmu+U/2d0)*(nup+ndw) + U*nup*ndw + heff*(nup-ndw)
+       end select
+       !energy of the bath=\sum_{n=1,N}\e_l n_l
+       do kp=2,Ns
+          htmp=htmp + eup(kp-1)*real(ib(kp),8)
+          htmp=htmp + edw(kp-1)*real(ib(kp+Ns),8)
+       enddo
+
+       Hv(i) = Hv(i) + htmp*v(i)
+
+       !Non-Diagonal part
+       do ms=2,Ns
+          if(ib(1)==1 .AND. ib(ms)==0)then
+             call c(1,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
+             call cdg(ms,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(isector,r)
+             tef=vup(ms-1)
+             htmp = tef*sg1*sg2
+             Hv(i) = Hv(i) + htmp*v(j)
+             Hv(j) = Hv(j) + htmp*v(i)
+          endif
+          if(ib(1+Ns)==1 .AND. ib(ms+Ns)==0)then
+             call c(1+Ns,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
+             call cdg(ms+Ns,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)           
+             j=invHmap(isector,r)
+             tef=vdw(ms-1)   
+             htmp=tef*sg1*sg2
+             Hv(i) = Hv(i) + htmp*v(j)
+             Hv(j) = Hv(j) + htmp*v(i)
+          endif
+       enddo
+    enddo
+    return
+  end subroutine HtimesV
 
 
 end MODULE ED_GETH
