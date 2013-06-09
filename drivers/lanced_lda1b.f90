@@ -130,7 +130,7 @@ contains
           read(50,"(10(2F10.7,1x))")(Hk(iorb,jorb,ik),jorb=1,Nopd)
        enddo
     enddo
-    dos_wt(ik)=1.d0/dfloat(Lk)
+    dos_wt=1.d0/dfloat(Lk)
     if(fbethe)then
        de=2.d0/dfloat(Lk)
        do ik=1,Lk
@@ -140,6 +140,16 @@ contains
        enddo
     endif
   end subroutine read_hk
+
+
+
+  function get_density_fromFFT(giw,beta) result(n)
+    complex(8),dimension(:) :: giw
+    real(8)                 :: gtau(0:size(giw))
+    real(8)                 :: beta,n
+    call fftgf_iw2tau(giw,gtau,beta)
+    n = -2.d0*gtau(size(giw))
+  end function get_density_fromFFT
 
 
   subroutine get_delta
@@ -166,10 +176,11 @@ contains
        !
     enddo
     !
-    call fftgf_iw2tau(gp,gptau,beta)
-    call fftgf_iw2tau(gd,gdtau,beta)
-    npimp=-2.d0*gptau(Ltau)
+
+    npimp=get_density_fromFFT(gp,beta)
     ntotal=nimp+npimp
+    write(*,*)"np  =",npimp
+    write(*,*)"ntot=",ntotal
 
     do i=1,Nw
        iw=cmplx(wr(i),eps)
@@ -198,7 +209,6 @@ contains
 
     call splot("Sigmadd_realw.ed",wr,sdr)
 
-    call splot("G_tau_ddpp.ed",tau,gdtau,gptau)
     call splot("np.ntot.ed.all",npimp,ntotal,append=.true.)
     call splot("np.ntot.ed",npimp,ntotal)
 
@@ -211,6 +221,7 @@ contains
     endif
 
   end subroutine get_delta
+
 
 
 
@@ -246,7 +257,7 @@ contains
     gk(2,1) = conjg(gk(1,2))
   end function inverse_gk
 
-end program fulled_lda
+end program
 
 
 
