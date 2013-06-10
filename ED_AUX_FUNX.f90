@@ -6,65 +6,82 @@ MODULE ED_AUX_FUNX
   USE ED_VARS_GLOBAL
   implicit none
   private
-  public :: build_sector_ns
+  public :: build_sector
   public :: bdecomp
   public :: c,cdg
+  public :: setup_pointers
   public :: search_mu
 
 contains
 
 
+
+
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine search_mu(ntmp,convergence)
-    logical,intent(inout) :: convergence
-    real(8)               :: ntmp
-    logical               :: check
-    integer,save          :: count=0
-    integer,save          :: nindex=0
-    real(8)               :: ndelta1,nindex1
-    if(count==0)then
-       inquire(file="searchmu_file.restart",exist=check)
-       if(check)then
-          open(10,file="searchmu_file.restart")
-          read(10,*)ndelta,nindex          
-          close(10)
-       endif
-    endif
-    count=count+1
-    nindex1=nindex
-    ndelta1=ndelta
-    if((ntmp >= nread+nerr))then
-       nindex=-1
-    elseif(ntmp <= nread-nerr)then
-       nindex=1
-    else
-       nindex=0
-    endif
-    if(nindex1+nindex==0.AND.nindex/=0)then !avoid loop forth and back
-       ndelta=ndelta1/2.d0 !decreasing the step       
-    else
-       ndelta=ndelta1
-    endif
-    xmu=xmu+real(nindex,8)*ndelta
-    write(*,"(A,f15.12,A,f15.12,A,f15.12,A,f15.12)")" n=",ntmp," /",nread,&
-         "| shift=",nindex*ndelta,"| xmu=",xmu
-    write(*,"(A,f15.12)")"dn=",abs(ntmp-nread)
-    print*,""
-    if(abs(ntmp-nread)>nerr)then
-       convergence=.false.
-       ! else
-       !    convergence=.true.
-    endif
-    print*,""
-    print*,"Convergence:",convergence
-    print*,""
-    open(10,file="searchmu_file.restart.new")
-    write(10,*)ndelta,nindex
-    close(10)
-  end subroutine search_mu
+  subroutine setup_pointers
+    integer                          :: in,dim,isector,jsector,dimup,dimdw
+    integer                          :: nup,ndw,jup,jdw
+    integer,dimension(:),allocatable :: imap
+    integer,dimension(:),allocatable :: invmap
+    call msg("Setting up pointers:")
+    call start_timer
+    isector=0
+    do nup=0,Ns
+       do ndw=0,Ns
+          isector=isector+1
+          getsector(nup,ndw)=isector
+          getnup(isector)=nup
+          getndw(isector)=ndw
+          dimup=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
+          dimdw=(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
+          dim=dimup*dimdw
+          getdim(isector)=dim
+          allocate(Hmap(isector)%map(dim))
+          call build_sector(nup,ndw,dim,&
+               Hmap(isector)%map(:),invHmap(isector,:))
+       enddo
+    enddo
+    call stop_timer
 
+    do in=1,Norb
+       impIndex(in,1)=in
+       impIndex(in,2)=in+Ns
+    enddo
+
+    getCsector=0
+    do isector=1,Nsect
+       nup=getnup(isector);ndw=getndw(isector)
+       jup=nup-1;jdw=ndw;if(jup < 0)cycle
+       jsector=getsector(jup,jdw)
+       getCsector(1,isector)=jsector
+    enddo
+    !
+    do isector=1,Nsect
+       nup=getnup(isector);ndw=getndw(isector)
+       jup=nup;jdw=ndw-1;if(jdw < 0)cycle
+       jsector=getsector(jup,jdw)
+       getCsector(2,isector)=jsector
+    enddo
+
+    getCDGsector=0
+    do isector=1,Nsect
+       nup=getnup(isector);ndw=getndw(isector)
+       jup=nup+1;jdw=ndw;if(jup > Ns)cycle
+       jsector=getsector(jup,jdw)
+       getCDGsector(1,isector)=jsector
+    enddo
+    !
+    do isector=1,Nsect
+       nup=getnup(isector);ndw=getndw(isector)
+       jup=nup;jdw=ndw+1;if(jdw > Ns)cycle
+       jsector=getsector(jup,jdw)
+       getCDGsector(2,isector)=jsector
+    enddo
+
+    startloop=1;lastloop=Nsect
+  end subroutine setup_pointers
 
 
 
@@ -77,28 +94,27 @@ contains
   !ordering definition of the sub-basis within each sector
   !+------------------------------------------------------------------+
   !|ImpUP,BathUP;,ImpDW,BathDW >
-  subroutine build_sector_ns(in,is,idg,imap,invmap)
-    integer :: i,j,in,is,idg
-    integer :: ibn,ibs
+  subroutine build_sector(iup,idw,dim,imap,invmap)
+    integer :: i,j,iup,idw,dim
+    integer :: nup,ndw
     integer :: imap(:),invmap(:)
-    integer :: ib2(Ntot)
-    idg=0
+    integer :: ivec(Ntot)
+    dim=0
     imap=0
     invmap=0
-    if(size(invmap)/=NN)stop "ERROR1 in imp_sectorns"
-    if(size(imap)/=NP)stop "ERROR2 in imp_sectorns"
+    if(size(invmap)/=NN)stop "ERROR1 in imp_sectorns" 
     do i=1,NN
-       call bdecomp(i,ib2)
-       ibn = sum(ib2)
-       ibs = sum(ib2(1:Ns)) - sum(ib2(Ns+1:2*Ns))
-       if(ibn==in.AND.ibs==is)then
-          idg=idg+1           !count the states in the sector (n,s)
-          imap(idg)=i         !build the map to full space states
-          invmap(i)=idg       !and the inverse map
+       call bdecomp(i,ivec)
+       nup = sum(ivec(1:Ns))
+       ndw = sum(ivec(Ns+1:2*Ns))
+       if(nup==iup.AND.ndw==idw)then
+          dim=dim+1           !count the states in the sector (n_up,n_dw)
+          imap(dim)=i         !build the map to full space states
+          invmap(i)=dim       !and the inverse map
        endif
     enddo
-    return
-  end subroutine build_sector_ns
+    if(size(imap)/=dim)stop "ERROR2 in imp_sectorns" 
+  end subroutine build_sector
 
 
 
@@ -186,35 +202,60 @@ contains
 
 
 
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine search_mu(ntmp,convergence)
+    logical,intent(inout) :: convergence
+    real(8)               :: ntmp
+    logical               :: check
+    integer,save          :: count=0
+    integer,save          :: nindex=0
+    real(8)               :: ndelta1,nindex1
+    if(count==0)then
+       inquire(file="searchmu_file.restart",exist=check)
+       if(check)then
+          open(10,file="searchmu_file.restart")
+          read(10,*)ndelta,nindex          
+          close(10)
+       endif
+    endif
+    count=count+1
+    nindex1=nindex
+    ndelta1=ndelta
+    if((ntmp >= nread+nerr))then
+       nindex=-1
+    elseif(ntmp <= nread-nerr)then
+       nindex=1
+    else
+       nindex=0
+    endif
+    if(nindex1+nindex==0.AND.nindex/=0)then !avoid loop forth and back
+       ndelta=ndelta1/2.d0 !decreasing the step       
+    else
+       ndelta=ndelta1
+    endif
+    xmu=xmu+real(nindex,8)*ndelta
+    write(*,"(A,f15.12,A,f15.12,A,f15.12,A,f15.12)")" n=",ntmp," /",nread,&
+         "| shift=",nindex*ndelta,"| xmu=",xmu
+    write(*,"(A,f15.12)")"dn=",abs(ntmp-nread)
+    print*,""
+    if(abs(ntmp-nread)>nerr)then
+       convergence=.false.
+       ! else
+       !    convergence=.true.
+    endif
+    print*,""
+    print*,"Convergence:",convergence
+    print*,""
+    open(10,file="searchmu_file.restart.new")
+    write(10,*)ndelta,nindex
+    close(10)
+  end subroutine search_mu
 
 
 
 
 
-  ! !+------------------------------------------------------------------+
-  ! !PURPOSE  : 
-  ! !+------------------------------------------------------------------+
-  ! subroutine getloop_range(initloop)
-  !   integer                        :: initloop
-  !   integer                        :: sectchunk,sum,id,isloop     
-  !   integer,dimension(0:mpiSIZE-1) :: lloop
-  !   startloop=initloop
-  !   sectchunk=NN/mpiSIZE;sum=0;id=0
-  !   do isloop=startloop,Nsect
-  !      sum=sum+deg(isloop)
-  !      if(sum > sectchunk)then
-  !         lloop(id)=isloop
-  !         sum=0;id=id+1
-  !      endif
-  !   enddo
-  !   lloop(mpiSIZE-1)=Nsect
-  !   if(mpiID==0)lastloop=lloop(0)
-  !   do id=1,mpiSIZE-1
-  !      if(mpiID==id)then
-  !         startloop=lloop(id-1)+1
-  !         lastloop=lloop(id)
-  !      endif
-  !   enddo
-  ! end subroutine getloop_range
 
 END MODULE ED_AUX_FUNX

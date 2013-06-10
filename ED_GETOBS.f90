@@ -114,8 +114,7 @@ contains
     integer                      :: i,j
     integer                      :: k,r
     integer                      :: izero,isect0,jsect0,m
-    integer                      :: in0,is0,dim0,ispin
-    integer                      :: jn0,js0,jdg0
+    integer                      :: dim0,ispin
     real(8)                      :: gs
     real(8)                      :: wm1,wm2
     real(8)                      :: norm0,sgn,nup,ndw
@@ -133,8 +132,6 @@ contains
     do izero=1,numzero   
        !GET THE GROUNDSTATE (make some checks)
        isect0 = es_get_sector(groundstate,izero)
-       in0    = getin(isect0)
-       is0    = getis(isect0)
        dim0   = getdim(isect0)
        vec    => es_get_vector(groundstate,izero)
        do i=1,dim0

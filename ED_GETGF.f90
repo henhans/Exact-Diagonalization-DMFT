@@ -70,7 +70,7 @@ contains
     ! USE STATISTICS
     real(8)                  :: cdgmat,matcdg
     integer,dimension(Ntot)  :: ib,ibi,ibj
-    integer                  :: i,j,k,r,ll,m,in,is,ispin,kk
+    integer                  :: i,j,k,r,ll,m,iup,idw,ispin,kk
     integer                  :: idim,jdim,isector,jsector,ia,unit(2)
     real(8)                  :: cc,spin,peso,chij,weigth
     real(8)                  :: de,w0,it,Ei,Ej,expterm,Pchi(Nsect),totPchi
@@ -89,8 +89,6 @@ contains
     call start_timer
     do isector=1,Nsect !loop over <i| total particle number
        call eta(isector,lastloop,file="ETA_chi.ed")
-       in=getin(isector)
-       is=getis(isector)
        idim=getdim(isector)
        Pchi(isector)=0.d0
        do i=1,idim 
@@ -152,7 +150,7 @@ contains
     totPchi=sum(Pchi)
     Pchi=Pchi/totPchi
     do i=1,Nsect
-       write(100,*)getin(i),getis(i),Pchi(i)
+       write(100,*)getnup(i),getndw(i),Pchi(i)
     enddo
     rewind(100)
   end subroutine full_ed_getchi
@@ -176,8 +174,8 @@ contains
   subroutine lanc_ed_getgf()
     integer                      :: i,izero,isect0,jsect0,m,j
     integer                      :: iorb,ispin
-    integer                      :: in0,is0,idim0
-    integer                      :: jn0,js0,jdim0
+    integer                      :: iup0,idw0,idim0
+    integer                      :: jup0,jdw0,jdim0
     real(8)                      :: norm0,sgn,gs,nup,ndw
     integer                      :: ib(Ntot),k,r,Nlanc,Nitermax
     real(8),dimension(:),pointer :: vec
@@ -204,8 +202,8 @@ contains
     do izero=1,numzero 
        !get gs-sector information
        isect0 = es_get_sector(groundstate,izero)
-       in0    = getin(isect0)
-       is0    = getis(isect0)
+       iup0    = getnup(isect0)
+       idw0    = getndw(isect0)
        idim0  = getdim(isect0)
        vec => es_get_vector(groundstate,izero)
        egs =  es_get_energy(groundstate,izero)
@@ -240,9 +238,9 @@ contains
       jsect0 = getCDGsector(ispin,isect0)
       if(jsect0/=0)then 
          jdim0  = getdim(jsect0)
-         jn0    = getin(jsect0)
-         js0    = getis(jsect0)
-         write(*,"(A,2I3,I15)")'GetGF sector:',jn0,js0,jdim0
+         jup0    = getnup(jsect0)
+         jdw0    = getndw(jsect0)
+         write(*,"(A,2I3,I15)")'GetGF sector:',jup0,jdw0,jdim0
          allocate(vvinit(jdim0));vvinit=0.d0
          do m=1,idim0                                                !loop over |gs> components m
             i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
@@ -272,9 +270,9 @@ contains
       jsect0 = getCsector(ispin,isect0)
       if(jsect0/=0)then
          jdim0  = getdim(jsect0)
-         jn0    = getin(jsect0)
-         js0    = getis(jsect0)
-         write(*,"(A,2I3,I15)")'GetGF: sector:',jn0,js0,jdim0
+         jup0    = getnup(jsect0)
+         jdw0    = getndw(jsect0)
+         write(*,"(A,2I3,I15)")'GetGF: sector:',jup0,jdw0,jdim0
          allocate(vvinit(jdim0)) ; vvinit=0.d0
          do m=1,idim0                                                !loop over |gs> components m
             i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
@@ -332,7 +330,7 @@ contains
     call msg("Evaluating G_imp_Orb"//trim(txtfy(iorb))//"_Spin"//trim(txtfy(ispin)),unit=LOGfile)
     call start_timer
     do isector=startloop,lastloop
-       if(isector < minCsector(ispin))cycle
+       !if(isector < minCsector(ispin))cycle
        jsector=getCsector(1,isector);if(jsector==0)cycle
        call eta(isector,lastloop,file="ETA_GF_Orb"//trim(txtfy(iorb))//"_Spin"//trim(txtfy(ispin))//".ed")
        idim=getdim(isector)     !i-th sector dimension
