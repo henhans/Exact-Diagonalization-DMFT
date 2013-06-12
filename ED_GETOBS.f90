@@ -31,6 +31,7 @@ contains
     integer              :: izero,isect0,jsect0,m
     integer              :: in0,is0,idg0,ispin
     integer              :: jn0,js0,jdg0
+    real(8)              :: nup2,ndw2
     real(8)              :: gs
     real(8)              :: wm1,wm2
     real(8)              :: norm0,sgn,nup,ndw
@@ -43,6 +44,15 @@ contains
     dimp   = 0.d0
     magimp = 0.d0
     m2imp  = 0.d0
+
+    nimp2   =0.d0
+    nupimp2 =0.d0
+    ndwimp2 =0.d0
+    dimp2   =0.d0
+    magimp2 =0.d0
+    m2imp2  =0.d0
+
+    m2imp12 =0.d0
 
     do izero=1,numzero   
        !GET THE GROUNDSTATE (make some checks)
@@ -62,6 +72,20 @@ contains
           dimp   = dimp   +  (nup*ndw)*gs**2
           magimp = magimp +  (nup-ndw)*gs**2
           m2imp  = m2imp  +  gs**2*(nup-ndw)**2
+
+
+          if(Nimp==2)then
+             nup2=real(ib(2),8)
+             ndw2=real(ib(2+Ns),8)
+             nimp2   = nimp2   +  (nup2+ndw2)*gs**2
+             nupimp2 = nupimp2 +  (nup2)*gs**2
+             ndwimp2 = ndwimp2 +  (ndw2)*gs**2
+             dimp2   = dimp2   +  (nup2*ndw2)*gs**2
+             magimp2 = magimp2 +  (nup2-ndw2)*gs**2
+             m2imp2  = m2imp2  +  gs**2*(nup2-ndw2)**2
+             m2imp12 = m2imp12  + gs**2*(nup2-ndw2)*(nup-ndw)
+          endif
+
        enddo
     enddo
     nsimp  = nsimp/factor
@@ -70,6 +94,16 @@ contains
     dimp   = dimp/factor
     magimp = magimp/factor
     m2imp  = m2imp/factor
+
+
+    nimp2   =nimp2/factor
+    nupimp2 =nupimp2/factor
+    ndwimp2 =ndwimp2/factor
+    dimp2   =dimp2/factor
+    magimp2 =magimp2/factor
+    m2imp2  =m2imp2/factor
+
+    m2imp12 =m2imp12/factor
 
     wm1 = pi/beta ; wm2=3.d0*pi/beta
     supimp   = dimag(Siw(1,1)) - wm1*(dimag(Siw(1,2))-dimag(Siw(1,1)))/(wm2-wm1)
@@ -110,7 +144,6 @@ contains
     integer                  :: idg
     real(8)                  :: gs
     real(8)                  :: wm1,wm2
-    real(8)                  :: rupimp2,rdwimp2
     real(8)                  :: Ei,nup,ndw,nup2,ndw2,peso
     real(8)                  :: w
     complex(8)               :: iw,alpha,greend0,selfd,zita
