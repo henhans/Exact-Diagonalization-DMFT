@@ -4,41 +4,32 @@ include sfmake.inc
 #EXE=fulled_lda1b
 #EXE=lanced_lda1b
 #EXE =fulled_pam_2dsquare
-#EXE=fulled_pam_2imp
-EXE=lanced_pam_2imp
 #EXE=fulled_pam_bethe
 #EXE=fulled_hm_bethe
-#EXE=lanced_hm_bethe
+EXE=lanced_hm_bethe
 DIR =drivers
 DIREXE=$(HOME)/.bin
 
-.SUFFIXES: .f90 
+FC=$(SFMPI)/mpif90
 
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
-# REV= $(shell git rev-parse HEAD)
-# VER='character(len=41),parameter :: revision = "$(REV)"' > revision.inc
-
-#ADD ARPACK LIB:
-# SFLIBS += -L/opt/arpack/lib -larpack
-# SFLIBS_DEB += -L/opt/arpack/lib -larpack
 
 #COMPILATION:
-OBJS=ED_VARS_GLOBAL.o ED_LANCZOS.o ED_AUX_FUNX.o ED_BATH.o ED_GETH.o ED_GETGF.o ED_GETOBS.o ED_CHI2FIT.o ED_DIAG.o DMFT_ED.o
+OBJS= MATRIX_SPARSE.o ARPACK_LANCZOS.o PLAIN_LANCZOS.o ED_EIGENSPACE.o ED_VARS_GLOBAL.o ED_AUX_FUNX.o ED_BATH.o ED_GETH.o ED_GETGF.o ED_GETOBS.o ED_CHI2FIT.o ED_DIAG.o DMFT_ED.o
 
 #=================STANDARD COMPILATION====================================
 all: FLAG=$(STD) 
-all: ARGS=$(SFINCLUDE) $(SFLIBS)
+all: ARGS=$(SFLIBS)
 all:compile
-
 
 #================OPTIMIZED COMPILATION====================================
 opt: FLAG=$(OPT)
-opt: ARGS=$(SFINCLUDE) $(SFLIBS)
+opt: ARGS=$(SFLIBS)
 opt:compile
 
 #================DEBUGGIN COMPILATION=====================================
 debug: FLAG=$(DEB)
-debug: ARGS=$(SFINCLUDE_DEB) $(SFLIBS_DEB)
+debug: ARGS=$(SFLIBS_DEB)
 debug:compile
 
 

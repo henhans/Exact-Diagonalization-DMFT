@@ -1,39 +1,181 @@
-MODULE LANCZOS_HTIMESV_INTERFACE
+MODULE PLAIN_LANCZOS_HTIMESV_INTERFACE
   implicit none
   abstract interface 
-     subroutine lanc_htimesv(n,vin,vout)
+     subroutine lanc_htimesv_d(n,vin,vout)
        integer :: n
        real(8) :: vin(n)
        real(8) :: vout(n)
-     end subroutine lanc_htimesv
+     end subroutine lanc_htimesv_d
+     !
+     subroutine lanc_htimesv_c(n,vin,vout)
+       integer :: n
+       complex(8) :: vin(n)
+       complex(8) :: vout(n)
+     end subroutine lanc_htimesv_c
+     !
+     ! subroutine lanc_htimesv_mpi(Q,R,nloc,n,vin,vout)
+     !   integer                 :: Q,R,nloc,n
+     !   real(8),dimension(nloc) :: vin,vout
+     ! end subroutine lanc_htimesv_mpi
   end interface
-END MODULE LANCZOS_HTIMESV_INTERFACE
+END MODULE PLAIN_LANCZOS_HTIMESV_INTERFACE
 
 
 MODULE PLAIN_LANCZOS
-  USE LANCZOS_HTIMESV_INTERFACE
+  USE PLAIN_LANCZOS_HTIMESV_INTERFACE
   implicit none
   private
-  procedure(lanc_htimesv),pointer :: p_hprod
+  procedure(lanc_htimesv_d),pointer :: dp_hprod
+  procedure(lanc_htimesv_c),pointer :: cp_hprod
 
   logical :: verb=.false.
   real(8) :: threshold_=1.d-12
   real(8) :: ncheck_=10
 
-  public :: plain_lanczos_set_htimesv
-  public :: plain_lanczos_get_groundstate
-  public :: plain_lanczos_tridiag
+  interface plain_lanczos_iteration
+     module procedure plain_lanczos_iteration_d,plain_lanczos_iteration_c
+  end interface plain_lanczos_iteration
+  !
+  interface plain_lanczos_tridiag
+     module procedure plain_lanczos_tridiag_d,plain_lanczos_tridiag_c
+  end interface plain_lanczos_tridiag
+
+  public :: plain_lanczos_set_htimesv_d
+  public :: plain_lanczos_set_htimesv_c
+  public :: plain_lanczos_delete_htimesv_d
+  public :: plain_lanczos_delete_htimesv_c
+  !
   public :: plain_lanczos_iteration
+  !
+  public :: plain_lanczos_tridiag
+  !
+  public :: plain_lanczos_get_groundstate
+  !
   public :: tql2
 
 contains
 
 
-  subroutine plain_lanczos_set_htimesv(Hprod)
-    procedure(lanc_htimesv)  :: Hprod
-    if(associated(p_hprod))nullify(p_hprod)
-    p_hprod=>Hprod
-  end subroutine plain_lanczos_set_htimesv
+  subroutine plain_lanczos_set_htimesv_d(Hprod)
+    procedure(lanc_htimesv_d)  :: Hprod
+    if(associated(dp_hprod))nullify(dp_hprod)
+    dp_hprod=>Hprod
+  end subroutine plain_lanczos_set_htimesv_d
+  !
+  subroutine plain_lanczos_set_htimesv_c(Hprod)
+    procedure(lanc_htimesv_c)  :: Hprod
+    if(associated(cp_hprod))nullify(cp_hprod)
+    cp_hprod=>Hprod
+  end subroutine plain_lanczos_set_htimesv_c
+
+
+  subroutine plain_lanczos_delete_htimesv_d()
+    if(associated(dp_hprod))nullify(dp_hprod)
+  end subroutine plain_lanczos_delete_htimesv_d
+  !
+  subroutine plain_lanczos_delete_htimesv_c()
+    if(associated(cp_hprod))nullify(cp_hprod)
+  end subroutine plain_lanczos_delete_htimesv_c
+
+
+  subroutine plain_lanczos_iteration_d(iter,vin,vout,a,b)
+    real(8),dimension(:),intent(inout)         :: vin
+    real(8),dimension(size(vin)),intent(inout) :: vout
+    real(8),dimension(size(vin))               :: dummy,tmp
+    real(8),intent(inout)                      :: a,b
+    integer                                    :: i,iter,ns_
+    real(8)                                    :: norm
+    ns_=size(vin)
+    if(iter==1)then
+       norm=sqrt(dot_product(vin,vin))
+       if(norm==0.d0)stop "plain_lanczos_iteration: norm =0!!"
+       vin=vin/norm
+       b=0.d0
+    end if
+    call dp_Hprod(ns_,vin,tmp)
+    tmp=tmp-b*vout
+    a = dot_product(vin,tmp)
+    dummy=tmp-a*vin
+    b = sqrt(dot_product(dummy,dummy))
+    vout = vin
+    vin = dummy/b
+  end subroutine plain_lanczos_iteration_d
+  !
+  subroutine plain_lanczos_iteration_c(iter,vin,vout,a,b)
+    complex(8),dimension(:),intent(inout)         :: vin
+    complex(8),dimension(size(vin)),intent(inout) :: vout
+    complex(8),dimension(size(vin))               :: dummy,tmp
+    real(8),intent(inout)                         :: a,b
+    integer                                       :: i,iter,ns_
+    real(8)                                       :: norm
+    ns_=size(vin)
+    if(iter==1)then
+       norm=sqrt(dot_product(vin,vin))
+       if(norm==0.d0)stop "plain_lanczos_iteration: norm =0!!"
+       vin=vin/norm
+       b=0.d0
+    end if
+    call cp_Hprod(ns_,vin,tmp)
+    tmp=tmp-b*vout
+    a = dot_product(vin,tmp)
+    dummy=tmp-a*vin
+    b = sqrt(dot_product(dummy,dummy))
+    vout = vin
+    vin = dummy/b
+  end subroutine plain_lanczos_iteration_c
+
+
+
+  subroutine plain_lanczos_tridiag_d(vin,alanc,blanc,nitermax,iverbose,threshold)
+    real(8),dimension(:),intent(inout)        :: vin
+    real(8),dimension(size(vin))              :: vout
+    real(8),dimension(nitermax),intent(inout) :: alanc
+    real(8),dimension(nitermax),intent(inout) :: blanc
+    integer                                   :: i,nitermax,ierr
+    integer                                   :: iter,nlanc
+    real(8)                                   :: a_,b_,diff
+    real(8),optional                          :: threshold
+    logical,optional                          :: iverbose
+    if(present(iverbose))verb=iverbose
+    if(present(threshold))threshold_=threshold
+    a_=0.d0
+    b_=0.d0
+    vout=0.d0
+    do iter=1,nitermax
+       call plain_lanczos_iteration_d(iter,vin,vout,a_,b_)
+       if(verb)print*,iter,a_,b_
+       if(abs(b_)<threshold_)exit
+       alanc(iter)=a_
+       if(iter<nitermax)blanc(iter+1)=b_
+    enddo
+  end subroutine plain_lanczos_tridiag_d
+  !
+  subroutine plain_lanczos_tridiag_c(vin,alanc,blanc,nitermax,iverbose,threshold)
+    complex(8),dimension(:),intent(inout)     :: vin
+    complex(8),dimension(size(vin))           :: vout
+    real(8),dimension(nitermax),intent(inout) :: alanc
+    real(8),dimension(nitermax),intent(inout) :: blanc
+    integer                                   :: i,nitermax,ierr
+    integer                                   :: iter,nlanc
+    real(8)                                   :: a_,b_,diff
+    real(8),optional                          :: threshold
+    logical,optional                          :: iverbose
+    if(present(iverbose))verb=iverbose
+    if(present(threshold))threshold_=threshold
+    a_=0.d0
+    b_=0.d0
+    vout=cmplx(0.d0,0.d0,8)
+    do iter=1,nitermax
+       call plain_lanczos_iteration_c(iter,vin,vout,a_,b_)
+       if(verb)print*,iter,a_,b_
+       if(abs(b_)<threshold_)exit
+       alanc(iter)=a_
+       if(iter<nitermax)blanc(iter+1)=b_
+    enddo
+  end subroutine plain_lanczos_tridiag_c
+
+
+
 
 
   subroutine plain_lanczos_get_groundstate(ns,nitermax,egs,vect,Nlanc,iverbose,threshold,ncheck)
@@ -53,8 +195,8 @@ contains
     if(present(iverbose))verb=iverbose
     if(present(threshold))threshold_=threshold
     if(present(ncheck))ncheck_=ncheck
-    if(.not.associated(p_hprod))then
-       print*,"PLAIN_LANCZOS: p_hprod is not set. call plain_lanczos_set_htimesv"
+    if(.not.associated(dp_hprod))then
+       print*,"PLAIN_LANCZOS: dp_hprod is not set. call plain_lanczos_set_htimesv"
        stop
     endif
     norm=dot_product(vect,vect)
@@ -132,51 +274,9 @@ contains
 
 
 
-  subroutine plain_lanczos_tridiag(vin,alanc,blanc,nitermax,iverbose,threshold)
-    real(8),dimension(:),intent(inout)        :: vin
-    real(8),dimension(size(vin))              :: vout
-    real(8),dimension(nitermax),intent(inout) :: alanc
-    real(8),dimension(nitermax),intent(inout) :: blanc
-    integer                                   :: i,nitermax,ierr
-    integer                                   :: iter,nlanc
-    real(8)                                   :: a_,b_,diff
-    real(8),optional                          :: threshold
-    logical,optional                          :: iverbose
-    if(present(iverbose))verb=iverbose
-    if(present(threshold))threshold_=threshold
-    a_=0.d0
-    b_=0.d0
-    do iter=1,nitermax
-       call plain_lanczos_iteration(iter,vin,vout,a_,b_)
-       if(abs(b_)<threshold_)exit
-       alanc(iter)=a_
-       if(iter<nitermax)blanc(iter+1)=b_
-    enddo
-  end subroutine plain_lanczos_tridiag
 
 
 
-  subroutine plain_lanczos_iteration(iter,vin,vout,a,b)
-    real(8),dimension(:),intent(inout)         :: vin
-    real(8),dimension(size(vin)),intent(inout) :: vout
-    real(8),dimension(size(vin))               :: dummy,tmp
-    real(8),intent(inout)              :: a,b
-    integer                            :: i,iter,ns_
-    real(8)                            :: norm
-    ns_=size(vin)
-    if(iter==1)then
-       norm=sqrt(dot_product(vin,vin))
-       vin=vin/norm
-       b=0.d0
-    end if
-    call p_Hprod(ns_,vin,tmp)
-    tmp=tmp-b*vout
-    a = dot_product(vin,tmp)
-    dummy=tmp-a*vin
-    b = sqrt(dot_product(dummy,dummy))
-    vout = vin
-    vin = dummy/b
-  end subroutine plain_lanczos_iteration
 
 
   subroutine tql2 ( n, d, e, z, ierr )

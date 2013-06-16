@@ -24,14 +24,14 @@ MODULE ED_BATH
 
   !Bath parameters (to be used in H)
   !=========================================================
-  real(8),allocatable,dimension(:,:),public :: ebath
-  real(8),allocatable,dimension(:,:),public :: vbath
-  logical :: bath_status=.false.
+  real(8),allocatable,dimension(:,:),public   :: ebath
+  real(8),allocatable,dimension(:,:,:),public :: vbath
+  logical                                     :: bath_status=.false.
 
 contains
 
   subroutine allocate_bath()
-    allocate(ebath(Nspin,Nbath),vbath(Nspin,Nbath))
+    allocate(ebath(Nspin,Nbath),vbath(Norb,Nspin,Nbath))
     bath_status=.true.
   end subroutine allocate_bath
 
@@ -46,7 +46,7 @@ contains
     real(8),dimension(:) :: bath
     integer              :: N_
     N_=size(bath)
-    if(N_< 2*Nspin*Nbath)&
+    if(N_ < (Norb+1)*Nspin*Nbath)&
          call error("CHECK_BATH_DIMENSION: error")
   end subroutine check_bath_dimension
 
@@ -56,7 +56,8 @@ contains
   !+-------------------------------------------------------------------+
   function get_bath_size() result(N)
     integer :: N
-    N=2*Nspin*Nbath
+    !(Norb+1)[energies&hybridizations]*Nspin[# of spins]*Nbath[# of bath sites]
+    N=(Norb+1)*Nspin*Nbath
   end function get_bath_size
 
 
