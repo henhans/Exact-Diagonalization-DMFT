@@ -22,8 +22,7 @@ contains
   !####################################################################
   !                    FULL DIAGONALIZATION
   !####################################################################
-  include 'fulled_diag.f90'
-
+  include 'include_fulled_diag.f90'
 
 
   !####################################################################
@@ -37,7 +36,6 @@ contains
     integer                            :: i   
     call msg("INIT SOLVER, SETUP EIGENSPACE",unit=LOGfile)
     call check_bath_dimension(bath)
-    call allocate_bath
     call init_bath_ed
     if(Nspin==2)then
        heff=abs(heff)
@@ -58,6 +56,7 @@ contains
   !+------------------------------------------------------------------+
   subroutine lanc_ed_solver(bath)
     real(8),dimension(:),intent(in) :: bath
+    integer :: unit
     call msg("ED SOLUTION",unit=LOGfile)
     call check_bath_dimension(bath)
     call allocate_bath
@@ -65,13 +64,16 @@ contains
     call lanc_ed_diag
     call lanc_ed_getgf
     call lanc_ed_getobs
-    call dump_bath(Hfile)
+    unit=free_unit
+    open(unit,file=trim(Hfile))
+    call write_bath(unit)
+    close(unit)
     call deallocate_bath
   end subroutine lanc_ed_solver
 
 
 
-!+-------------------------------------------------------------------+
+  !+-------------------------------------------------------------------+
   !PURPOSE  : Setup the Hilbert space, create the Hamiltonian, get the
   ! GS, build the Green's functions calling all the necessary routines
   !+------------------------------------------------------------------+
@@ -114,7 +116,7 @@ contains
           eig_basis(1,1)=1.d0
        end select
        enemin=eig_values(1)  
-       if (enemin < oldzero-10.d-9) then
+       if (enemin < oldzero-1.d-10) then
           numzero=1
           oldzero=enemin
           call es_free_espace(groundstate)
@@ -135,8 +137,8 @@ contains
     do izero=1,numzero
        isect0= es_get_sector(groundstate,izero)
        egs   = es_get_energy(groundstate,izero)
-       nup0    = getnup(isect0)
-       ndw0    = getndw(isect0)
+       nup0  = getnup(isect0)
+       ndw0  = getndw(isect0)
        dim0  = getdim(isect0)
        write(LOGfile,"(A,f18.12,2I4)")'egs =',egs,nup0,ndw0
     enddo
@@ -146,10 +148,6 @@ contains
     close(3)
     call stop_timer
   end subroutine lanc_ed_diag
-
-
-
-
 
 
 end MODULE ED_DIAG

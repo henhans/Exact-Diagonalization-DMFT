@@ -4,7 +4,7 @@ MODULE ED_VARS_GLOBAL
   USE TIMER
   USE PARSE_CMD
   USE IOTOOLS
-  USE MATRIX, only: matrix_diagonalize
+  USE MATRIX, only: matrix_diagonalize,matrix_inverse
   USE OPTIMIZE
   USE TOOLS, only: arange,linspace
   !LOCAL
@@ -94,7 +94,9 @@ MODULE ED_VARS_GLOBAL
   complex(8),allocatable,dimension(:,:,:,:) :: Giw,Siw
   complex(8),allocatable,dimension(:,:,:,:) :: Gwr,Swr
   real(8),allocatable,dimension(:,:,:)      :: Chitau
+  real(8),allocatable,dimension(:)          :: Chitautot
   complex(8),allocatable,dimension(:,:,:)   :: Chiw
+  complex(8),allocatable,dimension(:)       :: Chiwtot
 
 
   !Variables for fixed density mu-loop 
@@ -103,9 +105,8 @@ MODULE ED_VARS_GLOBAL
 
   !Qties needed to get energy
   !=========================================================
-  real(8) ::  nimp,dimp,nupimp,ndwimp,magimp,m2imp
-  real(8) ::  nimp2,dimp2,nupimp2,ndwimp2,magimp2,m2imp2
-  real(8) ::  m2imp12
+  real(8),dimension(:),allocatable   ::  nimp,dimp,nupimp,ndwimp,magimp
+  real(8),dimension(:,:),allocatable ::  m2imp
 
 
   !NML READ/WRITE UNITS
@@ -175,10 +176,10 @@ contains
     cgType     = 0
     !ReadUnits
     Hfile  ="hamiltonian.restart"
-    GMfile ="impG_iw.ed"
-    GRfile ="impG_realw.ed"
-    CTfile ="Chi_tau.ed"
-    CWfile ="Chi_realw.ed"    
+    GMfile ="impG_iw"
+    GRfile ="impG_realw"
+    CTfile ="Chi_tau"
+    CWfile ="Chi_realw"    
     Ofile  ="observables.ed"
     LOGfile=6
 
@@ -267,6 +268,9 @@ contains
     allocate(Giw(Norb,Norb,Nspin,NL),Siw(Norb,Norb,Nspin,NL))
     allocate(Gwr(Norb,Norb,Nspin,Nw),Swr(Norb,Norb,Nspin,Nw))
     if(chiflag)allocate(Chitau(Norb,Norb,0:Ltau),Chiw(Norb,Norb,Nw))
+
+    allocate(nimp(Norb),dimp(Norb),nupimp(Norb),ndwimp(Norb),magimp(Norb))
+    allocate(m2imp(Norb,Norb))
   end subroutine read_input
 
 

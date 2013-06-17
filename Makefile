@@ -7,10 +7,11 @@ include sfmake.inc
 #EXE=fulled_pam_bethe
 #EXE=fulled_hm_bethe
 EXE=lanced_hm_bethe
+#EXE=testBATH
 DIR =drivers
 DIREXE=$(HOME)/.bin
 
-FC=$(SFMPI)/mpif90
+#FC=$(SFMPI)/mpif90
 
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
