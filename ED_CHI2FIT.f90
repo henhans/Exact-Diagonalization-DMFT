@@ -71,6 +71,7 @@ contains
     call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cgNitmax,ftol=cgFtol)
     bath(ifirst:ilast) = a(:)
     !
+    call dump_fit_result(bath,ispin)
     write(*,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
     print*," "
     deallocate(Fdelta,Xdelta,Wdelta)
@@ -159,8 +160,7 @@ contains
        dgz(i)    = Vpsk(orb1,i)*Vpsk(orb2,i)/(xi*w-epsk(i))**2
        do j=1,Norb
           dgz(i+j*Nbath) = &
-               (DeltaOrb(j,orb1)*Vpsk(orb2,i) + &
-               DeltaOrb(j,orb2)*Vpsk(orb1,i))  &
+               (DeltaOrb(j,orb1)*Vpsk(orb2,i) + DeltaOrb(j,orb2)*Vpsk(orb1,i))&
                /(xi*w-epsk(i))
        enddo
     enddo
@@ -171,20 +171,28 @@ contains
 
 
 
-  ! !+-------------------------------------------------------------+
-  ! !PURPOSE  : 
-  ! !+-------------------------------------------------------------+
-  ! subroutine dump_fit_result(ichan)
-  !   complex(8),dimension(Ldelta) :: fgand
-  !   integer                      :: ichan,i,j,Lw
-  !   real(8)                      :: w
-  !   fgand=zero
-  !   do i=1,Ldelta
-  !      w=Xdelta(i)
-  !      fgand(i) = delta_bath(xi*w,ichan)
-  !   enddo
-  !   call splot("fit_delta.ed",Xdelta,dimag(Fdelta),dimag(fgand),dreal(Fdelta),dreal(fgand))
-  ! end subroutine dump_fit_result
+  !+-------------------------------------------------------------+
+  !PURPOSE  : 
+  !+-------------------------------------------------------------+
+  subroutine dump_fit_result(bath,ispin)
+    real(8),dimension(:)         :: bath
+    complex(8),dimension(Ldelta) :: fgand
+    integer                      :: i,j,k,iorb,jorb,ispin
+    real(8)                      :: w
+    character(len=20)            :: suffix
+    do k=1,totNorb
+       iorb=getIorb(k)
+       jorb=getJorb(k)
+       suffix="_orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//".ed"
+       fgand=zero
+       do i=1,Ldelta
+          w=Xdelta(i)
+          fgand(i) = delta_and(xi*w,bath,iorb,jorb,ispin)
+       enddo
+       call splot("fit_delta"//reg(suffix),&
+            Xdelta,dimag(Fdelta(k,:)),dimag(fgand),dreal(Fdelta(k,:)),dreal(fgand))
+    enddo
+  end subroutine dump_fit_result
 
 
 

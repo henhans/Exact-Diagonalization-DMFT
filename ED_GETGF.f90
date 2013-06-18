@@ -80,9 +80,6 @@ contains
                   "_Spin"//trim(txtfy(ispin))//"_Sect0"//trim(txtfy(izero)),unit=LOGfile)
              call lanc_ed_buildgf(isect0,iorb,ispin)
           enddo
-       enddo
-       !
-       do ispin=1,Nspin
           do iorb=1,Norb
              do jorb=iorb+1,Norb
                 call lanc_ed_buildgf_mix(isect0,iorb,jorb,ispin)
@@ -341,47 +338,66 @@ contains
     real(8) :: kdelta  
     character(len=20) :: suffix
 
-
+    call msg("Printing the impurity GF")
 
     !Build the impurity Self-energies:
-    do ispin=1,Nspin
-       do iorb=1,Norb
-          do jorb=1,Norb
-             !Get Weiss Fields (from Bath):
-             kdelta=0.d0;if(iorb==jorb)kdelta=1.d0
-             do i=1,NL
-                iw=xi*wm(i)
-                G0iw(iorb,jorb,ispin,i)= kdelta*(iw+xmu)-delta_bath(iw,iorb,jorb,ispin)
-             enddo
-             do i=1,Nw
-                iw=cmplx(wr(i),eps)
-                G0wr(iorb,jorb,ispin,i)= kdelta*(iw+xmu)-delta_bath(iw,iorb,jorb,ispin)
+    select case(Norb)
+    case default
+       do ispin=1,Nspin
+          do iorb=1,Norb
+             do jorb=1,Norb
+                !Get Weiss Fields (from Bath):
+                kdelta=0.d0;if(iorb==jorb)kdelta=1.d0
+                do i=1,NL
+                   iw=xi*wm(i)
+                   G0iw(iorb,jorb,ispin,i)= kdelta*(iw+xmu)-delta_bath(iw,iorb,jorb,ispin)
+                enddo
+                do i=1,Nw
+                   iw=cmplx(wr(i),eps)
+                   G0wr(iorb,jorb,ispin,i)= kdelta*(iw+xmu)-delta_bath(iw,iorb,jorb,ispin)
+                enddo
              enddo
           enddo
+          do i=1,NL
+             Gfoo = Giw(:,:,ispin,i)
+             call matrix_inverse(Gfoo)
+             Siw(:,:,ispin,i) = G0iw(:,:,ispin,i) - Gfoo(:,:)           
+          enddo
+          do i=1,Nw
+             Gfoo = Gwr(:,:,ispin,i)
+             call matrix_inverse(Gfoo)
+             Swr(:,:,ispin,i) = G0wr(:,:,ispin,i) - Gfoo(:,:)
+          enddo
        enddo
-       do i=1,NL
-          Gfoo = Giw(:,:,ispin,i)
-          call matrix_inverse(Gfoo)
-          Siw(:,:,ispin,i) = G0iw(:,:,ispin,i) - Gfoo(:,:)           
-       enddo
-       do i=1,Nw
-          Gfoo = Gwr(:,:,ispin,i)
-          call matrix_inverse(Gfoo)
-          Swr(:,:,ispin,i) = G0wr(:,:,ispin,i) - Gfoo(:,:)
-       enddo
-    enddo
 
-
-    !Get the Weiss-Field of the Anderson problem: by inverting calG0^-1 matrix
-    do ispin=1,Nspin
-       do i=1,NL
-          call matrix_inverse(G0iw(:,:,ispin,i))
+       !Get the Weiss-Field of the Anderson problem: by inverting calG0^-1 matrix
+       do ispin=1,Nspin
+          do i=1,NL
+             call matrix_inverse(G0iw(:,:,ispin,i))
+          enddo
+          do i=1,Nw
+             call matrix_inverse(G0wr(:,:,ispin,i))
+          enddo
        enddo
-       do i=1,Nw
-          call matrix_inverse(G0wr(:,:,ispin,i))
-       enddo
-    enddo
 
+    case (1)
+       do ispin=1,Nspin
+          !Get Weiss Fields (from Bath):
+          do i=1,NL
+             iw=xi*wm(i)
+             G0iw(1,1,ispin,i)= (iw+xmu)-delta_bath(iw,1,1,ispin)
+             Siw(1,1,ispin,i) = G0iw(1,1,ispin,i) - one/Giw(1,1,ispin,i)
+             G0iw(1,1,ispin,i)= one/G0iw(1,1,ispin,i)
+          enddo
+          do i=1,Nw
+             iw=cmplx(wr(i),eps)
+             G0wr(1,1,ispin,i)= (iw+xmu)-delta_bath(iw,1,1,ispin)
+             Swr(1,1,ispin,i) = G0wr(1,1,ispin,i) - one/Gwr(1,1,ispin,i)
+             G0wr(1,1,ispin,i)= one/G0wr(1,1,ispin,i)
+          enddo
+       enddo
+
+    end select
 
     !Print the impurity functions:
     do iorb=1,Norb

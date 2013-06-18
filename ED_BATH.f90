@@ -70,7 +70,7 @@ contains
     integer :: i,iorb,ispin,unit
     logical :: IOfile
     real(8) :: ran(Nbath)
-    character :: foo
+    character(len=100) :: foo
     if(bath_status)call deallocate_bath
     call allocate_bath
     inquire(file=trim(Hfile),exist=IOfile)
@@ -78,10 +78,9 @@ contains
        write(LOGfile,"(A)")bg_green('Reading bath/xmu from file')
        unit = free_unit()
        open(unit,file=trim(Hfile))
-       read(unit,*)foo
+       read(unit,*)
        do i=1,Nbath
-          read(*,"(90(F13.9,1X))")(ebath(ispin,i),&
-               (vbath(iorb,ispin,i),iorb=1,Norb),ispin=1,Nspin)
+          read(unit,"(90(F13.9,1X))")(ebath(ispin,i),(vbath(iorb,ispin,i),iorb=1,Norb),ispin=1,Nspin)
        enddo
        close(unit)
     else

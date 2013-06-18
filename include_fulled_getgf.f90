@@ -10,13 +10,18 @@ subroutine full_ed_getgf()
   !Initialize some functions
   Giw   =zero
   Gwr   =zero
-  do iorb=1,Norb
-     do jorb=1,Norb
-        do ispin=1,Nspin
-           call full_ed_buildgf(iorb,jorb,ispin)
+  call start_timer
+  do ispin=1,Nspin
+     do iorb=1,Norb
+        call full_ed_buildgf(iorb,ispin)
+     enddo
+     do iorb=1,Norb
+        do jorb=iorb+1,Norb
+           call full_ed_buildgf_mix(iorb,jorb,ispin)
         enddo
      enddo
   enddo
+  call stop_timer
   call print_imp_gf
   deallocate(wm,tau,wr)
 end subroutine full_ed_getgf
@@ -26,7 +31,68 @@ end subroutine full_ed_getgf
 !+------------------------------------------------------------------+
 !PURPOSE  : 
 !+------------------------------------------------------------------+
-subroutine full_ed_buildgf(iorb,jorb,ispin)
+subroutine full_ed_buildgf(iorb,ispin)
+  integer                 :: iorb,ispin,isite,jsite,nsite
+  real(8),allocatable     :: cdgmat(:),cc(:)
+  integer,dimension(Ntot) :: ib
+  integer                 :: i,j,k,r,ll,m,in,is
+  integer                 :: idim,jdim,isector,jsector,ia
+  real(8)                 :: Ei,Ej,matcdg
+  real(8)                 :: expterm,peso,de,w0,it,chij1
+  complex(8)              :: iw
+  nsite=1
+  isite=impIndex(iorb,ispin)
+  allocate(cdgmat(nsite),cc(nsite))
+  call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(iorb))//&
+       "_Spin"//reg(txtfy(ispin)),unit=LOGfile)
+
+  do isector=startloop,lastloop
+     jsector=getCsector(1,isector);if(jsector==0)cycle
+     !call eta(isector,lastloop,file="ETA_GF_Orb"//reg(txtfy(iorb))//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin))//".ed")
+     idim=getdim(isector)     !i-th sector dimension
+     jdim=getdim(jsector)     !j-th sector dimension
+     do i=1,idim          !loop over the states in the i-th sect.
+        do j=1,jdim       !loop over the states in the j-th sect.
+           cdgmat=0.d0
+           expterm=exp(-beta*espace(isector)%e(i))+exp(-beta*espace(jsector)%e(j))
+           if(expterm < cutoff)cycle
+           !
+           do ll=1,jdim              !loop over the component of |j> (IN state!)
+              m=Hmap(jsector)%map(ll)!map from IN state (j) 2 full Hilbert space
+              call bdecomp(m,ib)
+              if(ib(isite) == 0)then
+                 call cdg(isite,m,k);cc(1)=dble(k)/dble(abs(k));k=abs(k)
+                 r=invHmap(isector,k)
+                 cdgmat(1)=cdgmat(1)+espace(isector)%M(r,i)*cc(1)*espace(jsector)%M(ll,j)
+              endif
+           enddo
+           Ei=espace(isector)%e(i)
+           Ej=espace(jsector)%e(j)
+           de=Ej-Ei
+           peso=expterm/zeta_function
+           matcdg=peso*cdgmat(1)**2
+           !build Matsubara GF
+           do m=1,NL
+              iw=xi*wm(m)
+              Giw(iorb,iorb,ispin,m)=Giw(iorb,iorb,ispin,m)+matcdg/(iw+de)
+           enddo
+           !build Real-freq. GF
+           do m=1,Nw 
+              w0=wr(m);iw=cmplx(w0,eps)
+              Gwr(iorb,iorb,ispin,m)=Gwr(iorb,iorb,ispin,m)+matcdg/(iw+de)
+           enddo
+        enddo
+     enddo
+  enddo
+  !call stop_timer
+end subroutine full_ed_buildgf
+
+
+
+!+------------------------------------------------------------------+
+!PURPOSE  : 
+!+------------------------------------------------------------------+
+subroutine full_ed_buildgf_mix(iorb,jorb,ispin)
   integer                 :: iorb,jorb,ispin,isite,jsite,nsite
   real(8),allocatable     :: cdgmat(:),cc(:)
   integer,dimension(Ntot) :: ib
@@ -36,21 +102,20 @@ subroutine full_ed_buildgf(iorb,jorb,ispin)
   real(8)                 :: expterm,peso,de,w0,it,chij1
   complex(8)              :: iw
   if(iorb==jorb)then
-     nsite=1
-     isite=impIndex(iorb,ispin)
-     jsite=isite
+     call error("FULL_ED_BUILDGF_MIX: jorb == iorb. Here I get off-diagonal GF only")
   else
      nsite=2
      isite=impIndex(iorb,ispin)
      jsite=impIndex(jorb,ispin)
+     if(isite==jsite)call error("FULL_ED_BUILDGF_MIX: isite == jsite. Here I get off-diagonal GF only")
   endif
   allocate(cdgmat(nsite),cc(nsite))
   call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//&
        "_Spin"//reg(txtfy(ispin)),unit=LOGfile)
-  call start_timer
+  !call start_timer
   do isector=startloop,lastloop
      jsector=getCsector(1,isector);if(jsector==0)cycle
-     call eta(isector,lastloop,file="ETA_GF_Orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//"_Spin"//reg(txtfy(ispin))//".ed")
+     !call eta(isector,lastloop,file="ETA_GF_Orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//"_Spin"//reg(txtfy(ispin))//".ed")
      idim=getdim(isector)     !i-th sector dimension
      jdim=getdim(jsector)     !j-th sector dimension
      do i=1,idim          !loop over the states in the i-th sect.
@@ -91,8 +156,8 @@ subroutine full_ed_buildgf(iorb,jorb,ispin)
         enddo
      enddo
   enddo
-  call stop_timer
-end subroutine full_ed_buildgf
+  !call stop_timer
+end subroutine full_ed_buildgf_mix
 
 
 
