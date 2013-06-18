@@ -58,7 +58,7 @@ contains
     integer :: isect0
     real(8) :: norm0
     !SET THE LANCZOS H*v method:
-    call plain_lanczos_set_htimesv(spHtimesV)
+    call plain_lanczos_set_htimesv_d(spHtimesV)
     !set grids
     call allocate_grids
     !Set Max GF iterations
@@ -341,9 +341,7 @@ contains
     real(8) :: kdelta  
     character(len=20) :: suffix
 
-    suffix="_orb"//trim(adjustl(trim(txtfy(iorb))))//&
-         trim(adjustl(trim(txtfy(jorb))))//&
-         "_s"//trim(adjustl(trim(txtfy(ispin))))//".ed"
+
 
     !Build the impurity Self-energies:
     do ispin=1,Nspin
@@ -387,24 +385,26 @@ contains
 
     !Print the impurity functions:
     do iorb=1,Norb
-       do jorb=1,Norb           
+       do jorb=1,Norb
+          suffix="_orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//".ed"
+
           unit(1)=free_unit()
-          open(unit(1),file=trim(GMfile)//trim(adjustl(trim(suffix))))
+          open(unit(1),file=trim(GMfile)//reg(suffix))
 
           unit(2)=free_unit()
-          open(unit(2),file="impG0_iw"//trim(adjustl(trim(suffix))))
+          open(unit(2),file="impG0_iw"//reg(suffix))
 
           unit(3)=free_unit()
-          open(unit(3),file="impSigma_iw"//trim(adjustl(trim(suffix))))
+          open(unit(3),file="impSigma_iw"//reg(suffix))
 
           unit(4)=free_unit()
-          open(unit(4),file=trim(GRfile)//trim(adjustl(trim(suffix))))
+          open(unit(4),file=trim(GRfile)//reg(suffix))
 
           unit(5)=free_unit()
-          open(unit(5),file="impG0_realw"//trim(adjustl(trim(suffix))))
+          open(unit(5),file="impG0_realw"//reg(suffix))
 
           unit(6)=free_unit()
-          open(unit(6),file="impSigma_realw"//trim(adjustl(trim(suffix))))
+          open(unit(6),file="impSigma_realw"//reg(suffix))
 
           do i=1,NL
              write(unit(1),"(F18.10,6(F18.10))")wm(i),&

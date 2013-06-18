@@ -10,47 +10,71 @@ MODULE ED_CHI2FIT
 
   public :: chi2_fitgf
 
-  integer                             :: Ldelta
-  complex(8),dimension(:),allocatable :: Fdelta
-  real(8),dimension(:),allocatable    :: Xdelta
+  integer                               :: Ldelta
+  complex(8),dimension(:,:),allocatable :: Fdelta
+  real(8),dimension(:),allocatable      :: Xdelta,Wdelta
+  integer                               :: totNorb
+  integer,dimension(:,:),allocatable    :: IndxOrb
+  integer,dimension(:),allocatable      :: getIorb,getJorb
+  real(8),dimension(:,:),allocatable    :: DeltaOrb
 contains
 
   !+-------------------------------------------------------------+
   !PURPOSE  : 
   !+-------------------------------------------------------------+
-  subroutine chi2_fitgf(fg,bath,ichan)
-    complex(8),dimension(:)            :: fg
+  subroutine chi2_fitgf(fg,bath,ispin)
+    complex(8),dimension(:,:,:)        :: fg
     real(8),dimension(:),intent(inout) :: bath
-    integer                            :: ichan
-    real(8),dimension(2*Nbath)         :: a
-    integer                            :: iter
+    integer                            :: ispin
+    real(8),dimension((Norb+1)*Nbath)  :: a
+    integer                            :: iter,stride,ifirst,ilast,i,j,corb
     real(8)                            :: chi
     !
     call msg("FIT Delta function:",unit=LOGfile)
+    if(size(fg,1)/=Norb)call error("CHI2_FITGF: wrong dimension 1 in Delta_input")
+    if(size(fg,2)/=Norb)call error("CHI2_FITGF: wrong dimension 2 in Delta_input")
     call check_bath_dimension(bath)
-    call allocate_bath
-    call set_bath(bath)
-
+    allocate(IndxOrb(Norb,Norb),DeltaOrb(Norb,Norb),getIorb(Norb),getJorb(Norb))
+    corb=0
+    DeltaOrb=0.d0
+    do i=1,Norb
+       DeltaOrb(i,i)=1.d0
+       do j=i,Norb
+          corb=corb+1
+          IndxOrb(i,j)=corb
+          getIorb(corb)=i
+          getJorb(corb)=j
+       enddo
+    enddo
+    totNorb=corb
+    !
     Ldelta = size(fg)
-    allocate(fdelta(Ldelta))
-    allocate(xdelta(Ldelta))
-    Fdelta = fg
-    Xdelta = pi/beta*dble(2*arange(1,Ldelta)-1)
-
-    a(1:Nbath)           = ebath(ichan,:)
-    a(Nbath+1:2*Nbath)   = vbath(ichan,:)
+    allocate(Fdelta(Norb*(Norb+1)/2,Ldelta))
+    allocate(Xdelta(Ldelta))
+    allocate(Wdelta(Ldelta))
+    do i=1,totNorb
+       Fdelta(i,:) = fg(getIorb(i),getJorb(i),:)
+    enddo
+    Xdelta = pi/beta*real(2*arange(1,Ldelta)-1,8)
+    select case(CGtype)
+    case(0)
+       Wdelta=(/(1.d0,i=1,Ldelta)/)
+    case(1)
+       Wdelta=(/(real(i,8),i=1,Ldelta)/)
+    case(2)
+       Wdelta=Xdelta
+    end select
     !
+    stride=(ispin-1)*(Norb+1)*Nbath
+    ifirst=stride+1 ; ilast =stride+(Norb+1)*Nbath
+    a(:) = bath(ifirst:ilast)
     call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cgNitmax,ftol=cgFtol)
+    bath(ifirst:ilast) = a(:)
     !
-    ebath(ichan,:) = a(1:Nbath)
-    vbath(ichan,:) = a(Nbath+1:2*Nbath)
-
     write(*,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
     print*," "
-    call dump_fit_result(ichan)
-    bath = copy_bath()
-    call deallocate_bath
-    deallocate(Fdelta,Xdelta)
+    deallocate(Fdelta,Xdelta,Wdelta)
+    deallocate(IndxOrb,DeltaOrb,getIorb,getJorb)
   end subroutine chi2_fitgf
 
 
@@ -60,117 +84,107 @@ contains
 
 
 
-
-  function chi2(x)
-    real(8),dimension(:)  ::  x
+  !FUNCTION CHI^2 to be minimized:
+  function chi2(a)
+    real(8),dimension(:)  ::  a
     real(8)               ::  chi2
-    integer               ::  i
-    complex(8)            ::  g0(Ldelta)
-    chi2 = 0.d0 
-    do i=1,Ldelta   !Number of freq. in common to the module
-       g0(i)   = gand(xdelta(i),x)
+    real(8)               ::  chig(Norb*(Norb+1)/2)
+    integer               ::  i,corb
+    complex(8)            ::  g0(Norb*(Norb+1)/2,Ldelta)
+    chig=0.d0
+    do corb=1,totNorb
+       do i=1,Ldelta   !Number of freq. in common to the module
+          g0(corb,i)   = gand(xdelta(i),getIorb(corb),getJorb(corb),a)
+       enddo
+       chig(corb) = sum(abs(Fdelta(corb,:)-g0(corb,:))**2/Wdelta(:))
     enddo
-    select case(CGtype)
-    case(0)
-       do i=1,Ldelta   !Number of freq. in common to the module
-          chi2 = chi2 + abs(fdelta(i)-g0(i))**2
-       end do
-    case(1)
-       do i=1,Ldelta   !Number of freq. in common to the module
-          chi2 = chi2 + abs(fdelta(i)-g0(i))**2/dble(i)
-       end do
-    case(2)
-       do i=1,Ldelta   !Number of freq. in common to the module
-          chi2 = chi2 + abs(fdelta(i)-g0(i))**2/dble(xdelta(i))
-       end do
-
-    end select
+    chi2=sum(chig)
   end function chi2
-
-  function dchi2(x)
-    real(8),dimension(:)                 :: x
-    real(8),dimension(size(x))           :: dchi2,df
-    integer                              :: i,j
-    complex(8)                           :: g0(Ldelta)
-    complex(8),dimension(Ldelta,size(x)) :: dg0
-    df=0.d0
-    do i=1,Ldelta
-       g0(i)    = gand(xdelta(i),x)
-       dg0(i,:) = grad_gand(xdelta(i),x)
+  !GRADIENT OF CHI^2 used in the CG minimization:
+  function dchi2(a)
+    real(8),dimension(:)                                 :: a
+    real(8),dimension(size(a))                           :: dchi2
+    real(8),dimension(Norb*(Norb+1)/2,size(a))           :: df
+    integer                                              :: i,j,corb
+    complex(8),dimension(Norb*(Norb+1)/2,Ldelta)         :: g0
+    complex(8),dimension(Norb*(Norb+1)/2,Ldelta,size(a)) :: dg0
+    df  =0.d0
+    do corb=1,totNorb
+       do i=1,Ldelta
+          g0(corb,i)    = gand(xdelta(i),getIorb(corb),getJorb(corb),a)
+          dg0(corb,i,:) = grad_gand(xdelta(i),getIorb(corb),getJorb(corb),a)
+       enddo
+       do j=1,size(a)
+          df(corb,j)=&
+               sum(dreal(Fdelta(corb,:)-g0(corb,:))*dreal(dg0(corb,:,j))/Wdelta(:) ) + &
+               sum(dimag(Fdelta(corb,:)-g0(corb,:))*dimag(dg0(corb,:,j))/Wdelta(:) )
+       enddo
     enddo
-    select case(CGtype)
-    case(0)
-       do j=1,size(x)
-          do i=1,Ldelta
-             df(j) = df(j)+(dreal(fdelta(i))-dreal(g0(i)))*dreal(dg0(i,j)) + &
-                  (dimag(fdelta(i))-dimag(g0(i)))*dimag(dg0(i,j))
-          enddo
-       enddo
-    case(1)
-       do j=1,size(x)
-          do i=1,Ldelta
-             df(j) = df(j)+(dreal(fdelta(i))-dreal(g0(i)))*dreal(dg0(i,j)) + &
-                  (dimag(fdelta(i))-dimag(g0(i)))*dimag(dg0(i,j))/dble(i)
-          enddo
-       enddo
-    case(2)
-       do j=1,size(x)
-          do i=1,Ldelta
-             df(j) = df(j)+(dreal(fdelta(i))-dreal(g0(i)))*dreal(dg0(i,j)) + &
-                  (dimag(fdelta(i))-dimag(g0(i)))*dimag(dg0(i,j))/dble(xdelta(i))
-          enddo
-       enddo
-    end select
-    dchi2 = -2.d0*df
+    dchi2 = -2.d0*sum(df,dim=1)
   end function dchi2
 
-  function gand(w,a) result(gg)
-    real(8)                :: w
-    real(8),dimension(:)   :: a
-    real(8),dimension(size(a)/2) :: eps,vps
-    complex(8)             :: gg
-    integer                :: i,Nb
-    Nb=size(a)/2
-    eps=a(1:Nb)
-    vps=a(Nb+1:2*Nb)
+
+  function gand(w,orb1,orb2,a) result(gg)
+    real(8)                       :: w
+    real(8),dimension(:)          :: a
+    real(8),dimension(Nbath)      :: epsk
+    real(8),dimension(Norb,Nbath) :: vpsk
+    complex(8)                    :: gg
+    integer                       :: i,orb1,orb2,j
+    epsk=a(1:Nbath)
+    do j=1,Norb
+       vpsk(j,:)=a((j*Nbath+1):((j+1)*Nbath))
+    enddo
     gg=zero
-    do i=1,Nb
-       gg=gg+vps(i)**2/(xi*w-eps(i))
+    do i=1,Nbath
+       gg=gg + vpsk(orb1,i)*vpsk(orb2,i)/(xi*w-epsk(i))
     enddo
   end function gand
 
-  function grad_gand(w,a) result(dgz)
-    real(8)                         :: w
-    real(8),dimension(:)            :: a
-    real(8),dimension(size(a)/2)    :: eps,vps
-    complex(8),dimension(size(a))   :: dgz
-    integer                         :: i,Nb
-    dgz=zero
-    Nb=size(a)/2
-    eps=a(1:Nb)
-    vps=a(Nb+1:2*Nb)
-    do i=1,Nb
-       dgz(i)    = vps(i)*vps(i)/(xi*w-eps(i))**2
-       dgz(i+Nb) = 2.d0*vps(i)/(xi*w-eps(i))
+
+
+  function grad_gand(w,orb1,orb2,a) result(dgz)
+    real(8)                       :: w
+    real(8),dimension(:)          :: a
+    real(8),dimension(Nbath)      :: epsk
+    real(8),dimension(Norb,Nbath) :: vpsk
+    complex(8),dimension(size(a)) :: dgz
+    integer                       :: i,orb1,orb2,j
+    dgz =zero
+    epsk=a(1:Nbath)
+    do j=1,Norb
+       vpsk(j,:)=a((j*Nbath+1):((j+1)*Nbath))
+    enddo
+    do i=1,Nbath
+       dgz(i)    = Vpsk(orb1,i)*Vpsk(orb2,i)/(xi*w-epsk(i))**2
+       do j=1,Norb
+          dgz(i+j*Nbath) = &
+               (DeltaOrb(j,orb1)*Vpsk(orb2,i) + &
+               DeltaOrb(j,orb2)*Vpsk(orb1,i))  &
+               /(xi*w-epsk(i))
+       enddo
     enddo
   end function grad_gand
 
 
 
-  !+-------------------------------------------------------------+
-  !PURPOSE  : 
-  !+-------------------------------------------------------------+
-  subroutine dump_fit_result(ichan)
-    complex(8),dimension(Ldelta) :: fgand
-    integer                      :: ichan,i,j,Lw
-    real(8)                      :: w
-    fgand=zero
-    do i=1,Ldelta
-       w=Xdelta(i)
-       fgand(i) = delta_bath(xi*w,ichan)
-    enddo
-    call splot("fit_delta.ed",Xdelta,dimag(Fdelta),dimag(fgand),dreal(Fdelta),dreal(fgand))
-  end subroutine dump_fit_result
+
+
+
+  ! !+-------------------------------------------------------------+
+  ! !PURPOSE  : 
+  ! !+-------------------------------------------------------------+
+  ! subroutine dump_fit_result(ichan)
+  !   complex(8),dimension(Ldelta) :: fgand
+  !   integer                      :: ichan,i,j,Lw
+  !   real(8)                      :: w
+  !   fgand=zero
+  !   do i=1,Ldelta
+  !      w=Xdelta(i)
+  !      fgand(i) = delta_bath(xi*w,ichan)
+  !   enddo
+  !   call splot("fit_delta.ed",Xdelta,dimag(Fdelta),dimag(fgand),dreal(Fdelta),dreal(fgand))
+  ! end subroutine dump_fit_result
 
 
 

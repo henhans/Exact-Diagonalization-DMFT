@@ -64,7 +64,7 @@ contains
     call lanc_ed_diag
     call lanc_ed_getgf
     call lanc_ed_getobs
-    unit=free_unit
+    unit=free_unit()
     open(unit,file=trim(Hfile))
     call write_bath(unit)
     close(unit)

@@ -28,6 +28,7 @@ end subroutine init_full_ed_solver
 !+------------------------------------------------------------------+
 subroutine full_ed_solver(bath)
   real(8),dimension(:),intent(in) :: bath
+  integer                         :: unit
   call msg("ED SOLUTION",unit=LOGfile)
   call check_bath_dimension(bath)
   call allocate_bath
@@ -37,7 +38,10 @@ subroutine full_ed_solver(bath)
   call full_ed_getgf
   if(chiflag)call full_ed_getchi
   call full_ed_getobs
-  call dump_bath(Hfile)
+  unit=free_unit()
+  open(unit,file=trim(Hfile))
+  call write_bath(unit)
+  close(unit)
   call deallocate_bath
 end subroutine full_ed_solver
 

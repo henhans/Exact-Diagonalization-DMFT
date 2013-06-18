@@ -45,14 +45,12 @@ subroutine full_ed_buildgf(iorb,jorb,ispin)
      jsite=impIndex(jorb,ispin)
   endif
   allocate(cdgmat(nsite),cc(nsite))
-  call msg("Evaluating G_imp_Orb1"//trim(txtfy(iorb))//&
-       "_Orb2"//trim(txtfy(jorb))//&
-       "_Spin"//trim(txtfy(ispin)),unit=LOGfile)
+  call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//&
+       "_Spin"//reg(txtfy(ispin)),unit=LOGfile)
   call start_timer
   do isector=startloop,lastloop
      jsector=getCsector(1,isector);if(jsector==0)cycle
-     call eta(isector,lastloop,file="ETA_GF_Orb"//trim(txtfy(iorb))//&
-          "_Orb2"//trim(txtfy(jorb))//"_Spin"//trim(txtfy(ispin))//".ed")
+     call eta(isector,lastloop,file="ETA_GF_Orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//"_Spin"//reg(txtfy(ispin))//".ed")
      idim=getdim(isector)     !i-th sector dimension
      jdim=getdim(jsector)     !j-th sector dimension
      do i=1,idim          !loop over the states in the i-th sect.
@@ -185,11 +183,9 @@ subroutine full_ed_getchi()
   do iorb=1,Norb
      do jorb=1,Norb
         unit(1)=free_unit()
-        open(unit(1),file=trim(CTfile)//"_orb"//&
-             trim(adjustl(trim(txtfy(iorb))))//trim(adjustl(trim(txtfy(jorb))))//".ed")
+        open(unit(1),file=trim(CTfile)//"_orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//".ed")
         unit(2)=free_unit()
-        open(unit(2),file=trim(CWfile)//"_orb"//&
-             trim(adjustl(trim(txtfy(iorb))))//trim(adjustl(trim(txtfy(jorb))))//".ed")
+        open(unit(2),file=trim(CWfile)//"_orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//".ed")
         do i=0,Ltau
            write(unit(1),*)tau(i),chitau(iorb,jorb,i)
         enddo

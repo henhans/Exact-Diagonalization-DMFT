@@ -50,23 +50,20 @@ contains
     eup=ebath(1,:)   ; edw=ebath(Nspin,:)
     vup=vbath(1,:,:) ; vdw=vbath(Nspin,:,:)
 
-
     do i=1,dim
        m=Hmap(isector)%map(i)
        call bdecomp(m,ib)
 
        do iorb=1,Norb
-          iup=impIndex(iorb,1)
-          idw=impIndex(iorb,2)
-          nup(iorb)=real(ib(iup),8)
-          ndw(iorb)=real(ib(idw),8)
+          nup(iorb)=real(ib(iorb),8)
+          ndw(iorb)=real(ib(iorb+Ns),8)
        enddo
 
-       !DIAGONAL terms
-       !Hlocal:
+       !LOCAL HAMILTONIAN PART:
+       !diagonal terms:
        htmp = 0.d0
        htmp = -xmu*(sum(nup)+sum(ndw)) + heff*(sum(nup)-sum(ndw))
-       htmp = htmp + ep0*(nup(2)+ndw(2))
+       if(Norb==2)htmp =  htmp + ep0*(nup(2)+ndw(2))
        select case(hfmode)
        case(.true.)
           htmp =htmp + u*(nup(1)-0.5d0)*(ndw(1)-0.5d0)
@@ -81,47 +78,50 @@ contains
        enddo
        h(i,i)=htmp
 
+       !Hybridization part
+       if(Norb>1)then
+          if(ib(1) == 1 .AND. ib(2) == 0)then
+             call c(1,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
+             call cdg(2,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(isector,r)
+             tef=tpd
+             h(i,j)=tef*sg1*sg2
+             h(j,i)=h(i,j)
+          endif
+          if(ib(1+Ns) == 1 .AND. ib(2+Ns) == 0)then
+             call c(1+Ns,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
+             call cdg(2+Ns,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(isector,r)
+             tef=tpd
+             h(i,j)=tef*sg1*sg2
+             h(j,i)=h(i,j)
+          endif
+       endif
+
+
        !NON-Diagonal part
        do iorb=1,Norb
-          iup=impIndex(iorb,1)
-          idw=impIndex(iorb,2)
           do ms=Norb+1,Ns
-             if(ib(iup) == 1 .AND. ib(ms) == 0)then
-                call c(iup,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
+             if(ib(iorb) == 1 .AND. ib(ms) == 0)then
+                call c(iorb,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
                 call cdg(ms,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)
                 j=invHmap(isector,r)
                 tef=vup(iorb,ms-Norb)
                 h(i,j)=tef*sg1*sg2
                 h(j,i)=h(i,j)
              endif
-             if(ib(idw) == 1 .AND. ib(ms+Ns) == 0)then
-                call c(idw,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
+             if(ib(iorb+Ns) == 1 .AND. ib(ms+Ns) == 0)then
+                call c(iorb+Ns,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
                 call cdg(ms+Ns,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)           
                 j=invHmap(isector,r)
-                tef=vdw(iorb,ms-Norb)   
+                tef=vdw(iorb,ms-Norb)
                 h(i,j)=tef*sg1*sg2
                 h(j,i)=h(i,j)
              endif
           enddo
        enddo
 
-       !Hybridization part
-       if(ib(1) == 1 .AND. ib(2) == 0)then
-          call c(1,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
-          call cdg(2,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)
-          j=invHmap(isector,r)
-          tef=tpd
-          h(i,j)=tef*sg1*sg2
-          h(j,i)=h(i,j)
-       endif
-       if(ib(1+Ns) == 1 .AND. ib(2+Ns) == 0)then
-          call c(1+Ns,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
-          call cdg(2+Ns,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)
-          j=invHmap(isector,r)
-          tef=tpd
-          h(i,j)=tef*sg1*sg2
-          h(j,i)=h(i,j)
-       endif
+
     enddo
     return
   end subroutine full_ed_geth

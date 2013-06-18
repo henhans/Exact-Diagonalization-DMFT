@@ -70,6 +70,7 @@ contains
     integer :: i,iorb,ispin,unit
     logical :: IOfile
     real(8) :: ran(Nbath)
+    character :: foo
     if(bath_status)call deallocate_bath
     call allocate_bath
     inquire(file=trim(Hfile),exist=IOfile)
@@ -77,7 +78,7 @@ contains
        write(LOGfile,"(A)")bg_green('Reading bath/xmu from file')
        unit = free_unit()
        open(unit,file=trim(Hfile))
-       read(unit,*)
+       read(unit,*)foo
        do i=1,Nbath
           read(*,"(90(F13.9,1X))")(ebath(ispin,i),&
                (vbath(iorb,ispin,i),iorb=1,Norb),ispin=1,Nspin)
@@ -106,9 +107,11 @@ contains
     integer :: i,unit,ispin,iorb
     if(.not.bath_status)call error("WRITE_BATH: bath not allocated")
     write(unit,"(90(A13,1X))")("# ek_s"//trim(adjustl(trim(txtfy(ispin)))),&
-         ("Vk^orb"//trim(adjustl(trim(txtfy(iorb))))//"_"//trim(adjustl(trim(txtfy(ispin)))),iorb=1,Norb),ispin=1,Nspin)
+         ("Vk^orb"//trim(adjustl(trim(txtfy(iorb))))//"_"//&
+         trim(adjustl(trim(txtfy(ispin)))),iorb=1,Norb),ispin=1,Nspin)
     do i=1,Nbath
-       write(unit,"(90(F13.9,1X))")(ebath(ispin,i),(vbath(iorb,ispin,i),iorb=1,Norb),ispin=1,Nspin)
+       write(unit,"(90(F13.9,1X))")(ebath(ispin,i),&
+            (vbath(iorb,ispin,i),iorb=1,Norb),ispin=1,Nspin)
     enddo
   end subroutine write_bath
 
@@ -119,17 +122,18 @@ contains
   !+-------------------------------------------------------------------+
   subroutine set_bath(bath)
     real(8),dimension(:) :: bath
-    integer              :: iorb,ispin
+    integer              :: iorb,ispin,stride
     integer              :: ae,be
     integer              :: av(Norb),bv(Norb)
     if(.not.bath_status)call error("SET_BATH: bath not allocated")
     do ispin=1,Nspin
-       ae=1+(ispin-1)*(Norb+1)*Nbath     !min for ebath variables
-       be=Nbath+(ispin-1)*(Norb+1)*Nbath !max for ebath variables
+       stride=(ispin-1)*(Norb+1)*Nbath
+       ae=stride + 1
+       be=stride + Nbath
        ebath(ispin,:) = bath(ae:be)
        do iorb=1,Norb
-          av(iorb)=1+iorb*Nbath+(ispin-1)*(Norb+1)*Nbath   !min for vbath variables
-          bv(iorb)=(iorb+1)*Nbath+(ispin-1)*(Norb+1)*Nbath !max for vbath variables
+          av(iorb)=stride + iorb*Nbath + 1
+          bv(iorb)=stride +(iorb+1)*Nbath
           vbath(iorb,ispin,:) = bath(av(iorb):bv(iorb))
        enddo
     enddo
@@ -141,17 +145,18 @@ contains
   !+-------------------------------------------------------------------+
   function copy_bath() result(bath)
     real(8),dimension((Norb+1)*Nspin*Nbath) :: bath
-    integer                                 :: iorb,ispin
+    integer                                 :: iorb,ispin,stride
     integer                                 :: ae,be
     integer                                 :: av(Norb),bv(Norb)
     if(.not.bath_status)call error("COPY_BATH: bath not allocated")
     do ispin=1,Nspin
-       ae=1+(ispin-1)*(Norb+1)*Nbath     !min for ebath variables
-       be=Nbath+(ispin-1)*(Norb+1)*Nbath !max for ebath variables
+       stride=(ispin-1)*(Norb+1)*Nbath
+       ae=stride + 1
+       be=stride + Nbath
        bath(ae:be) = ebath(ispin,:)
        do iorb=1,Norb
-          av(iorb)=1+iorb*Nbath+(ispin-1)*(Norb+1)*Nbath   !min for vbath variables
-          bv(iorb)=(iorb+1)*Nbath+(ispin-1)*(Norb+1)*Nbath !max for vbath variables
+          av(iorb)=stride + iorb*Nbath + 1
+          bv(iorb)=stride +(iorb+1)*Nbath
           bath(av(iorb):bv(iorb)) = vbath(iorb,ispin,:)
        enddo
     enddo
@@ -176,18 +181,19 @@ contains
     complex(8),intent(in)                              :: x
     integer,intent(in)                                 :: orb1,orb2,spin
     complex(8)                                         :: fg
-    integer                                            :: i,iorb,ispin
+    integer                                            :: i,iorb,ispin,stride
     integer                                            :: ae,be
     integer                                            :: av(Norb),bv(Norb)
     real(8),dimension(Nspin,Nbath)                     :: epsk
     real(8),dimension(Norb,Nspin,Nbath)                :: vpsk
     do ispin=1,Nspin
-       ae=1+(ispin-1)*(Norb+1)*Nbath     !min for ebath variables
-       be=Nbath+(ispin-1)*(Norb+1)*Nbath !max for ebath variables
+       stride=(ispin-1)*(Norb+1)*Nbath
+       ae=stride + 1
+       be=stride + Nbath
        epsk(ispin,:) = bath(ae:be)
        do iorb=1,Norb
-          av(iorb)=1+iorb*Nbath+(ispin-1)*(Norb+1)*Nbath   !min for vbath variables
-          bv(iorb)=(iorb+1)*Nbath+(ispin-1)*(Norb+1)*Nbath !max for vbath variables
+          av(iorb)=stride + iorb*Nbath + 1
+          bv(iorb)=stride +(iorb+1)*Nbath
           vpsk(iorb,ispin,:) = bath(av(iorb):bv(iorb))
        enddo
     enddo
