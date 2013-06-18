@@ -34,7 +34,8 @@ contains
     if(size(fg,1)/=Norb)call error("CHI2_FITGF: wrong dimension 1 in Delta_input")
     if(size(fg,2)/=Norb)call error("CHI2_FITGF: wrong dimension 2 in Delta_input")
     call check_bath_dimension(bath)
-    allocate(IndxOrb(Norb,Norb),DeltaOrb(Norb,Norb),getIorb(Norb),getJorb(Norb))
+    allocate(IndxOrb(Norb,Norb),DeltaOrb(Norb,Norb),&
+         getIorb(Norb*(Norb+1)/2),getJorb(Norb*(Norb+1)/2))
     corb=0
     DeltaOrb=0.d0
     do i=1,Norb
@@ -48,7 +49,7 @@ contains
     enddo
     totNorb=corb
     !
-    Ldelta = size(fg)
+    Ldelta = size(fg,3)    
     allocate(Fdelta(Norb*(Norb+1)/2,Ldelta))
     allocate(Xdelta(Ldelta))
     allocate(Wdelta(Ldelta))

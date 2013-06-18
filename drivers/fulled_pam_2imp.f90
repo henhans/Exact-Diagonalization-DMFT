@@ -1,16 +1,17 @@
 program fullED
   USE DMFT_ED
-  USE FFTGF
+  USE TOOLS
+  USE FUNCTIONS
   implicit none
   integer                :: iloop,Nb
   logical                :: converged
-  real(8)                :: gzero,gzerop,gzerom,gmu,ntot,npimp
+  real(8)                :: gzero,gzerop,gzerom,gmu,npimp
   real(8)                :: wband
   real(8),allocatable    :: wm(:),wr(:),tau(:)
   !The local hybridization function:
   !Bath:
   real(8),allocatable    :: Bath(:)
-  complex(8),allocatable :: Delta(:)
+  complex(8),allocatable :: Delta(:,:,:)
   integer                :: ntype
   real(8)                :: nobj
 
@@ -38,10 +39,10 @@ program fullED
   !setup solver
   Nb=get_bath_size()
   allocate(bath(Nb))
-  call init_ed_solver(bath)
+  call init_full_ed_solver(bath)
 
   !allocate delta function
-  allocate(delta(NL))
+  allocate(delta(Norb,Norb,NL))
 
   !DMFT loop
   iloop=0;converged=.false.
@@ -50,16 +51,16 @@ program fullED
      call start_loop(iloop,nloop,"DMFT-loop")
 
      !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
-     call ed_solver(bath) 
+     call full_ed_solver(bath) 
 
      !Get the Weiss field/Delta function to be fitted (user defined)
      call get_delta_pam_2imp() 
 
      !Fit the new bath, starting from the old bath + the supplied delta
-     call chi2_fitgf(delta(:),bath,ichan=1)
+     call chi2_fitgf(delta,bath,ispin=1)
 
      !Check convergence (if required change chemical potential)
-     converged = check_convergence(delta(:),eps_error,nsuccess,nloop)
+     converged = check_convergence(delta(2,2,:),eps_error,nsuccess,nloop)
      if(nread/=0.d0)call search_mu(nobj,converged)
      if(iloop>nloop)converged=.true.
      call end_loop
@@ -71,22 +72,23 @@ contains
   subroutine get_delta_pam_2imp
     integer                   :: i,j
     complex(8)                :: iw,zita
+    complex(8)                :: calG0(Norb,Norb,NL),calG0r(Norb,Norb,Nw)
     complex(8),dimension(NL)  :: g0p,g0d,sd,sp,gp,gd
-    complex(8),dimension(Nw)  :: g0pr,g0dr,sdr,spr,gpr,gdr
-    real(8),dimension(0:Ltau) :: gptau,gdtau
+    complex(8),dimension(Nw)  :: sdr,spr,gpr,gdr
     real(8)                   :: zdd,zpp
 
+    delta=zero
     do i=1,NL
        iw     = xi*wm(i)
-       g0p(i) = iw + xmu - ep0 - delta_and(iw,bath,1)
-       g0d(i) = iw + xmu - (tpd**2)/(iw + xmu - ep0 - 0.25d0*wband**2*G2iw(1,i))
-       sd(i)  = g0d(i) - one/Giw(1,i)
+       g0p(i) = iw + xmu - ep0 - delta_and(iw,bath,2,2,1)
+       g0d(i) = iw + xmu - (tpd**2)/(iw + xmu - ep0 - 0.25d0*wband**2*Giw(2,2,1,i))
+       sd(i)  = g0d(i) - one/Giw(1,1,1,i)
        sp(i)  = tpd**2/(iw + xmu - sd(i))
        zita   = iw + xmu - ep0 - sp(i)
        gp(i)  = gfbethe(wm(i),zita,Wband)
        gd(i)  = one/(iw+xmu-sd(i)) + tpd**2/(iw+xmu-sd(i))**2*gp(i)
        !
-       delta(i) = 0.25*Wband**2*G2iw(1,i)
+       delta(2,2,i) = 0.25*Wband**2*Giw(2,2,1,i)
        !
     enddo
     call splot("Delta_iw.ed",wm,delta)
@@ -97,17 +99,16 @@ contains
     call splot("Sigmapp_iw.ed",wm,sp)
     call splot("Sigmadd_iw.ed",wm,sd)
 
-    ntot=nsimp+nimp2
     zdd=1.d0+abs(sd(1))/wm(1);zdd=1.d0/zdd
     zpp=1.d0+abs(sp(1))/wm(1);zpp=1.d0/zpp
-    call splot("ntot.zdd.zpp.ed",iloop,ntot,zdd,zpp,gmu,append=.true.)
+    call splot("ntot.zdd.zpp.ed",iloop,nimp(1)+nimp(2),zdd,zpp,gmu,append=.true.)
 
     if(ntype==1)then
-       nobj=nsimp
+       nobj=nimp(1)
     elseif(ntype==2)then
-       nobj=npimp
+       nobj=nimp(2)
     else
-       nobj=ntot
+       nobj=nimp(1)+nimp(2)
     endif
   end subroutine get_delta_pam_2imp
 

@@ -89,7 +89,7 @@ contains
        do ispin=1,Nspin
           do i=1,Nbath
              ebath(ispin,i)=(2.d0*ran(i)-1.d0)*real(Nbath,8)/2.d0
-             vbath(ispin,1:Norb,i)=1.d0/sqrt(real(Nbath,8))
+             vbath(1:Norb,ispin,i)=1.d0/sqrt(real(Nbath,8))
           enddo
        enddo
 
