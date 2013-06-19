@@ -19,79 +19,10 @@ module ED_DIAG
 
 contains
 
-
   !####################################################################
   !                    FULL DIAGONALIZATION
   !####################################################################
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine init_full_ed_solver(bath)
-    real(8),dimension(:),intent(inout) :: bath
-    integer                            :: i   
-    call msg("INIT SOLVER, SETUP EIGENSPACE",unit=LOGfile)
-    call check_bath_dimension(bath)
-    call allocate_bath
-    call init_bath_ed
-    if(Nspin==2)then
-       heff=abs(heff)
-       write(LOGfile,"(A,F12.9)")"Symmetry Breaking field = ",heff
-       ebath(1,:) = ebath(1,:) + heff
-       ebath(2,:) = ebath(2,:) - heff
-       heff=0.d0
-    endif
-    call setup_pointers
-    call setup_eigenspace
-    call write_bath(LOGfile)
-    bath = copy_bath()
-    call deallocate_bath
-    call msg("SET STATUS TO 0 in ED_SOLVER",unit=LOGfile)
-  end subroutine init_full_ed_solver
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine full_ed_solver(bath)
-    real(8),dimension(:),intent(in) :: bath
-    call msg("ED SOLUTION",unit=LOGfile)
-    call check_bath_dimension(bath)
-    call allocate_bath
-    call set_bath(bath)
-    call reset_eigenspace()
-    call full_ed_diag
-    call full_ed_getgf
-    if(chiflag)call full_ed_getchi
-    call full_ed_getobs
-    call dump_bath(Hfile)
-    call deallocate_bath
-  end subroutine full_ed_solver
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : Setup the Hilbert space, create the Hamiltonian, get the
-  ! GS, build the Green's functions calling all the necessary routines
-  !+------------------------------------------------------------------+
-  subroutine full_ed_diag
-    integer :: in,is,isector,dim
-    real(8),dimension(Nsect) :: e0 
-    integer                  :: info,i,j
-    integer                  :: lwork
-    e0=0.d0
-    call msg("Get Hamiltonian:",unit=LOGfile)
-    call start_timer
-    do isector=startloop,lastloop
-       call eta(isector,lastloop,file="ETA_diag.ed")
-       dim=getdim(isector)
-       call full_ed_geth(isector,espace(isector)%M(:,:))
-       call matrix_diagonalize(espace(isector)%M,espace(isector)%e,'V','U')
-       if(isector >=startloop)e0(isector)=minval(espace(isector)%e)
-    enddo
-    call stop_timer
-    call findgs(e0)
-    return
-  end subroutine full_ed_diag
-
-
-
+  include 'fulled_diag.f90'
 
 
   !####################################################################
@@ -142,8 +73,8 @@ contains
   ! GS, build the Green's functions calling all the necessary routines
   !+------------------------------------------------------------------+
   subroutine lanc_ed_diag
-    integer             :: in,is,isector,dim
-    integer             :: n0,s0,isect0,dim0,izero
+    integer             :: nup,ndw,isector,dim
+    integer             :: nup0,ndw0,isect0,dim0,izero
     integer             :: info,i,j
     integer             :: Nitermax,Neigen
     real(8)             :: oldzero,enemin,egs
@@ -201,10 +132,10 @@ contains
     do izero=1,numzero
        isect0= es_get_sector(groundstate,izero)
        egs   = es_get_energy(groundstate,izero)
-       n0    = getin(isect0)
-       s0    = getis(isect0)
+       nup0    = getnup(isect0)
+       ndw0    = getndw(isect0)
        dim0  = getdim(isect0)
-       write(LOGfile,"(A,f18.12,2I4)")'egs =',egs,n0,s0
+       write(LOGfile,"(A,f18.12,2I4)")'egs =',egs,nup0,ndw0
     enddo
     write(LOGfile,"(A,f18.12)")'Z   =',dble(numzero)
     open(3,file='egs.ed',access='append')
@@ -223,144 +154,12 @@ contains
   !####################################################################
   !                    COMPUTATIONAL ROUTINES
   !####################################################################
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine setup_pointers
-    integer                          :: in,is,dim,isector,jn,js,jsector
-    integer                          :: ism,Nup,Ndw
-    integer,dimension(:),allocatable :: imap
-    integer,dimension(:),allocatable :: invmap
-    call msg("Setting up pointers:")
-    allocate(imap(NP),invmap(NN))
-    isector=0
-    call start_timer
-    do in=1,Ntot
-       ism=in
-       if(in>Ns)ism=Ntot-in
-       do is=-ism,ism,2
-          isector=isector+1
-          getsector(in,is)=isector
-          getin(isector)=in
-          getis(isector)=is
-          call build_sector_ns(in,is,dim,imap,invmap)
-          getdim(isector)=dim
-          allocate(Hmap(isector)%map(dim))
-          Hmap(isector)%map(1:dim)=imap(1:dim)
-          invHmap(isector,:)=invmap
-       enddo
-    enddo
-    call stop_timer
-    deallocate(imap,invmap)
-
-    do in=1,Norb
-       impIndex(in,1)=in
-       impIndex(in,2)=in+Ns
-    enddo
-
-    minCsector(1)=getsector(2,0)
-    minCsector(2)=getsector(2,-2)
-    getCsector=0
-    do isector=1,Nsect
-       if(isector < minCsector(1))cycle
-       in=getin(isector);is=getis(isector)
-       jn=in-1;js=is-1;if(abs(js) > jn)cycle
-       jsector=getsector(jn,js)
-       getCsector(1,isector)=jsector
-    enddo
-    !
-    do isector=1,Nsect
-       if(isector < minCsector(2))cycle
-       in=getin(isector);is=getis(isector)
-       jn=in-1;js=is+1;if(abs(js) > jn)cycle
-       jsector=getsector(jn,js)
-       getCsector(2,isector)=jsector
-    enddo
-
-    minCDGsector(1)=getsector(Ntot-1,-1)
-    minCDGsector(2)=getsector(Ntot-1,1)
-    getCDGsector=0
-    do isector=1,Nsect
-       if(isector > minCDGsector(1))cycle
-       in=getin(isector);is=getis(isector)
-       jn=in+1;js=is+1;if(abs(js) > jn)cycle
-       jsector=getsector(jn,js)
-       getCDGsector(1,isector)=jsector
-    enddo
-    !
-    do isector=1,Nsect
-       if(isector > minCDGsector(2))cycle
-       in=getin(isector);is=getis(isector)
-       jn=in+1;js=is-1;if(abs(js) > jn)cycle
-       jsector=getsector(jn,js)
-       getCDGsector(2,isector)=jsector
-    enddo
-
-    startloop=1;lastloop=Nsect
-  end subroutine setup_pointers
-
-
-  subroutine setup_eigenspace
-    integer :: isector,dim,jsector
-    if(allocated(espace)) deallocate(espace)
-    allocate(espace(startloop:lastloop))
-    do isector=startloop,lastloop
-       dim=getdim(isector)
-       allocate(espace(isector)%e(dim),espace(isector)%M(dim,dim))
-    enddo
-  end subroutine setup_eigenspace
-
-
-  subroutine reset_eigenspace
-    integer :: isector
-    forall(isector=startloop:lastloop)
-       espace(isector)%e=0.d0
-       espace(isector)%M=0.d0
-    end forall
-  end subroutine reset_eigenspace
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+-------------------------------------------------------------------+
-  subroutine findgs(e0)
-    integer :: i,isector,dim
-    real(8) :: egs
-    real(8),dimension(Nsect) :: e0 
-    egs=minval(e0)
-    forall(isector=startloop:lastloop)espace(isector)%e = espace(isector)%e - egs
-
-    !Get the partition function Z and rescale energies
-    zeta_function=0.d0;zeta_function=0.d0
-    do isector=startloop,lastloop
-       dim=getdim(isector)
-       do i=1,dim
-          zeta_function=zeta_function+exp(-beta*espace(isector)%e(i))
-       enddo
-    enddo
-    call msg("DIAG resume:",unit=LOGfile)
-    write(LOGfile,"(A,f18.12)")'egs  =',egs
-    write(LOGfile,"(A,f18.12)")'Z    =',zeta_function    
-    write(LOGfile,*)""
-
-    open(3,file='egs.ed',access='append')
-    write(3,*)egs
-    close(3)
-  end subroutine findgs
 
 
 

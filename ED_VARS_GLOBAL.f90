@@ -25,7 +25,7 @@ MODULE ED_VARS_GLOBAL
   !Nbath=Ns-1=numero di siti del bagno (sistema - impurezza)
   !NP=dimensione del sottospazio piu' grande (settore).
   !=========================================================
-  integer :: Ns,Norb,Nspin,Nbath,NP,Ntot,NN,Nsect
+  integer :: Ns,Norb,Nspin,Nbath,Ntot,NN,Nsect
 
 
   !Global variables
@@ -65,10 +65,8 @@ MODULE ED_VARS_GLOBAL
   integer,allocatable,dimension(:,:) :: getsector
   integer,allocatable,dimension(:,:) :: getCsector
   integer,allocatable,dimension(:,:) :: getCDGsector
-  integer,allocatable,dimension(:)   :: minCsector
-  integer,allocatable,dimension(:)   :: minCDGsector
   integer,allocatable,dimension(:,:) :: impIndex
-  integer,allocatable,dimension(:)   :: getdim,getin,getis
+  integer,allocatable,dimension(:)   :: getdim,getnup,getndw
   integer                            :: startloop,lastloop
 
 
@@ -137,7 +135,7 @@ contains
   !+-------------------------------------------------------------------+
   subroutine read_input(INPUTunit)
     character(len=*) :: INPUTunit
-    integer          :: i
+    integer          :: i,NP,nup,ndw
     logical          :: control
 
     !ModelConf
@@ -234,6 +232,10 @@ contains
 
     call allocate_system_structure()
 
+    nup=Ns/2
+    ndw=Ns-nup
+    NP=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
+    NP=NP*(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
     write(*,*)"CONTROL PARAMETERS"
     write(*,nml=EDvars)
     write(*,*)"--------------------------------------------"
@@ -256,7 +258,6 @@ contains
     !Some check:
     if(Nfit>NL)Nfit=NL
     if(Norb>1)call abort("Norb > 1 is not yet supported!")
-    !if(Ns>8)call abort("Ns > 8 is too big!")
     if(nerr > eps_error) nerr=eps_error
 
     !allocate functions
@@ -274,44 +275,30 @@ contains
   !PURPOSE  : 
   !+-------------------------------------------------------------------+
   subroutine allocate_system_structure()
-    !Get maximum dimensions of the sector (half-filling)
-    !NP= (Ntot!/NS!/NS!)**2
-    select case(Ns)
-    case (3)
-       NP=9
-    case (4)
-       NP=36
-    case (5)
-       NP=100
-    case (6)
-       NP=400
-    case (7)
-       NP=1225
-    case (8)
-       NP=4900
-    case (9)
-       NP=15876
-    case (10)
-       NP=63504
-    case (11)
-       NP=213444
-    case (12)
-       NP=853776
-    end select
     Nbath = Ns-Norb
     Ntot  = 2*Ns
     NN    = 2**Ntot
-    Nsect = ((Ns+1)*(Ns+1) - 1)
+    Nsect = (Ns+1)*(Ns+1)
     allocate(impIndex(Norb,2))
     allocate(Hmap(Nsect),invHmap(Nsect,NN))
-    allocate(getdim(Nsect),getin(Nsect),getis(Nsect))
-    allocate(getsector(Ntot,-Ntot:Ntot))
+    allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect))
+    allocate(getsector(0:Ns,0:Ns))
     allocate(getCsector(2,Nsect))
     allocate(getCDGsector(2,Nsect))
-    allocate(minCsector(2))
-    allocate(minCDGsector(2))
   end subroutine allocate_system_structure
 
 
+  !+------------------------------------------------------------------+
+  !PURPOSE  : calculate the Heaviside  function
+  !+------------------------------------------------------------------+
+  recursive function factorial(n) result(f)
+    integer            :: f
+    integer,intent(in) :: n
+    if(n<=0)then
+       f=1
+    else
+       f=n*factorial(n-1)
+    end if
+  end function factorial
 
 END MODULE ED_VARS_GLOBAL
