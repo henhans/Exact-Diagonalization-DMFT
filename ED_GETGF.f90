@@ -62,6 +62,8 @@ contains
     !set grids
     call allocate_grids
     !Set Max GF iterations
+    Giw=zero
+    Gwr=zero
 
     !Zeta:
     zeta_function=real(numzero,8)
@@ -93,13 +95,15 @@ contains
     Gwr=Gwr/zeta_function
     !Print convenience impurity functions:
     call print_imp_gf
-    deallocate(wm,wr)
+    deallocate(wm,wr,tau)
     deallocate(gsvec)
   end subroutine lanc_ed_getgf
 
 
 
-
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine lanc_ed_buildgf(isect0,iorb,ispin)
     integer             :: iorb,ispin,isite,isect0
     integer             :: nlanc,idim0,jsect0
@@ -142,7 +146,7 @@ contains
        ! call set_Hsector(jsect0)
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
        call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
-       call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,1,iorb,iorb,ispin)
+       call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,1,iorb,ispin)
        deallocate(vvinit)
        ! !##IF SPARSE_MATRIX:
        call sp_delete_matrix(spH0)
@@ -174,7 +178,7 @@ contains
        ! call set_Hsector(jsect0)
        alfa_=0.d0 ; beta_=0.d0
        call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
-       call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,-1,iorb,iorb,ispin)
+       call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,-1,iorb,ispin)
        deallocate(vvinit)
        ! !##IF SPARSE_MATRIX:
        call sp_delete_matrix(spH0)
@@ -183,6 +187,10 @@ contains
   end subroutine lanc_ed_buildgf
 
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
   subroutine lanc_ed_buildgf_mix(isect0,iorb,jorb,ispin)
     integer             :: iorb,jorb,ispin,isite,jsite,isect0
     integer             :: nlanc,idim0,jsect0
@@ -232,7 +240,7 @@ contains
        ! call set_Hsector(jsect0)
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
        call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
-       call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,1,iorb,jorb,ispin)
+       call add_to_lanczos_gf_mix(norm0,egs,nitermax,alfa_,beta_,1,iorb,jorb,ispin)
        deallocate(vvinit)
        ! !##IF SPARSE_MATRIX:
        call sp_delete_matrix(spH0)
@@ -270,7 +278,7 @@ contains
        ! call set_Hsector(jsect0)
        alfa_=0.d0 ; beta_=0.d0
        call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
-       call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,-1,iorb,jorb,ispin)
+       call add_to_lanczos_gf_mix(norm0,egs,nitermax,alfa_,beta_,-1,iorb,jorb,ispin)
        deallocate(vvinit)
        ! !##IF SPARSE_MATRIX:
        call sp_delete_matrix(spH0)
@@ -287,7 +295,45 @@ contains
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine add_to_lanczos_gf(vnorm,emin,nlanc,alanc,blanc,isign,iorb,jorb,ispin)
+  subroutine add_to_lanczos_gf(vnorm,emin,nlanc,alanc,blanc,isign,iorb,ispin)
+    real(8)                                    :: vnorm,emin
+    integer                                    :: nlanc
+    real(8),dimension(nlanc)                   :: alanc,blanc 
+    integer                                    :: isign,iorb,ispin
+    real(8),dimension(size(alanc),size(alanc)) :: Z
+    real(8),dimension(size(alanc))             :: diag,subdiag
+    integer                                    :: i,j,ierr
+    complex(8)                                 :: cdummy
+    diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
+    forall(i=1:Nlanc)Z(i,i)=1.d0
+    diag(1:Nlanc)    = alanc(1:Nlanc)
+    subdiag(2:Nlanc) = blanc(2:Nlanc)
+    call tql2(Nlanc,diag,subdiag,Z,ierr)
+    do i=1,NL
+       do j=1,nlanc
+          Giw(iorb,iorb,ispin,i)=Giw(iorb,iorb,ispin,i) + vnorm**2*Z(1,j)**2/(xi*wm(i) - isign*(diag(j)-emin))
+       enddo
+    enddo
+    do i=1,Nw
+       do j=1,nlanc
+          Gwr(iorb,iorb,ispin,i)=Gwr(iorb,iorb,ispin,i) + vnorm**2*Z(1,j)**2/(dcmplx(wr(i),eps)-isign*(diag(j)-emin))
+       enddo
+    enddo
+    ! do i=1,NL
+    !    cdummy = vnorm**2*sum(Z(1,:)**2/(xi*wm(i)-isign*(diag(:)-emin)))
+    !    Giw(iorb,iorb,ispin,i)=Giw(iorb,iorb,ispin,i)+cdummy          
+    ! enddo
+    ! do i=1,Nw
+    !    cdummy = vnorm**2*sum(Z(1,:)**2/(dcmplx(wr(i),eps)-isign*(diag(:)-emin)))
+    !    Gwr(iorb,iorb,ispin,i)=Gwr(iorb,iorb,ispin,i) + cdummy          
+    ! enddo
+  end subroutine add_to_lanczos_gf
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine add_to_lanczos_gf_mix(vnorm,emin,nlanc,alanc,blanc,isign,iorb,jorb,ispin)
     real(8)                                    :: vnorm,emin
     integer                                    :: nlanc
     real(8),dimension(nlanc)                   :: alanc,blanc 
@@ -301,26 +347,25 @@ contains
     diag(1:Nlanc)    = alanc(1:Nlanc)
     subdiag(2:Nlanc) = blanc(2:Nlanc)
     call tql2(Nlanc,diag,subdiag,Z,ierr)
-    if(iorb==jorb)then
-       do i=1,NL
-          cdummy = vnorm**2*sum(Z(1,:)**2/(xi*wm(i)-isign*(diag(:)-emin)))
-          Giw(iorb,iorb,ispin,i)=Giw(iorb,iorb,ispin,i)+cdummy          
+    do i=1,NL
+       do j=1,nlanc
+          Giw(iorb,jorb,ispin,i)=Giw(iorb,jorb,ispin,i) + vnorm**2*Z(1,j)**2/(xi*wm(i) - isign*(diag(j)-emin))
        enddo
-       do i=1,Nw
-          cdummy = vnorm**2*sum(Z(1,:)**2/(dcmplx(wr(i),eps)-isign*(diag(:)-emin)))
-          Gwr(iorb,iorb,ispin,i)=Gwr(iorb,iorb,ispin,i) + cdummy          
+    enddo
+    do i=1,Nw
+       do j=1,nlanc
+          Gwr(iorb,jorb,ispin,i)=Gwr(iorb,jorb,ispin,i) + vnorm**2*Z(1,j)**2/(dcmplx(wr(i),eps)-isign*(diag(j)-emin))
        enddo
-    else
-       do i=1,NL
-          cdummy = vnorm**2*sum(Z(1,:)**2/(xi*wm(i)-isign*(diag(:)-emin)))
-          Giw(iorb,jorb,ispin,i) = 0.50d0*(cdummy - Giw(iorb,iorb,ispin,i) - Giw(jorb,jorb,ispin,i))
-       enddo
-       do i=1,Nw
-          cdummy = vnorm**2*sum(Z(1,j)**2/(dcmplx(wr(:),eps)-isign*(diag(:)-emin)))
-          Gwr(iorb,jorb,ispin,i) = 0.5d0*(cdummy - Gwr(iorb,iorb,ispin,i) - Gwr(jorb,jorb,ispin,i))
-       enddo
-    endif
-  end subroutine add_to_lanczos_gf
+    enddo
+    ! do i=1,NL
+    !    cdummy = vnorm**2*sum(Z(1,:)**2/(xi*wm(i)-isign*(diag(:)-emin)))
+    !    Giw(iorb,jorb,ispin,i) = 0.50d0*(cdummy - Giw(iorb,iorb,ispin,i) - Giw(jorb,jorb,ispin,i))
+    ! enddo
+    ! do i=1,Nw
+    !    cdummy = vnorm**2*sum(Z(1,j)**2/(dcmplx(wr(:),eps)-isign*(diag(:)-emin)))
+    !    Gwr(iorb,jorb,ispin,i) = 0.5d0*(cdummy - Gwr(iorb,iorb,ispin,i) - Gwr(jorb,jorb,ispin,i))
+    ! enddo
+  end subroutine add_to_lanczos_gf_mix
 
 
 
@@ -423,19 +468,19 @@ contains
           open(unit(6),file="impSigma_realw"//reg(suffix))
 
           do i=1,NL
-             write(unit(1),"(F18.10,6(F18.10))")wm(i),&
+             write(unit(1),"(F20.12,6(F20.12))")wm(i),&
                   (dimag(Giw(iorb,jorb,ispin,i)),dreal(Giw(iorb,jorb,ispin,i)),ispin=1,Nspin)
-             write(unit(2),"(F18.10,6(F18.10))")wm(i),&
+             write(unit(2),"(F20.12,6(F20.12))")wm(i),&
                   (dimag(G0iw(iorb,jorb,ispin,i)),dreal(G0iw(iorb,jorb,ispin,i)),ispin=1,Nspin)
-             write(unit(3),"(F18.10,6(F18.10))")wm(i),&
+             write(unit(3),"(F20.12,6(F20.12))")wm(i),&
                   (dimag(Siw(iorb,jorb,ispin,i)),dreal(Siw(iorb,jorb,ispin,i)),ispin=1,Nspin)
           enddo
           do i=1,Nw
-             write(unit(4),"(F18.10,6(F18.10))")wr(i),&
+             write(unit(4),"(F20.12,6(F20.12))")wr(i),&
                   (dimag(Gwr(iorb,jorb,ispin,i)),dreal(Gwr(iorb,jorb,ispin,i)),ispin=1,Nspin)
-             write(unit(5),"(F18.10,6(F18.10))")wr(i),&
+             write(unit(5),"(F20.12,6(F20.12))")wr(i),&
                   (dimag(G0wr(iorb,jorb,ispin,i)),dreal(G0wr(iorb,jorb,ispin,i)),ispin=1,Nspin)
-             write(unit(6),"(F18.10,6(F18.10))")wr(i),&
+             write(unit(6),"(F20.12,6(F20.12))")wr(i),&
                   (dimag(Swr(iorb,jorb,ispin,i)),dreal(Swr(iorb,jorb,ispin,i)),ispin=1,Nspin)
           enddo
           do i=1,6

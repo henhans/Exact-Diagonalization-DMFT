@@ -62,6 +62,7 @@ contains
        end subroutine hprod
     end interface
     verb=.false.;if(present(iverbose))verb=iverbose
+
     !=========================================================================
     !  Specifications for ARPACK usage are set below:
     !  0) N   = Ns set the dimension of the problem
@@ -84,10 +85,19 @@ contains
     bmat   = 'I'
     which  = 'SA'    
     !
-    allocate(ax(maxn),d(maxncv,2),resid(maxn),&
-         workl(maxncv*(maxncv+8)),workd(3*maxn),&
-         v(ldv,maxncv),select(maxncv))
+    allocate(ax(ldv),resid(ldv),workd(3*ldv),v(ldv,maxncv),&
+         d(maxncv,2),workl(maxncv*(maxncv+8)),select(maxncv))
+    ax=0.d0
+    resid=0.d0
+    workd=0.d0
+    v=0.d0
+    d=0.d0
+    workl=0.d0
+    select=0.d0
 
+    ! allocate(ax(maxn),d(maxncv,2),resid(maxn),&
+    !      workl(maxncv*(maxncv+8)),workd(3*maxn),&
+    !      v(ldv,maxncv),select(maxncv))
 
     !=========================================================================
     !  Specification of stopping rules and initial

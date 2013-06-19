@@ -90,8 +90,7 @@ contains
        end select
        !+energy of the bath=\sum_{n=1,N}\e_l n_l
        do kp=Norb+1,Ns
-          htmp =htmp + eup(kp-Norb)*real(ib(kp),8)
-          htmp =htmp + edw(kp-Norb)*real(ib(kp+Ns),8)
+          htmp =htmp + eup(kp-Norb)*real(ib(kp),8) + edw(kp-Norb)*real(ib(kp+Ns),8)
        enddo
        call sp_insert_element(spH0,htmp,i,i)
        !

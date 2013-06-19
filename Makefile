@@ -1,17 +1,17 @@
 #=========================================================================
 include sfmake.inc
+#FC=$(SFMPI)/mpif90
 #=========================================================================
 #EXE=fulled_lda1b
 #EXE=lanced_lda1b
 #EXE =fulled_pam_2dsquare
-EXE=fulled_pam_2imp
+#EXE=fulled_pam_2imp
 #EXE=fulled_hm_bethe
-#EXE=lanced_hm_bethe
-#EXE=testBATH
+EXE=lanced_hm_bethe
 DIR =drivers
 DIREXE=$(HOME)/.bin
 
-#FC=$(SFMPI)/mpif90
+
 
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
