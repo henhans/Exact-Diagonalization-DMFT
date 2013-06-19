@@ -71,15 +71,15 @@ contains
     do izero=1,numzero 
        !get gs-sector information
        isect0 =  es_get_sector(groundstate,izero)
-       gsvec  => es_get_vector(groundstate,izero)
        egs    =  es_get_energy(groundstate,izero)
+       gsvec  => es_get_vector(groundstate,izero)
        norm0=sqrt(dot_product(gsvec,gsvec))
-       if(abs(norm0-1.d0)>1.d-9)call warning("GS"//txtfy(izero)//"is not normalized:"//txtfy(norm0))
+       if(abs(norm0-1.d0)>1.d-9)call warning("GS"//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0))
        !
        do ispin=1,Nspin
           do iorb=1,Norb
-             call msg("Evaluating diagonal G_imp_Orb"//trim(txtfy(iorb))//trim(txtfy(iorb))//&
-                  "_Spin"//trim(txtfy(ispin))//"_Sect0"//trim(txtfy(izero)),unit=LOGfile)
+             call msg("Evaluating diagonal G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(iorb))//&
+                  "_Spin"//reg(txtfy(ispin))//"_Sect0"//reg(txtfy(izero)),unit=LOGfile)
              call lanc_ed_buildgf(isect0,iorb,ispin)
           enddo
           do iorb=1,Norb
@@ -89,14 +89,14 @@ contains
           enddo
        enddo
        !
+       nullify(gsvec)
     enddo
-    call stop_timer
     Giw=Giw/zeta_function
     Gwr=Gwr/zeta_function
     !Print convenience impurity functions:
     call print_imp_gf
+    call stop_timer
     deallocate(wm,wr,tau)
-    deallocate(gsvec)
   end subroutine lanc_ed_getgf
 
 
@@ -380,11 +380,9 @@ contains
     complex(8),dimension(Norb,Norb,Nspin,Nw) :: G0wr
     complex(8),dimension(Norb,Norb)          :: Gfoo
     complex(8)                               :: G0inv(Nspin,NL),G0invr(Nspin,Nw)
-    real(8) :: kdelta  
-    character(len=20) :: suffix
-
+    real(8)                                  :: kdelta  
+    character(len=20)                        :: suffix
     call msg("Printing the impurity GF")
-
     !Build the impurity Self-energies:
     select case(Norb)
     case default

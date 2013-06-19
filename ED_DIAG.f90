@@ -71,8 +71,6 @@ contains
     call deallocate_bath
   end subroutine lanc_ed_solver
 
-
-
   !+-------------------------------------------------------------------+
   !PURPOSE  : Setup the Hilbert space, create the Hamiltonian, get the
   ! GS, build the Green's functions calling all the necessary routines
@@ -116,7 +114,7 @@ contains
           eig_basis(1,1)=1.d0
        end select
        enemin=eig_values(1)  
-       if (enemin < oldzero-1.d-10) then
+       if (enemin < oldzero-10.d-9) then
           numzero=1
           oldzero=enemin
           call es_free_espace(groundstate)

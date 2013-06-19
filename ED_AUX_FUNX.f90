@@ -14,6 +14,9 @@ MODULE ED_AUX_FUNX
 
 contains
 
+
+
+
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
@@ -84,6 +87,7 @@ contains
 
 
 
+
   !+------------------------------------------------------------------+
   !PURPOSE  : constructs the pointers for the different sectors and
   !the vectors isrt and jsrt with the corresponding
@@ -117,7 +121,7 @@ contains
 
 
   !+------------------------------------------------------------------+
-  !PURPOSE  : input a state |i> and output a vector ivec(N)
+  !PURPOSE  : input a state |i> and output a vector ivec(Ntot)
   !with its binary decomposition
   !(corresponds to the decomposition of the number i-1)
   !+------------------------------------------------------------------+
@@ -125,8 +129,8 @@ contains
     integer :: ivec(Ntot)         
     integer :: l,i
     logical :: busy
-    !this is the configuration vector |1,..,Ns,Ns+1,...,N>
-    !obtained from binary decomposition of the state/number i\in 2^N
+    !this is the configuration vector |1,..,Ns,Ns+1,...,Ntot>
+    !obtained from binary decomposition of the state/number i\in 2^Ntot
     do l=0,Ntot-1                  !loop sul numero di "siti"
        busy=btest(i-1,l)
        ivec(l+1)=0
@@ -167,7 +171,6 @@ contains
 
 
 
-
   !+-------------------------------------------------------------------+
   !PURPOSE  : input state |i> of the basis and calculates |j>=Cm+|i>
   !the sign of j has the phase convention
@@ -197,35 +200,6 @@ contains
 
 
 
-
-
-
-
-  ! !+------------------------------------------------------------------+
-  ! !PURPOSE  : 
-  ! !+------------------------------------------------------------------+
-  ! subroutine getloop_range(initloop)
-  !   integer                        :: initloop
-  !   integer                        :: sectchunk,sum,id,isloop     
-  !   integer,dimension(0:mpiSIZE-1) :: lloop
-  !   startloop=initloop
-  !   sectchunk=NN/mpiSIZE;sum=0;id=0
-  !   do isloop=startloop,Nsect
-  !      sum=sum+deg(isloop)
-  !      if(sum > sectchunk)then
-  !         lloop(id)=isloop
-  !         sum=0;id=id+1
-  !      endif
-  !   enddo
-  !   lloop(mpiSIZE-1)=Nsect
-  !   if(mpiID==0)lastloop=lloop(0)
-  !   do id=1,mpiSIZE-1
-  !      if(mpiID==id)then
-  !         startloop=lloop(id-1)+1
-  !         lastloop=lloop(id)
-  !      endif
-  !   enddo
-  ! end subroutine getloop_range
 
 
   !+------------------------------------------------------------------+
@@ -278,5 +252,10 @@ contains
     write(10,*)ndelta,nindex
     close(10)
   end subroutine search_mu
+
+
+
+
+
 
 END MODULE ED_AUX_FUNX

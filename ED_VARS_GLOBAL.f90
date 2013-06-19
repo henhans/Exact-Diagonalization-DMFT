@@ -180,7 +180,7 @@ contains
     GRfile ="impG_realw"
     CTfile ="Chi_tau"
     CWfile ="Chi_realw"    
-    Ofile  ="observables.ed"
+    Ofile  ="observables"
     LOGfile=6
 
     inquire(file=INPUTunit,exist=control)    
