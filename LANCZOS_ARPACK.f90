@@ -1,4 +1,4 @@
-subroutine lanczos_arpack(ns,neigen,nitermax,eval,evec,hprod,iverbose)
+subroutine lanczos_arpack(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   !    This routine shows how to use ARPACK to find a few eigenvalues
   !    LAMBDA and corresponding eigenvectors X for the standard
   !    eigenvalue problem:
@@ -18,7 +18,7 @@ subroutine lanczos_arpack(ns,neigen,nitermax,eval,evec,hprod,iverbose)
   !
   implicit none
   !Arguments
-  integer             :: ns,neigen,nitermax
+  integer             :: ns,neigen,nblock,nitermax
   real(8)             :: eval(neigen),evec(ns,neigen)
   logical,optional    :: iverbose
   !Dimensions:
@@ -64,8 +64,10 @@ subroutine lanczos_arpack(ns,neigen,nitermax,eval,evec,hprod,iverbose)
   !    NEV + 1 <= NCV <= MAXNCV
   maxn   = Ns
   maxnev = Neigen
-  maxncv = min(Ns,5*Neigen+10)
+  maxncv = max(nblock,5*Neigen+10)
   ldv    = maxn
+  if(maxncv>Ns)maxncv=Ns
+
   !
   n      = maxn
   nev    = maxnev
@@ -81,7 +83,13 @@ subroutine lanczos_arpack(ns,neigen,nitermax,eval,evec,hprod,iverbose)
   allocate(workd(3*maxn))
   allocate(v(ldv,maxncv))
   allocate(select(maxncv))
-
+  d=0.d0
+  ax=0.d0
+  resid=0.d0
+  workl=0.d0
+  workd=0.d0
+  v=0.d0
+  select=0.d0
 
   !=========================================================================
   !  Specification of stopping rules and initial
@@ -145,12 +153,9 @@ subroutine lanczos_arpack(ns,neigen,nitermax,eval,evec,hprod,iverbose)
      call hprod(n,workd(ipntr(1)),workd(ipntr(2)) )
   end do
 
-
-
   !=========================================================================
   !  Post-Process using SSEUPD.
   if(info<0)then
-     write(*,'(a)')'SSSIMP - Fatal error!'
      write(*,'(a,i6)')'Error with SSAUPD, INFO = ', info
   else
      !  Computed eigenvalues may be extracted.

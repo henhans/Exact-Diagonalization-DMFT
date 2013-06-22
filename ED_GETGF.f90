@@ -408,13 +408,13 @@ contains
     complex(8),dimension(1:2,NL) :: G0iw
     complex(8),dimension(1:2,Nw) :: G0wr
     unit(1)=free_unit()
-    open(unit(1),file=trim(GMfile))
+    open(unit(1),file=trim(GMfile)//".ed")
     unit(2)=free_unit()
     open(unit(2),file="impG0_iw.ed")
     unit(3)=free_unit()
     open(unit(3),file="impSigma_iw.ed")
     unit(4)=free_unit()
-    open(unit(4),file=trim(GRfile))
+    open(unit(4),file=trim(GRfile)//".ed")
     unit(5)=free_unit()
     open(unit(5),file="impG0_realw.ed")
     unit(6)=free_unit()

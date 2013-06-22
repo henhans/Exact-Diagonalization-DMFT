@@ -163,11 +163,11 @@ contains
     if(iolegend)call write_legend
 
     loop=loop+1
-    open(10,file=trim(Ofile)//".all",access="append")
+    open(10,file="all_"//trim(Ofile)//".ed",access="append")
     call write_to_unit_column(10)
     close(10)
 
-    open(20,file=trim(Ofile))
+    open(20,file=trim(Ofile)//".ed")
     call write_to_unit_column(20)
     close(20)
 

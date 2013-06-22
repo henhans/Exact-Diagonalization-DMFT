@@ -76,39 +76,43 @@ contains
     integer             :: nup,ndw,isector,dim
     integer             :: nup0,ndw0,isect0,dim0,izero
     integer             :: info,i,j
-    integer             :: Nitermax,Neigen
+    integer             :: Nitermax,Neigen,Nblock
     real(8)             :: oldzero,enemin,egs
     real(8),allocatable :: eig_values(:)
     real(8),allocatable :: eig_basis(:,:)
+    logical             :: isolve
     if(.not.groundstate%status)groundstate=es_init_espace()
     call es_free_espace(groundstate)
     oldzero=1000.d0
     numzero=0
     call msg("Get Hamiltonian:",unit=LOGfile)
     call start_timer
+    rewind(500)
     do isector=startloop,lastloop
        call eta(isector,lastloop,file="ETA_diag.ed")
-       !Get Hamiltonian (to be changed)
-       dim=getdim(isector)
-       ! !##IF SPARSE_MATRIX:
-       call sp_init_matrix(spH0,dim)
-       call lanc_ed_geth(isector)
-       ! !##ELSE DIRECT H*V PRODUCT:
-       ! call set_Hsector(isector)
-       select case(dim)
-       case default
-          Neigen=1
-          Nitermax=min(dim,nLancitermax)
-          allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
-          call lanczos_arpack(dim,Neigen,Nitermax,eig_values,eig_basis,spHtimesV,.false.)
-       case (1)
-          allocate(eig_values(dim),eig_basis(dim,dim))
+       dim     = getdim(isector)
+       Neigen  = min(dim,nLanceigen)
+       Nitermax= min(dim,nLancitermax)
+       Nblock  = max(nLancblock,5*Neigen+10)
+       Nblock  = min(dim,Nblock)
+       isolve  = .true.
+       if((Neigen==Nitermax).AND.&
+            (Neigen==Nblock).AND.&
+            (Neigen==dim))isolve=.false.
+       allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
+       eig_values=0.d0 ; eig_basis=0.d0
+       select case(isolve)
+       case (.true.)
           ! !##IF SPARSE_MATRIX:
-          eig_values(dim) =sp_get_element(spH0,dim,dim)
+          call sp_init_matrix(spH0,dim)
+          call lanc_ed_geth(isector)
           ! !##ELSE DIRECT H*V PRODUCT:
-          ! call full_ed_geth(isector,eig_basis)
-          ! eig_values(dim)=eig_basis(dim,dim)
-          eig_basis(1,1)=1.d0
+          ! call set_Hsector(isector)
+          call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV,.false.)
+       case (.false.)
+          call full_ed_geth(isector,eig_basis)
+          call matrix_diagonalize(eig_basis,eig_values,'V','U')
+          if(dim==1)eig_basis(dim,dim)=1.d0
        end select
        enemin=eig_values(1)  
        if (enemin < oldzero-10.d-9) then
@@ -122,10 +126,14 @@ contains
           oldzero=min(oldzero,enemin)
           call es_insert_state(groundstate,enemin,eig_basis(1:dim,1),isector)
        endif
+       do i=1,Neigen
+          write(500,*)isector,eig_values(i)
+       enddo
+       write(500,*)""
        deallocate(eig_values,eig_basis)
        !Delete Hamiltonian matrix:
        ! !##IF SPARSE_MATRIX:
-       call sp_delete_matrix(spH0)
+       if(spH0%status)call sp_delete_matrix(spH0)
     enddo
     !
     write(LOGfile,"(A)")"groundstate sector(s):"
