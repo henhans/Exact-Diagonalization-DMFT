@@ -68,7 +68,7 @@ contains
          call error("LANC_ED_GETH: spH0 not initialized at sector:"//txtfy(isector))
 
     eup=ebath(1,:)   ; edw=ebath(Nspin,:)
-    vup=vbath(1,:,:) ; vdw=vbath(Nspin,:,:)
+    vup=vbath(:,1,:) ; vdw=vbath(:,Nspin,:)
 
     do i=1,dim
        m=Hmap(isector)%map(i)!Hmap(isector,i)

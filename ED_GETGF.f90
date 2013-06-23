@@ -62,8 +62,8 @@ contains
     !set grids
     call allocate_grids
     !Set Max GF iterations
-    Giw=zero
-    Gwr=zero
+    impGmats=zero
+    impGreal=zero
 
     !Zeta:
     zeta_function=real(numzero,8)
@@ -78,8 +78,8 @@ contains
        !
        do ispin=1,Nspin
           do iorb=1,Norb
-             call msg("Evaluating diagonal G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(iorb))//&
-                  "_Spin"//reg(txtfy(ispin))//"_Sect0"//reg(txtfy(izero)),unit=LOGfile)
+             ! call msg("Evaluating diagonal G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(iorb))//&
+             !      "_Spin"//reg(txtfy(ispin))//"_Sect0"//reg(txtfy(izero)),unit=LOGfile)
              call lanc_ed_buildgf(isect0,iorb,ispin)
           enddo
           do iorb=1,Norb
@@ -91,8 +91,8 @@ contains
        !
        nullify(gsvec)
     enddo
-    Giw=Giw/zeta_function
-    Gwr=Gwr/zeta_function
+    impGmats=impGmats/zeta_function
+    impGreal=impGreal/zeta_function
     !Print convenience impurity functions:
     call print_imp_gf
     call stop_timer
@@ -113,6 +113,8 @@ contains
     real(8)             :: norm0,sgn
     real(8),allocatable :: vvinit(:),alfa_(:),beta_(:)
     integer             :: Nitermax
+    call msg("Evaluating diagonal G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(iorb))//&
+         "_Spin"//reg(txtfy(ispin)),unit=LOGfile)
     Nitermax=nGFitermax
     allocate(alfa_(Nitermax),beta_(Nitermax))
     !Get site index of the iorb-impurity:
@@ -200,6 +202,8 @@ contains
     real(8)             :: norm0,sgn
     real(8),allocatable :: v1(:),v2(:),vvinit(:),alfa_(:),beta_(:)
     integer             :: Nitermax
+    call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//&
+         "_Spin"//reg(txtfy(ispin)),unit=LOGfile)
     Nitermax=nGFitermax
     allocate(alfa_(Nitermax),beta_(Nitermax))
     !Get site index of the iorb/jorb-impurity:
@@ -311,21 +315,21 @@ contains
     call tql2(Nlanc,diag,subdiag,Z,ierr)
     do i=1,NL
        do j=1,nlanc
-          Giw(iorb,iorb,ispin,i)=Giw(iorb,iorb,ispin,i) + vnorm**2*Z(1,j)**2/(xi*wm(i) - isign*(diag(j)-emin))
+          impGmats(iorb,iorb,ispin,i)=impGmats(iorb,iorb,ispin,i) + vnorm**2*Z(1,j)**2/(xi*wm(i) - isign*(diag(j)-emin))
        enddo
     enddo
     do i=1,Nw
        do j=1,nlanc
-          Gwr(iorb,iorb,ispin,i)=Gwr(iorb,iorb,ispin,i) + vnorm**2*Z(1,j)**2/(dcmplx(wr(i),eps)-isign*(diag(j)-emin))
+          impGreal(iorb,iorb,ispin,i)=impGreal(iorb,iorb,ispin,i) + vnorm**2*Z(1,j)**2/(cmplx(wr(i),eps,8)-isign*(diag(j)-emin))
        enddo
     enddo
     ! do i=1,NL
     !    cdummy = vnorm**2*sum(Z(1,:)**2/(xi*wm(i)-isign*(diag(:)-emin)))
-    !    Giw(iorb,iorb,ispin,i)=Giw(iorb,iorb,ispin,i)+cdummy          
+    !    impGmats(iorb,iorb,ispin,i)=impGmats(iorb,iorb,ispin,i)+cdummy          
     ! enddo
     ! do i=1,Nw
     !    cdummy = vnorm**2*sum(Z(1,:)**2/(dcmplx(wr(i),eps)-isign*(diag(:)-emin)))
-    !    Gwr(iorb,iorb,ispin,i)=Gwr(iorb,iorb,ispin,i) + cdummy          
+    !    impGreal(iorb,iorb,ispin,i)=impGreal(iorb,iorb,ispin,i) + cdummy          
     ! enddo
   end subroutine add_to_lanczos_gf
 
@@ -349,22 +353,18 @@ contains
     call tql2(Nlanc,diag,subdiag,Z,ierr)
     do i=1,NL
        do j=1,nlanc
-          Giw(iorb,jorb,ispin,i)=Giw(iorb,jorb,ispin,i) + vnorm**2*Z(1,j)**2/(xi*wm(i) - isign*(diag(j)-emin))
+          impGmats(iorb,jorb,ispin,i)=impGmats(iorb,jorb,ispin,i) + vnorm**2*Z(1,j)**2/(xi*wm(i) - isign*(diag(j)-emin))
        enddo
     enddo
     do i=1,Nw
        do j=1,nlanc
-          Gwr(iorb,jorb,ispin,i)=Gwr(iorb,jorb,ispin,i) + vnorm**2*Z(1,j)**2/(dcmplx(wr(i),eps)-isign*(diag(j)-emin))
+          impGreal(iorb,jorb,ispin,i)=impGreal(iorb,jorb,ispin,i) + vnorm**2*Z(1,j)**2/(cmplx(wr(i),eps,8)-isign*(diag(j)-emin))
        enddo
     enddo
-    ! do i=1,NL
-    !    cdummy = vnorm**2*sum(Z(1,:)**2/(xi*wm(i)-isign*(diag(:)-emin)))
-    !    Giw(iorb,jorb,ispin,i) = 0.50d0*(cdummy - Giw(iorb,iorb,ispin,i) - Giw(jorb,jorb,ispin,i))
-    ! enddo
-    ! do i=1,Nw
-    !    cdummy = vnorm**2*sum(Z(1,j)**2/(dcmplx(wr(:),eps)-isign*(diag(:)-emin)))
-    !    Gwr(iorb,jorb,ispin,i) = 0.5d0*(cdummy - Gwr(iorb,iorb,ispin,i) - Gwr(jorb,jorb,ispin,i))
-    ! enddo
+    impGmats(iorb,jorb,ispin,:) = 0.50d0*(impGmats(iorb,jorb,ispin,:) - impGmats(iorb,iorb,ispin,:) - impGmats(jorb,jorb,ispin,:))
+    impGmats(jorb,iorb,ispin,:) = impGmats(iorb,jorb,ispin,:)
+    impGreal(iorb,jorb,ispin,:) = 0.50d0*(impGreal(iorb,jorb,ispin,:) - impGreal(iorb,iorb,ispin,:) - impGreal(jorb,jorb,ispin,:))
+    impGreal(jorb,iorb,ispin,:) = impGreal(iorb,jorb,ispin,:)
   end subroutine add_to_lanczos_gf_mix
 
 
@@ -402,14 +402,14 @@ contains
              enddo
           enddo
           do i=1,NL
-             Gfoo = Giw(:,:,ispin,i)
+             Gfoo = impGmats(:,:,ispin,i)
              call matrix_inverse(Gfoo)
-             Siw(:,:,ispin,i) = G0iw(:,:,ispin,i) - Gfoo(:,:)           
+             impSmats(:,:,ispin,i) = G0iw(:,:,ispin,i) - Gfoo(:,:)           
           enddo
           do i=1,Nw
-             Gfoo = Gwr(:,:,ispin,i)
+             Gfoo = impGreal(:,:,ispin,i)
              call matrix_inverse(Gfoo)
-             Swr(:,:,ispin,i) = G0wr(:,:,ispin,i) - Gfoo(:,:)
+             impSreal(:,:,ispin,i) = G0wr(:,:,ispin,i) - Gfoo(:,:)
           enddo
        enddo
 
@@ -429,13 +429,13 @@ contains
           do i=1,NL
              iw=xi*wm(i)
              G0iw(1,1,ispin,i)= (iw+xmu)-delta_bath(iw,1,1,ispin)
-             Siw(1,1,ispin,i) = G0iw(1,1,ispin,i) - one/Giw(1,1,ispin,i)
+             impSmats(1,1,ispin,i) = G0iw(1,1,ispin,i) - one/impGmats(1,1,ispin,i)
              G0iw(1,1,ispin,i)= one/G0iw(1,1,ispin,i)
           enddo
           do i=1,Nw
              iw=cmplx(wr(i),eps)
              G0wr(1,1,ispin,i)= (iw+xmu)-delta_bath(iw,1,1,ispin)
-             Swr(1,1,ispin,i) = G0wr(1,1,ispin,i) - one/Gwr(1,1,ispin,i)
+             impSreal(1,1,ispin,i) = G0wr(1,1,ispin,i) - one/impGreal(1,1,ispin,i)
              G0wr(1,1,ispin,i)= one/G0wr(1,1,ispin,i)
           enddo
        enddo
@@ -467,19 +467,19 @@ contains
 
           do i=1,NL
              write(unit(1),"(F20.12,6(F20.12))")wm(i),&
-                  (dimag(Giw(iorb,jorb,ispin,i)),dreal(Giw(iorb,jorb,ispin,i)),ispin=1,Nspin)
+                  (dimag(impGmats(iorb,jorb,ispin,i)),dreal(impGmats(iorb,jorb,ispin,i)),ispin=1,Nspin)
              write(unit(2),"(F20.12,6(F20.12))")wm(i),&
                   (dimag(G0iw(iorb,jorb,ispin,i)),dreal(G0iw(iorb,jorb,ispin,i)),ispin=1,Nspin)
              write(unit(3),"(F20.12,6(F20.12))")wm(i),&
-                  (dimag(Siw(iorb,jorb,ispin,i)),dreal(Siw(iorb,jorb,ispin,i)),ispin=1,Nspin)
+                  (dimag(impSmats(iorb,jorb,ispin,i)),dreal(impSmats(iorb,jorb,ispin,i)),ispin=1,Nspin)
           enddo
           do i=1,Nw
              write(unit(4),"(F20.12,6(F20.12))")wr(i),&
-                  (dimag(Gwr(iorb,jorb,ispin,i)),dreal(Gwr(iorb,jorb,ispin,i)),ispin=1,Nspin)
+                  (dimag(impGreal(iorb,jorb,ispin,i)),dreal(impGreal(iorb,jorb,ispin,i)),ispin=1,Nspin)
              write(unit(5),"(F20.12,6(F20.12))")wr(i),&
                   (dimag(G0wr(iorb,jorb,ispin,i)),dreal(G0wr(iorb,jorb,ispin,i)),ispin=1,Nspin)
              write(unit(6),"(F20.12,6(F20.12))")wr(i),&
-                  (dimag(Swr(iorb,jorb,ispin,i)),dreal(Swr(iorb,jorb,ispin,i)),ispin=1,Nspin)
+                  (dimag(impSreal(iorb,jorb,ispin,i)),dreal(impSreal(iorb,jorb,ispin,i)),ispin=1,Nspin)
           enddo
           do i=1,6
              close(unit(i))

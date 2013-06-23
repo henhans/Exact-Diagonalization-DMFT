@@ -8,8 +8,8 @@ subroutine full_ed_getgf()
   !----------------------------------------------
   call allocate_grids
   !Initialize some functions
-  Giw   =zero
-  Gwr   =zero
+  impGmats   =zero
+  impGreal   =zero
   call start_timer
   do ispin=1,Nspin
      do iorb=1,Norb
@@ -74,12 +74,12 @@ subroutine full_ed_buildgf(iorb,ispin)
            !build Matsubara GF
            do m=1,NL
               iw=xi*wm(m)
-              Giw(iorb,iorb,ispin,m)=Giw(iorb,iorb,ispin,m)+matcdg/(iw+de)
+              impGmats(iorb,iorb,ispin,m)=impGmats(iorb,iorb,ispin,m)+matcdg/(iw+de)
            enddo
            !build Real-freq. GF
            do m=1,Nw 
               w0=wr(m);iw=cmplx(w0,eps)
-              Gwr(iorb,iorb,ispin,m)=Gwr(iorb,iorb,ispin,m)+matcdg/(iw+de)
+              impGreal(iorb,iorb,ispin,m)=impGreal(iorb,iorb,ispin,m)+matcdg/(iw+de)
            enddo
         enddo
      enddo
@@ -146,12 +146,12 @@ subroutine full_ed_buildgf_mix(iorb,jorb,ispin)
            !build Matsubara GF
            do m=1,NL
               iw=xi*wm(m)
-              Giw(iorb,jorb,ispin,m)=Giw(iorb,jorb,ispin,m)+matcdg/(iw+de)
+              impGmats(iorb,jorb,ispin,m)=impGmats(iorb,jorb,ispin,m)+matcdg/(iw+de)
            enddo
            !build Real-freq. GF
            do m=1,Nw 
               w0=wr(m);iw=cmplx(w0,eps)
-              Gwr(iorb,jorb,ispin,m)=Gwr(iorb,jorb,ispin,m)+matcdg/(iw+de)
+              impGreal(iorb,jorb,ispin,m)=impGreal(iorb,jorb,ispin,m)+matcdg/(iw+de)
            enddo
         enddo
      enddo
@@ -176,10 +176,21 @@ subroutine full_ed_getchi()
   real(8)                  :: Ei,Ej,cc,peso(Norb,Norb),pesotot
   real(8)                  :: expterm,de,w0,it
   complex(8)               :: iw
+
+  real(8),allocatable,dimension(:,:,:)      :: Chitau
+  real(8),allocatable,dimension(:)          :: Chitautot
+  complex(8),allocatable,dimension(:,:,:)   :: Chiw
+  complex(8),allocatable,dimension(:)       :: Chiwtot
+
   call allocate_grids
 
+  allocate(Chitau(Norb,Norb,0:Ltau),Chiw(Norb,Norb,Nw))
+  allocate(Chitautot(0:Ltau),Chiwtot(Nw))
+
   Chitau=0.d0
+  Chitautot=0.d0
   Chiw=zero
+  Chiwtot=zero
 
   !Spin susceptibility \X(tau). |<i|S_z|j>|^2
   call msg("Evaluating Chi_Sz",unit=LOGfile)
@@ -273,5 +284,6 @@ subroutine full_ed_getchi()
   enddo
   close(unit(1))
   close(unit(2))
+  deallocate(Chitau,Chiw,Chitautot,Chiwtot)
   deallocate(wm,tau,wr)
 end subroutine full_ed_getchi

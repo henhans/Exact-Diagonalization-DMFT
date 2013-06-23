@@ -14,8 +14,10 @@ subroutine full_ed_geth(isector,h)
   if(size(h,1)/=dim)call error("FULL_ED_GETH: wrong dimension 1 of H")
   if(size(h,2)/=dim)call error("FULL_ED_GETH: wrong dimension 2 of H")
   h=0.d0
+
   eup=ebath(1,:)   ; edw=ebath(Nspin,:)
   vup=vbath(:,1,:) ; vdw=vbath(:,Nspin,:)
+
   do i=1,dim
      m=Hmap(isector)%map(i)
      call bdecomp(m,ib)
@@ -36,8 +38,7 @@ subroutine full_ed_geth(isector,h)
      end select
      !Hbath:
      do kp=Norb+1,Ns
-        htmp =htmp + eup(kp-Norb)*real(ib(kp),8)
-        htmp =htmp + edw(kp-Norb)*real(ib(kp+Ns),8)
+        htmp =htmp + eup(kp-Norb)*real(ib(kp),8) + edw(kp-Norb)*real(ib(kp+Ns),8)
      enddo
      h(i,i)=htmp
      !

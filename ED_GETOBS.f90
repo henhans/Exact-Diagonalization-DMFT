@@ -91,11 +91,11 @@ contains
     allocate(simp(Norb,Nspin),zimp(Norb,Nspin),rimp(Norb,Nspin))
     do ispin=1,Nspin
        do iorb=1,Norb
-          simp(iorb,ispin) = dimag(Siw(iorb,iorb,ispin,1)) - &
-               wm1*(dimag(Siw(iorb,iorb,ispin,2))-dimag(Siw(iorb,iorb,ispin,1)))/(wm2-wm1)
-          zimp(iorb,ispin)   = 1.d0/( 1.d0 + abs( dimag(Siw(iorb,iorb,ispin,1))/wm1 ))
-          rimp(iorb,ispin)   = dimag(Giw(iorb,iorb,ispin,1)) - &
-               wm1*(dimag(Giw(iorb,iorb,ispin,2))-dimag(Giw(iorb,iorb,ispin,1)))/(wm2-wm1)
+          simp(iorb,ispin) = dimag(impSmats(iorb,iorb,ispin,1)) - &
+               wm1*(dimag(impSmats(iorb,iorb,ispin,2))-dimag(impSmats(iorb,iorb,ispin,1)))/(wm2-wm1)
+          zimp(iorb,ispin)   = 1.d0/( 1.d0 + abs( dimag(impSmats(iorb,iorb,ispin,1))/wm1 ))
+          rimp(iorb,ispin)   = dimag(impGmats(iorb,iorb,ispin,1)) - &
+               wm1*(dimag(impGmats(iorb,iorb,ispin,2))-dimag(impGmats(iorb,iorb,ispin,1)))/(wm2-wm1)
        enddo
     enddo
 

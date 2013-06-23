@@ -91,12 +91,9 @@ MODULE ED_VARS_GLOBAL
 
   !Functions for GETGFUNX (names must be changed)
   !=========================================================
-  complex(8),allocatable,dimension(:,:,:,:) :: Giw,Siw
-  complex(8),allocatable,dimension(:,:,:,:) :: Gwr,Swr
-  real(8),allocatable,dimension(:,:,:)      :: Chitau
-  real(8),allocatable,dimension(:)          :: Chitautot
-  complex(8),allocatable,dimension(:,:,:)   :: Chiw
-  complex(8),allocatable,dimension(:)       :: Chiwtot
+  complex(8),allocatable,dimension(:,:,:,:) :: impGmats,impSmats
+  complex(8),allocatable,dimension(:,:,:,:) :: impGreal,impSreal
+  
 
 
   !Variables for fixed density mu-loop 
@@ -171,7 +168,7 @@ contains
     nsuccess   = 2
     nLancitermax = 512
     nGFitermax = 100
-    cgNitmax   = 1000
+    cgNitmax   = 200
     cgFtol     = 1.d-9
     cgType     = 0
     !ReadUnits
@@ -265,9 +262,9 @@ contains
     if(nerr > eps_error) nerr=eps_error    
 
     !allocate functions
-    allocate(Giw(Norb,Norb,Nspin,NL),Siw(Norb,Norb,Nspin,NL))
-    allocate(Gwr(Norb,Norb,Nspin,Nw),Swr(Norb,Norb,Nspin,Nw))
-    if(chiflag)allocate(Chitau(Norb,Norb,0:Ltau),Chiw(Norb,Norb,Nw))
+    allocate(impGmats(Norb,Norb,Nspin,NL),impSmats(Norb,Norb,Nspin,NL))
+    allocate(impGreal(Norb,Norb,Nspin,Nw),impSreal(Norb,Norb,Nspin,Nw))
+
 
     allocate(nimp(Norb),dimp(Norb),nupimp(Norb),ndwimp(Norb),magimp(Norb))
     allocate(m2imp(Norb,Norb))
