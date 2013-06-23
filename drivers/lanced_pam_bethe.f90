@@ -81,7 +81,7 @@ contains
     do i=1,NL
        iw     = xi*wm(i)
        g0d(i) = iw + xmu - delta_and(iw,bath,1)
-       sd(i)  = g0d(i) - one/Giw(1,i)
+       sd(i)  = g0d(i) - one/impGmats(1,i)
        sp(i)  = tpd**2/(iw + xmu - sd(i))
        zita   = iw + xmu - ep0 - sp(i)
        gp(i)  = gfbethe(wm(i),zita,Wband)
@@ -99,7 +99,7 @@ contains
     do i=1,Nw
        iw=cmplx(wr(i),eps)
        g0dr(i) = wr(i)+xmu-delta_and(wr(i)+zero,bath,1)
-       sdr(i)  = g0dr(i) - one/Gwr(1,i)
+       sdr(i)  = g0dr(i) - one/impGreal(1,i)
        spr(i)  = tpd**2/(iw + xmu - sdr(i))
        zita    = iw + xmu -ep0 - spr(i)
        gpr(i)  = gfbether(wr(i),zita,wband)

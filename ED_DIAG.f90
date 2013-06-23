@@ -22,7 +22,7 @@ contains
   !####################################################################
   !                    FULL DIAGONALIZATION
   !####################################################################
-  include 'fulled_diag.f90'
+  include 'include_fulled_diag.f90'
 
 
   !####################################################################
@@ -36,7 +36,6 @@ contains
     integer                            :: i   
     call msg("INIT SOLVER, SETUP EIGENSPACE",unit=LOGfile)
     call check_bath_dimension(bath)
-    call allocate_bath
     call init_bath_ed
     if(Nspin==2)then
        heff=abs(heff)
@@ -57,6 +56,7 @@ contains
   !+------------------------------------------------------------------+
   subroutine lanc_ed_solver(bath)
     real(8),dimension(:),intent(in) :: bath
+    integer :: unit
     call msg("ED SOLUTION",unit=LOGfile)
     call check_bath_dimension(bath)
     call allocate_bath
@@ -64,7 +64,10 @@ contains
     call lanc_ed_diag
     call lanc_ed_getgf
     call lanc_ed_getobs
-    call dump_bath(Hfile)
+    unit=free_unit()
+    open(unit,file=trim(Hfile))
+    call write_bath(unit)
+    close(unit)
     call deallocate_bath
   end subroutine lanc_ed_solver
 

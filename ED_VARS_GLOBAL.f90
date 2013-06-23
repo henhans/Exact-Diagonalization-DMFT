@@ -11,7 +11,7 @@ MODULE ED_VARS_GLOBAL
   USE MATRIX_SPARSE
   USE EIGEN_SPACE
   USE PLAIN_LANCZOS
-  !USE ARPACK_LANCZOS
+  USE ARPACK_LANCZOS
   implicit none
 
   !GIT VERSION
@@ -82,7 +82,6 @@ MODULE ED_VARS_GLOBAL
   !=========================================================
   integer                                 :: numzero
   type(eig_space)                         :: groundstate
-  ! real(8),dimension(:,:),allocatable      :: H0
   type(sparse_matrix)                     :: spH0
 
 
@@ -93,10 +92,9 @@ MODULE ED_VARS_GLOBAL
 
   !Functions for GETGFUNX (names must be changed)
   !=========================================================
-  complex(8),allocatable,dimension(:,:) :: Giw,Siw
-  complex(8),allocatable,dimension(:,:) :: Gwr,Swr
-  real(8),allocatable,dimension(:)      :: Chitau
-  complex(8),allocatable,dimension(:)   :: Chiw
+  complex(8),allocatable,dimension(:,:) :: impGmats,impSmats
+  complex(8),allocatable,dimension(:,:) :: impGreal,impSreal
+  
 
 
   !Variables for fixed density mu-loop 
@@ -176,11 +174,11 @@ contains
     cgType     = 0
     !ReadUnits
     Hfile  ="hamiltonian.restart"
-    GMfile ="impG_iw.ed"
-    GRfile ="impG_realw.ed"
-    CTfile ="Chi_tau.ed"
-    CWfile ="Chi_realw.ed"    
-    Ofile  ="observables.ed"
+    GMfile ="impG_iw"
+    GRfile ="impG_realw"
+    CTfile ="Chi_tau"
+    CWfile ="Chi_realw"    
+    Ofile  ="observables"
     LOGfile=6
 
     inquire(file=INPUTunit,exist=control)    
@@ -253,9 +251,6 @@ contains
     write(*,*)'| Total size, Hilber space dim.= ',Ntot,NN
     write(*,*)'| Number of sectors            = ',Nsect
     write(*,*)"--------------------------------------------"
-    write(*,*)'| mu       = ',xmu
-    write(*,*)'| T        = ',1.d0/beta
-    write(*,*)"--------------------------------------------"
     print*,''
     USEDinput="used."//INPUTunit
     open(50,file=trim(adjustl(trim(USEDinput))))
@@ -268,9 +263,8 @@ contains
     if(nerr > eps_error) nerr=eps_error
 
     !allocate functions
-    allocate(Giw(Nspin,NL),Siw(Nspin,NL))
-    allocate(Gwr(Nspin,Nw),Swr(Nspin,Nw))
-    if(chiflag)allocate(Chitau(0:Ltau),Chiw(Nw))
+    allocate(impGmats(Nspin,NL),impSmats(Nspin,NL))
+    allocate(impGreal(Nspin,Nw),impSreal(Nspin,Nw))
 
   end subroutine read_input
 
