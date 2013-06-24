@@ -9,7 +9,9 @@ include sfmake.inc
 #EXE=fulled_pam_2imp
 #EXE=fulled_hm_bethe
 #EXE=lanced_hm_bethe
-EXE=lanced_pam_2imp
+#EXE=lanced_pam_2imp
+#EXE=lanced_tddpam_bethe
+EXE=lanced_tddpam_2imp
 DIR =drivers
 DIREXE=$(HOME)/.bin
 

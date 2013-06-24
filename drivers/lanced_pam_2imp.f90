@@ -103,26 +103,25 @@ contains
     call splot("ntot.zdd.zpp.ed",iloop,nimp(1)+nimp(2),zdd,zpp,gmu,append=.true.)
     deallocate(g0p,g0d,sd,sp,gp,gd)
 
-    ! allocate(g0p(Nw),g0d(Nw),sd(Nw),sp(Nw),gp(Nw),gd(Nw))
-    ! do i=1,Nw
-    !    iw     = wr(i)+xi*eps
-    !    g0p(i) = iw + xmu - ep0 - delta_and(iw,bath,2,2,1)
-    !    g0d(i) = iw + xmu - (tpd**2)/(iw + xmu - ep0 - 0.25d0*wband**2*impGreal(2,2,1,i))
-    !    sd(i)  = g0d(i) - one/impGreal(1,1,1,i)
-    !    sp(i)  = tpd**2/(iw + xmu - sd(i))
-    !    zita   = iw + xmu - ep0 - sp(i)
-    !    gp(i)  = gfbethe(wr(i),zita,Wband)
-    !    gd(i)  = one/(iw+xmu-sd(i)) + tpd**2/(iw+xmu-sd(i))**2*gp(i)
-    ! enddo
-    ! call splot("G0dd_realw.ed",wr,one/g0d)
-    ! call splot("G0pp_realw.ed",wr,one/g0p)
-    ! call splot("Gdd_realw.ed",wr,gd)
-    ! call splot("Gpp_realw.ed",wr,gp)
-    ! call splot("DOSdd.ed",wr,-dimag(gd)/pi)
-    ! call splot("DOSpp.ed",wr,-dimag(gp)/pi)
-    ! call splot("Sigmapp_realw.ed",wr,sp)
-    ! call splot("Sigmadd_realw.ed",wr,sd)
-    ! deallocate(g0p,g0d,sd,sp,gp,gd)
+    allocate(g0p(Nw),g0d(Nw),sd(Nw),sp(Nw),gp(Nw),gd(Nw))
+    do i=1,Nw
+       iw=cmplx(wr(i),eps)
+       g0d(i) = wr(i)+xmu-delta_and(wr(i)+zero,bath,2,2,1)
+       sd(i)  = g0d(i) -  one/impGreal(1,1,1,i)
+       sp(i)  = tpd**2/(iw + xmu - sd(i))
+       zita    = iw + xmu -ep0 - sp(i)
+       gp(i)  = gfbether(wr(i),zita,wband)
+       gd(i)  = one/(iw+xmu-sd(i)) + tpd**2/(iw+xmu-sd(i))**2*gp(i)
+    enddo
+    call splot("G0dd_realw.ed",wr,one/g0d)
+    call splot("G0pp_realw.ed",wr,one/g0p)
+    call splot("Gdd_realw.ed",wr,gd)
+    call splot("Gpp_realw.ed",wr,gp)
+    call splot("DOSdd.ed",wr,-dimag(gd)/pi)
+    call splot("DOSpp.ed",wr,-dimag(gp)/pi)
+    call splot("Sigmapp_realw.ed",wr,sp)
+    call splot("Sigmadd_realw.ed",wr,sd)
+    deallocate(g0p,g0d,sd,sp,gp,gd)
 
     if(ntype==1)then
        nobj=nimp(1)

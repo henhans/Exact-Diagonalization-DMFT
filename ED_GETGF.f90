@@ -113,7 +113,7 @@ contains
     real(8)             :: norm0,sgn
     real(8),allocatable :: vvinit(:),alfa_(:),beta_(:)
     integer             :: Nitermax
-    call msg("Evaluating diagonal G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(iorb))//&
+    call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(iorb))//&
          "_Spin"//reg(txtfy(ispin)),unit=LOGfile)
     Nitermax=nGFitermax
     allocate(alfa_(Nitermax),beta_(Nitermax))
@@ -200,7 +200,7 @@ contains
     integer             :: ib(Ntot)
     integer             :: m,i,j,r
     real(8)             :: norm0,sgn
-    real(8),allocatable :: v1(:),v2(:),vvinit(:),alfa_(:),beta_(:)
+    real(8),allocatable :: v1(:),v2(:),cvin(:,:),vvinit(:),alfa_(:),beta_(:)
     integer             :: Nitermax
     call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//&
          "_Spin"//reg(txtfy(ispin)),unit=LOGfile)
@@ -218,7 +218,7 @@ contains
        jup0   = getnup(jsect0)
        jdw0   = getndw(jsect0)
        write(*,"(A,2I3,I15)")'GetGF sector:',jup0,jdw0,jdim0
-       allocate(vvinit(jdim0));vvinit=0.d0
+       allocate(vvinit(jdim0),cvin(2,jdim0));vvinit=0.d0
        do m=1,idim0                                                !loop over |gs> components m
           i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
           call bdecomp(i,ib)                                       !decompose i into binary representation
@@ -226,15 +226,17 @@ contains
              call cdg(isite,i,r)
              sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
              j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             vvinit(j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
+             cvin(1,j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
           endif
           if(ib(jsite)==0)then                                     !if impurity is empty: proceed
              call cdg(jsite,i,r)
              sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
              j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             vvinit(j) = vvinit(j) + sgn*gsvec(m)                                !build the cdg_up|gs> state
+             cvin(2,j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
           endif
        enddo
+       vvinit = cvin(1,:) + cvin(2,:)
+       deallocate(cvin)
        norm0=sqrt(dot_product(vvinit,vvinit))
        vvinit=vvinit/norm0
        ! !##IF SPARSE_MATRIX:
@@ -253,11 +255,11 @@ contains
     !REMOVE ONE PARTICLE UP:
     jsect0 = getCsector(ispin,isect0)
     if(jsect0/=0)then
-       jdim0  = getdim(jsect0)
+       jdim0   = getdim(jsect0)
        jup0    = getnup(jsect0)
        jdw0    = getndw(jsect0)
        write(*,"(A,2I3,I15)")'GetGF: sector:',jup0,jdw0,jdim0
-       allocate(vvinit(jdim0)) ; vvinit=0.d0
+       allocate(vvinit(jdim0),cvin(2,jdim0)) ; vvinit=0.d0
        do m=1,idim0                                                !loop over |gs> components m
           i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
           call bdecomp(i,ib)                                       !decompose i into binary representation
@@ -265,15 +267,17 @@ contains
              call c(isite,i,r)
              sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
              j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             vvinit(j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
+             cvin(1,j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
           endif
           if(ib(jsite)==1)then                                     !if impurity is empty: proceed
              call c(jsite,i,r)
              sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
              j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             vvinit(j) = vvinit(j) + sgn*gsvec(m)                                !build the cdg_up|gs> state
+             cvin(2,j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
           endif
        enddo
+       vvinit = cvin(1,:) + cvin(2,:)
+       deallocate(cvin)
        norm0=sqrt(dot_product(vvinit,vvinit))
        vvinit=vvinit/norm0
        call sp_init_matrix(spH0,jdim0)

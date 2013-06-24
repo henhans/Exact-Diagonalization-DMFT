@@ -113,7 +113,7 @@ contains
     enddo
     dos_wt=2.d0*Wbath/dfloat(Lk)
     if(fbethe)then
-       de=2.d0/dfloat(Lk)
+       de=2.d0*wbath/dfloat(Lk)
        do ik=1,Lk
           e = -wbath + dfloat(ik-1)*de
           dos_wt(ik)=dens_bethe(e,wbath)*de

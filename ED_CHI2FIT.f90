@@ -2,7 +2,8 @@
 !PURPOSE  : Perform the \Chi^2 fit procedure on the Delta function
 !########################################################################
 MODULE ED_CHI2FIT
-  USE ED_VARS_GLOBAL
+  USE ED_VARS_GLOBAL, only: zero,xi,pi,beta,CGtype,LOGfile,cgNitmax,cgFtol,Nbath,Norb,&
+       msg,txtfy,reg,arange,fmin_cg,splot,error
   USE ED_BATH
   USE ED_AUX_FUNX
   implicit none
