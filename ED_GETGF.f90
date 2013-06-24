@@ -8,7 +8,6 @@ MODULE ED_GETGF
   USE ED_AUX_FUNX
   USE ED_GETH
   !
-
   implicit none
   private 
 
@@ -21,6 +20,10 @@ MODULE ED_GETGF
   real(8),dimension(:),pointer :: gsvec
   real(8)                      :: egs
 
+  !mixed GF 
+  !=========================================================
+  complex(8),dimension(:,:,:,:),allocatable :: Gm,Gmb
+  complex(8),dimension(:,:,:,:),allocatable :: Gmr,Gmbr
 
 
   public :: full_ed_getgf
@@ -57,8 +60,6 @@ contains
     integer :: izero,iorb,jorb,ispin
     integer :: isect0
     real(8) :: norm0
-    !SET THE LANCZOS H*v method:
-    call plain_lanczos_set_htimesv_d(spHtimesV)
     !set grids
     call allocate_grids
     !Set Max GF iterations
@@ -68,36 +69,60 @@ contains
     !Zeta:
     zeta_function=real(numzero,8)
     call start_timer
+    if(Norb>1)then
+       allocate(Gm(Norb,Norb,Nspin,NL),Gmb(Norb,Norb,Nspin,NL))
+       allocate(Gmr(Norb,Norb,Nspin,Nw),Gmbr(Norb,Norb,Nspin,Nw))
+    endif
     do izero=1,numzero 
-       !get gs-sector information
        isect0 =  es_get_sector(groundstate,izero)
        egs    =  es_get_energy(groundstate,izero)
        gsvec  => es_get_vector(groundstate,izero)
        norm0=sqrt(dot_product(gsvec,gsvec))
        if(abs(norm0-1.d0)>1.d-9)call warning("GS"//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0))
        !
+       call plain_lanczos_set_htimesv_d(spHtimesV_d)
        do ispin=1,Nspin
           do iorb=1,Norb
-             ! call msg("Evaluating diagonal G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(iorb))//&
-             !      "_Spin"//reg(txtfy(ispin))//"_Sect0"//reg(txtfy(izero)),unit=LOGfile)
              call lanc_ed_buildgf(isect0,iorb,ispin)
           enddo
-          do iorb=1,Norb
-             do jorb=iorb+1,Norb
-                call lanc_ed_buildgf_mix(isect0,iorb,jorb,ispin)
+          call plain_lanczos_delete_htimesv_d
+          !
+          if(Norb>1)then
+             call plain_lanczos_set_htimesv_c(spHtimesV_c)
+             do iorb=1,Norb
+                do jorb=1,Norb!iorb+1,Norb
+                   if(iorb/=jorb)call lanc_ed_buildgf_mix(isect0,iorb,jorb,ispin)
+                enddo
              enddo
-          enddo
+             call plain_lanczos_delete_htimesv_d
+          endif
        enddo
        !
        nullify(gsvec)
     enddo
+    !Put here off-diagonal manipulation by symmetry:
+    forall(ispin=1:Nspin,iorb=1:Norb,jorb=1:Norb,iorb/=jorb)
+       impGmats(iorb,jorb,ispin,:) = &
+            (Gm(iorb,jorb,ispin,:) - xi*Gmb(iorb,jorb,ispin,:) + (xi-one)*(impGmats(iorb,iorb,ispin,:)+impGmats(jorb,jorb,ispin,:)))/2.d0
+       impGreal(iorb,jorb,ispin,:) = &
+            (Gmr(iorb,jorb,ispin,:)- xi*Gmbr(iorb,jorb,ispin,:)+ (xi-one)*(impGreal(iorb,iorb,ispin,:)+impGreal(jorb,jorb,ispin,:)))/2.d0
+    end forall
+
+    if(Norb>1)then
+       deallocate(Gm,Gmb,Gmr,Gmbr)
+    endif
+
     impGmats=impGmats/zeta_function
     impGreal=impGreal/zeta_function
-    !Print convenience impurity functions:
+
+    !Print impurity functions:
     call print_imp_gf
     call stop_timer
     deallocate(wm,wr,tau)
   end subroutine lanc_ed_getgf
+
+
+
 
 
 
@@ -113,22 +138,28 @@ contains
     real(8)             :: norm0,sgn
     real(8),allocatable :: vvinit(:),alfa_(:),beta_(:)
     integer             :: Nitermax
-    call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(iorb))//&
-         "_Spin"//reg(txtfy(ispin)),unit=LOGfile)
+    call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin)),unit=LOGfile)
     Nitermax=nGFitermax
     allocate(alfa_(Nitermax),beta_(Nitermax))
     !Get site index of the iorb-impurity:
     isite=impIndex(iorb,ispin)
     !Get dimension of the gs-sector isect0
     idim0  = getdim(isect0)
-    !Get the +up particle sector information:
+    !ADD ONE PARTICLE:
     jsect0 = getCDGsector(ispin,isect0)
     if(jsect0/=0)then 
        jdim0  = getdim(jsect0)
        jup0   = getnup(jsect0)
        jdw0   = getndw(jsect0)
-       write(*,"(A,2I3,I15)")'GetGF sector:',jup0,jdw0,jdim0
-       allocate(vvinit(jdim0));vvinit=0.d0
+       write(*,"(A,2I3,I15)")'add particle:',jup0,jdw0,jdim0
+       ! !##IF SPARSE_MATRIX:
+       call sp_init_matrix(spH0,jdim0)
+       call lanc_ed_geth(jsect0)
+       ! !##ELSE DIRECT H*V PRODUCT:
+       ! call set_Hsector(jsect0)
+       allocate(vvinit(jdim0))
+       !
+       vvinit=0.d0
        do m=1,idim0                                                !loop over |gs> components m
           i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
           call bdecomp(i,ib)                                       !decompose i into binary representation
@@ -141,11 +172,6 @@ contains
        enddo
        norm0=sqrt(dot_product(vvinit,vvinit))
        vvinit=vvinit/norm0
-       ! !##IF SPARSE_MATRIX:
-       call sp_init_matrix(spH0,jdim0)
-       call lanc_ed_geth(jsect0)
-       ! !##ELSE DIRECT H*V PRODUCT:
-       ! call set_Hsector(jsect0)
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
        call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
        call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,1,iorb,ispin)
@@ -154,30 +180,32 @@ contains
        call sp_delete_matrix(spH0)
     endif
     !
-    !REMOVE ONE PARTICLE UP:
+    !
+    !REMOVE ONE PARTICLE:
     jsect0 = getCsector(ispin,isect0)
     if(jsect0/=0)then
        jdim0  = getdim(jsect0)
        jup0    = getnup(jsect0)
        jdw0    = getndw(jsect0)
-       write(*,"(A,2I3,I15)")'GetGF: sector:',jup0,jdw0,jdim0
-       allocate(vvinit(jdim0)) ; vvinit=0.d0
-       do m=1,idim0                                                !loop over |gs> components m
-          i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
-          call bdecomp(i,ib)                                       !decompose i into binary representation
-          if(ib(isite)==1)then                                     !if impurity is empty: proceed
-             call c(isite,i,r)
-             sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
-             j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             vvinit(j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
-          endif
-       enddo
-       norm0=sqrt(dot_product(vvinit,vvinit))
-       vvinit=vvinit/norm0
+       write(*,"(A,2I3,I15)")'del particle:',jup0,jdw0,jdim0
        call sp_init_matrix(spH0,jdim0)
        call lanc_ed_geth(jsect0)
        ! !##ELSE DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
+       allocate(vvinit(jdim0)) 
+       !
+       vvinit=0.d0
+       do m=1,idim0
+          i=Hmap(isect0)%map(m)
+          call bdecomp(i,ib)
+          if(ib(isite)==1)then
+             call c(isite,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(jsect0,r)
+             vvinit(j) = sgn*gsvec(m)
+          endif
+       enddo
+       norm0=sqrt(dot_product(vvinit,vvinit))
+       vvinit=vvinit/norm0
        alfa_=0.d0 ; beta_=0.d0
        call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
        call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,-1,iorb,ispin)
@@ -187,6 +215,12 @@ contains
     endif
     deallocate(alfa_,beta_)
   end subroutine lanc_ed_buildgf
+
+
+
+
+
+
 
 
 
@@ -200,10 +234,10 @@ contains
     integer             :: ib(Ntot)
     integer             :: m,i,j,r
     real(8)             :: norm0,sgn
-    real(8),allocatable :: v1(:),v2(:),cvin(:,:),vvinit(:),alfa_(:),beta_(:)
+    complex(8),allocatable :: v1(:),v2(:),vvinit(:)
+    real(8),allocatable :: alfa_(:),beta_(:)
     integer             :: Nitermax
-    call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//&
-         "_Spin"//reg(txtfy(ispin)),unit=LOGfile)
+    call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(jorb))//"_Spin"//reg(txtfy(ispin)),unit=LOGfile)
     Nitermax=nGFitermax
     allocate(alfa_(Nitermax),beta_(Nitermax))
     !Get site index of the iorb/jorb-impurity:
@@ -211,86 +245,136 @@ contains
     jsite=impIndex(jorb,ispin)
     !Get dimension of the gs-sector isect0
     idim0  = getdim(isect0)
-    !Get the +up particle sector information:
+    !
+    !
+    !EVALUATE +1PARTICLE CONTRIBUTION TO RMIX-GF/CMIX-GF
     jsect0 = getCDGsector(ispin,isect0)
     if(jsect0/=0)then 
        jdim0  = getdim(jsect0)
        jup0   = getnup(jsect0)
        jdw0   = getndw(jsect0)
-       write(*,"(A,2I3,I15)")'GetGF sector:',jup0,jdw0,jdim0
-       allocate(vvinit(jdim0),cvin(2,jdim0));vvinit=0.d0
-       do m=1,idim0                                                !loop over |gs> components m
-          i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
-          call bdecomp(i,ib)                                       !decompose i into binary representation
-          if(ib(isite)==0)then                                     !if impurity is empty: proceed
-             call cdg(isite,i,r)
-             sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
-             j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             cvin(1,j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
-          endif
-          if(ib(jsite)==0)then                                     !if impurity is empty: proceed
-             call cdg(jsite,i,r)
-             sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
-             j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             cvin(2,j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
-          endif
-       enddo
-       vvinit = cvin(1,:) + cvin(2,:)
-       deallocate(cvin)
-       norm0=sqrt(dot_product(vvinit,vvinit))
-       vvinit=vvinit/norm0
+       write(*,"(A,2I3,I15)")'add particle:',jup0,jdw0,jdim0
        ! !##IF SPARSE_MATRIX:
        call sp_init_matrix(spH0,jdim0)
        call lanc_ed_geth(jsect0)
        ! !##ELSE DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
+       allocate(vvinit(jdim0))
+       !
+       vvinit=zero
+       do m=1,idim0
+          i=Hmap(isect0)%map(m)
+          call bdecomp(i,ib)
+          if(ib(isite)==0)then
+             call cdg(isite,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(jsect0,r)
+             vvinit(j) = sgn*gsvec(m)
+          endif
+          if(ib(jsite)==0)then
+             call cdg(jsite,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(jsect0,r)
+             vvinit(j) = vvinit(j) + sgn*gsvec(m)
+          endif
+       enddo
+       norm0=sqrt(dot_product(vvinit,vvinit))
+       vvinit=vvinit/norm0
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
        call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
-       call add_to_lanczos_gf_mix(norm0,egs,nitermax,alfa_,beta_,1,iorb,jorb,ispin)
+       call add_to_lanczos_gf_rmix(norm0,egs,nitermax,alfa_,beta_,1,iorb,jorb,ispin)
+
+       vvinit=zero
+       do m=1,idim0
+          i=Hmap(isect0)%map(m)
+          call bdecomp(i,ib)
+          if(ib(isite)==0)then
+             call cdg(isite,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(jsect0,r)
+             vvinit(j) = sgn*gsvec(m)
+          endif
+          if(ib(jsite)==0)then
+             call cdg(jsite,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(jsect0,r)
+             vvinit(j) = vvinit(j) + xi*sgn*gsvec(m)
+          endif
+       enddo
+       norm0=sqrt(dot_product(vvinit,vvinit))
+       vvinit=vvinit/norm0
+       alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
+       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
+       call add_to_lanczos_gf_bmix(norm0,egs,nitermax,alfa_,beta_,1,iorb,jorb,ispin)
        deallocate(vvinit)
        ! !##IF SPARSE_MATRIX:
        call sp_delete_matrix(spH0)
     endif
     !
-    !REMOVE ONE PARTICLE UP:
+    !
+    !EVALUATE -1PARTICLE CONTRIBUTION TO RMIX-GF/CMIX-GF
     jsect0 = getCsector(ispin,isect0)
     if(jsect0/=0)then
        jdim0   = getdim(jsect0)
        jup0    = getnup(jsect0)
        jdw0    = getndw(jsect0)
-       write(*,"(A,2I3,I15)")'GetGF: sector:',jup0,jdw0,jdim0
-       allocate(vvinit(jdim0),cvin(2,jdim0)) ; vvinit=0.d0
-       do m=1,idim0                                                !loop over |gs> components m
-          i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
-          call bdecomp(i,ib)                                       !decompose i into binary representation
-          if(ib(isite)==1)then                                     !if impurity is empty: proceed
-             call c(isite,i,r)
-             sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
-             j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             cvin(1,j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
-          endif
-          if(ib(jsite)==1)then                                     !if impurity is empty: proceed
-             call c(jsite,i,r)
-             sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
-             j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             cvin(2,j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
-          endif
-       enddo
-       vvinit = cvin(1,:) + cvin(2,:)
-       deallocate(cvin)
-       norm0=sqrt(dot_product(vvinit,vvinit))
-       vvinit=vvinit/norm0
+       write(*,"(A,2I3,I15)")'del particle:',jup0,jdw0,jdim0
        call sp_init_matrix(spH0,jdim0)
        call lanc_ed_geth(jsect0)
        ! !##ELSE DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
+       allocate(vvinit(jdim0))
+       !
+       vvinit=zero
+       do m=1,idim0
+          i=Hmap(isect0)%map(m)
+          call bdecomp(i,ib)
+          if(ib(isite)==1)then
+             call c(isite,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(jsect0,r)
+             vvinit(j) = sgn*gsvec(m)
+          endif
+          if(ib(jsite)==1)then
+             call c(jsite,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(jsect0,r)
+             vvinit(j) = vvinit(j) + sgn*gsvec(m)
+          endif
+       enddo
+       norm0=sqrt(dot_product(vvinit,vvinit))
+       vvinit=vvinit/norm0
        alfa_=0.d0 ; beta_=0.d0
        call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
-       call add_to_lanczos_gf_mix(norm0,egs,nitermax,alfa_,beta_,-1,iorb,jorb,ispin)
+       call add_to_lanczos_gf_rmix(norm0,egs,nitermax,alfa_,beta_,-1,iorb,jorb,ispin)
+
+
+       vvinit=zero
+       do m=1,idim0
+          i=Hmap(isect0)%map(m)
+          call bdecomp(i,ib)
+          if(ib(isite)==1)then
+             call c(isite,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(jsect0,r)
+             vvinit(j) = sgn*gsvec(m)
+          endif
+          if(ib(jsite)==1)then
+             call c(jsite,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(jsect0,r)
+             vvinit(j) = vvinit(j) - xi*sgn*gsvec(m)
+          endif
+       enddo
+       norm0=sqrt(dot_product(vvinit,vvinit))
+       vvinit=vvinit/norm0
+       alfa_=0.d0 ; beta_=0.d0
+       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
+       call add_to_lanczos_gf_bmix(norm0,egs,nitermax,alfa_,beta_,-1,iorb,jorb,ispin)
+       !
        deallocate(vvinit)
        ! !##IF SPARSE_MATRIX:
        call sp_delete_matrix(spH0)
     endif
+
+
+
+
+
+
+
     deallocate(alfa_,beta_)
   end subroutine lanc_ed_buildgf_mix
 
@@ -311,7 +395,7 @@ contains
     real(8),dimension(size(alanc),size(alanc)) :: Z
     real(8),dimension(size(alanc))             :: diag,subdiag
     integer                                    :: i,j,ierr
-    complex(8)                                 :: cdummy
+    complex(8)                                 :: iw
     diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
     forall(i=1:Nlanc)Z(i,i)=1.d0
     diag(1:Nlanc)    = alanc(1:Nlanc)
@@ -319,29 +403,23 @@ contains
     call tql2(Nlanc,diag,subdiag,Z,ierr)
     do i=1,NL
        do j=1,nlanc
-          impGmats(iorb,iorb,ispin,i)=impGmats(iorb,iorb,ispin,i) + vnorm**2*Z(1,j)**2/(xi*wm(i) - isign*(diag(j)-emin))
+          iw=xi*wm(i)
+          impGmats(iorb,iorb,ispin,i)=impGmats(iorb,iorb,ispin,i) + vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))
        enddo
     enddo
     do i=1,Nw
        do j=1,nlanc
-          impGreal(iorb,iorb,ispin,i)=impGreal(iorb,iorb,ispin,i) + vnorm**2*Z(1,j)**2/(cmplx(wr(i),eps,8)-isign*(diag(j)-emin))
+          iw=cmplx(wr(i),eps,8)
+          impGreal(iorb,iorb,ispin,i)=impGreal(iorb,iorb,ispin,i) + vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))
        enddo
     enddo
-    ! do i=1,NL
-    !    cdummy = vnorm**2*sum(Z(1,:)**2/(xi*wm(i)-isign*(diag(:)-emin)))
-    !    impGmats(iorb,iorb,ispin,i)=impGmats(iorb,iorb,ispin,i)+cdummy          
-    ! enddo
-    ! do i=1,Nw
-    !    cdummy = vnorm**2*sum(Z(1,:)**2/(dcmplx(wr(i),eps)-isign*(diag(:)-emin)))
-    !    impGreal(iorb,iorb,ispin,i)=impGreal(iorb,iorb,ispin,i) + cdummy          
-    ! enddo
   end subroutine add_to_lanczos_gf
 
 
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine add_to_lanczos_gf_mix(vnorm,emin,nlanc,alanc,blanc,isign,iorb,jorb,ispin)
+  subroutine add_to_lanczos_gf_rmix(vnorm,emin,nlanc,alanc,blanc,isign,iorb,jorb,ispin)
     real(8)                                    :: vnorm,emin
     integer                                    :: nlanc
     real(8),dimension(nlanc)                   :: alanc,blanc 
@@ -349,7 +427,7 @@ contains
     real(8),dimension(size(alanc),size(alanc)) :: Z
     real(8),dimension(size(alanc))             :: diag,subdiag
     integer                                    :: i,j,ierr
-    complex(8) :: cdummy
+    complex(8)                                 :: iw
     diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
     forall(i=1:Nlanc)Z(i,i)=1.d0
     diag(1:Nlanc)    = alanc(1:Nlanc)
@@ -357,19 +435,49 @@ contains
     call tql2(Nlanc,diag,subdiag,Z,ierr)
     do i=1,NL
        do j=1,nlanc
-          impGmats(iorb,jorb,ispin,i)=impGmats(iorb,jorb,ispin,i) + vnorm**2*Z(1,j)**2/(xi*wm(i) - isign*(diag(j)-emin))
+          iw=xi*wm(i)
+          Gm(iorb,jorb,ispin,i)=Gm(iorb,jorb,ispin,i) + vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))
        enddo
     enddo
     do i=1,Nw
        do j=1,nlanc
-          impGreal(iorb,jorb,ispin,i)=impGreal(iorb,jorb,ispin,i) + vnorm**2*Z(1,j)**2/(cmplx(wr(i),eps,8)-isign*(diag(j)-emin))
+          iw=cmplx(wr(i),eps,8)
+          Gmr(iorb,jorb,ispin,i)=Gmr(iorb,jorb,ispin,i) + vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))          
        enddo
     enddo
-    impGmats(iorb,jorb,ispin,:) = 0.50d0*(impGmats(iorb,jorb,ispin,:) - impGmats(iorb,iorb,ispin,:) - impGmats(jorb,jorb,ispin,:))
-    impGmats(jorb,iorb,ispin,:) = impGmats(iorb,jorb,ispin,:)
-    impGreal(iorb,jorb,ispin,:) = 0.50d0*(impGreal(iorb,jorb,ispin,:) - impGreal(iorb,iorb,ispin,:) - impGreal(jorb,jorb,ispin,:))
-    impGreal(jorb,iorb,ispin,:) = impGreal(iorb,jorb,ispin,:)
-  end subroutine add_to_lanczos_gf_mix
+  end subroutine add_to_lanczos_gf_rmix
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine add_to_lanczos_gf_bmix(vnorm,emin,nlanc,alanc,blanc,isign,iorb,jorb,ispin)
+    real(8)                                    :: vnorm,emin
+    integer                                    :: nlanc
+    real(8),dimension(nlanc)                   :: alanc,blanc 
+    integer                                    :: isign,iorb,jorb,ispin
+    real(8),dimension(size(alanc),size(alanc)) :: Z
+    real(8),dimension(size(alanc))             :: diag,subdiag
+    integer                                    :: i,j,ierr
+    complex(8)                                 :: iw
+    diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
+    forall(i=1:Nlanc)Z(i,i)=1.d0
+    diag(1:Nlanc)    = alanc(1:Nlanc)
+    subdiag(2:Nlanc) = blanc(2:Nlanc)
+    call tql2(Nlanc,diag,subdiag,Z,ierr)
+    do i=1,NL
+       do j=1,nlanc
+          iw=xi*wm(i)
+          Gmb(iorb,jorb,ispin,i)=Gmb(iorb,jorb,ispin,i) + vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))
+       enddo
+    enddo
+    do i=1,Nw
+       do j=1,nlanc
+          iw=cmplx(wr(i),eps,8)
+          Gmbr(iorb,jorb,ispin,i)=Gmbr(iorb,jorb,ispin,i) + vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))          
+       enddo
+    enddo
+  end subroutine add_to_lanczos_gf_bmix
 
 
 

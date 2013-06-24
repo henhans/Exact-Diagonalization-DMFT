@@ -103,7 +103,7 @@ contains
           Neigen=1
           Nitermax=min(dim,nLancitermax)
           allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
-          call lanczos_arpack(dim,Neigen,Nitermax,eig_values,eig_basis,spHtimesV,.false.)
+          call lanczos_arpack(dim,Neigen,Nitermax,eig_values,eig_basis,spHtimesV_d,.false.)
        case (1)
           allocate(eig_values(dim),eig_basis(dim,dim))
           ! !##IF SPARSE_MATRIX:

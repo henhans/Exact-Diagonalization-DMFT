@@ -11,7 +11,7 @@ MODULE ED_GETH
   private
   public :: full_ed_geth
   public :: lanc_ed_geth
-  public :: spHtimesV
+  public :: spHtimesV_d,spHtimesV_c
   public :: set_Hsector
 
   integer :: Hsector
@@ -40,13 +40,21 @@ contains
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine spHtimesV(N,v,Hv)
+  subroutine spHtimesV_d(N,v,Hv)
     integer              :: N
     real(8),dimension(N) :: v
     real(8),dimension(N) :: Hv
     Hv=zero
     call sp_matrix_vector_product(N,spH0,v,Hv)
-  end subroutine SpHtimesV
+  end subroutine SpHtimesV_d
+
+  subroutine spHtimesV_c(N,v,Hv)
+    integer              :: N
+    complex(8),dimension(N) :: v
+    complex(8),dimension(N) :: Hv
+    Hv=zero
+    call sp_matrix_vector_product(N,spH0,v,Hv)
+  end subroutine SpHtimesV_c
 
 
 
