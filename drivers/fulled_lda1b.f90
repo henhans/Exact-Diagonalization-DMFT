@@ -107,7 +107,7 @@ program fulled_lda
      !Check convergence (if required change chemical potential)
      converged = check_convergence(delta(:),eps_error,nsuccess,nloop)
      if(nread/=0.d0)call search_mu(nobj,converged)
-     if(iloop>nloop)converged=.true.
+     if(iloop>=nloop)converged=.true.
      call end_loop
   enddo
 

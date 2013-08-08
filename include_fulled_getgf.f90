@@ -17,13 +17,13 @@ subroutine full_ed_getgf()
   !Initialize some functions
   impGmats   =zero
   impGreal   =zero
-  call start_timer
+  if(Nspin*Norb>1)call start_timer
   do ispin=1,Nspin
      do iorb=1,Norb
         call full_ed_buildgf(iorb,ispin)
      enddo
   enddo
-  call stop_timer
+  if(Nspin*Norb>1)call stop_timer
   call print_imp_gf
   deallocate(wm,tau,wr)
 end subroutine full_ed_getgf
