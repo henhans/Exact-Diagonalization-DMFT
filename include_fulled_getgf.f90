@@ -101,15 +101,20 @@ subroutine full_ed_getchi()
   real(8)                  :: de,w0,it,Ei,Ej,expterm,Pchi(Nsect),totPchi
   complex(8)               :: iw
 
-  real(8),allocatable,dimension(:)      :: Chitau
-  complex(8),allocatable,dimension(:)   :: Chiw
+  real(8),allocatable,dimension(:)      :: Chitau,vm
+  complex(8),allocatable,dimension(:)   :: Chiw,Chiiw
 
   call allocate_grids
 
-  allocate(Chitau(0:Ltau),Chiw(Nw))
+  allocate(vm(0:NL))
+  do i=0,NL
+     vm(i) = pi/beta*2.d0*real(i,8)
+  enddo
+  allocate(Chitau(0:Ltau),Chiw(Nw),Chiiw(0:NL))
 
   Chitau=0.d0
   Chiw=zero
+  Chiiw=zero
 
   !Spin susceptibility \X(tau). |<i|S_z|j>|^2
   call msg("Evaluating Chi_Sz",unit=LOGfile)
@@ -130,19 +135,31 @@ subroutine full_ed_getchi()
            enddo
            Ei=espace(isector)%e(i)
            Ej=espace(isector)%e(j)
-           de=Ej-Ei
+           de=Ei-Ej
            peso=chij**2/zeta_function
-           !Imaginary time:
-           do m=0,Ltau 
-              it=tau(m)
-              chitau(m)=chitau(m) + exp(-it*espace(isector)%e(i))*&
-                   exp(-(beta-it)*espace(isector)%e(j))*peso
+
+           !Matsubara (bosonic) frequency
+           if(de>cutoff)chiiw(0)=chiiw(0)-peso*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/de
+           do m=1,NL
+              iw=xi*vm(m)
+              chiiw(m)=chiiw(m)+peso*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/(iw-de)
            enddo
+
+           !Imaginary time:
+           do m=0,Ltau
+              it=tau(m)
+              chitau(m)=chitau(m) + peso*exp(-beta*Ej)*exp(-it*de)
+           enddo
+
            !Real-frequency
            do m=1,Nw
               w0=wr(m);iw=cmplx(w0,eps,8)
-              chiw(m)=chiw(m)-exp(-beta*espace(isector)%e(j))*&
-                   (one/(w0+xi*eps+de) + one/(w0-xi*eps-de))*peso
+              !Time-ordered
+              ! chiw(m)=chiw(m)-exp(-beta*espace(isector)%e(j))*&
+              !      (one/(w0+xi*eps+de) + one/(w0-xi*eps-de))*peso
+              !Retarded = Commutator = response function
+              chiw(m)=chiw(m)+&
+                   exp(-beta*Ej)*peso*(exp(-beta*de)-1.d0)/(iw-de)
            enddo
         enddo
      enddo
@@ -152,16 +169,25 @@ subroutine full_ed_getchi()
   unit(1)=free_unit()
   open(unit(1),file=trim(CTfile))
   unit(2)=free_unit()
-  open(unit(2),file=trim(CWfile))
-  do i=0,Ltau
+  open(unit(2),file="Chi_w.ed")!trim(CWfile))
+  do i=0,Ltau/2
      write(unit(1),*)tau(i),chitau(i)
   enddo
   do i=1,Nw
-     if(wr(i)>=0.d0)write(unit(2),*)wr(i),dimag(chiw(i)),dreal(chiw(i))
+     if(wr(i)>=0.d0)&
+          write(unit(2),*)wr(i),dimag(chiw(i)),dreal(chiw(i))
   enddo
   close(unit(1))
   close(unit(2))
-  deallocate(wm,tau,wr)
+
+  m=free_unit()
+  open(m,file="Chi_iv.ed")
+  do i=0,NL
+     write(m,*)vm(i),dimag(chiiw(i)),dreal(chiiw(i))
+  enddo
+  close(m)
+
+  deallocate(wm,tau,wr,vm)
 end subroutine full_ed_getchi
 
 
