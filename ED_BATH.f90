@@ -76,7 +76,7 @@ contains
        write(LOGfile,"(A)")bg_green('Reading bath/xmu from file')
        open(51,file=trim(Hfile))
        do i=1,Nbath
-          read(51,"(6(F13.9,1X))")(ebath(ispin,i),vbath(ispin,i),ispin=1,Nspin)
+          read(51,"(6(F22.12,1X))")(ebath(ispin,i),vbath(ispin,i),ispin=1,Nspin)
        enddo
        close(51)
     endif
@@ -106,7 +106,7 @@ contains
     integer :: i,unit,ispin 
     if(.not.bath_status)call error("DUMP_BATH: bath not allocated")
     do i=1,Nbath
-       write(unit,"(6(F13.9,1X))")(ebath(ispin,i),vbath(ispin,i),ispin=1,Nspin)
+       write(unit,"(6(F22.12,1X))")(ebath(ispin,i),vbath(ispin,i),ispin=1,Nspin)
     enddo
   end subroutine write_bath
 
