@@ -23,16 +23,19 @@ MODULE ED_BATH
 
   !Bath parameters (to be used in H)
   !The total bath size should be:
+  !The dimensions of the bath components are:
+  !ebath =Nspin[# of spins] * Nbath[# of bath sites per orbital] * Norb[# of orbitals]
+  !vbath =Nspin[# of spins] * Nbath[# of bath sites per orbital] * Norb[# of orbitals]
   !N=(Norb+1)[energies&hybridizations]*Nspin[# of spins]*Nbath[# of bath sites]
   !=========================================================
-  real(8),allocatable,dimension(:,:),public   :: ebath
+  real(8),allocatable,dimension(:,:,:),public :: ebath
   real(8),allocatable,dimension(:,:,:),public :: vbath
   logical                                     :: bath_status=.false.
 
 contains
 
   subroutine allocate_bath()
-    allocate(ebath(Nspin,Nbath),vbath(Norb,Nspin,Nbath))
+    allocate(ebath(Nspin,Norb,Nbath),vbath(Nspin,Norb,Nbath))
     bath_status=.true.
   end subroutine allocate_bath
 
@@ -45,19 +48,21 @@ contains
 
   subroutine check_bath_dimension(bath)
     real(8),dimension(:) :: bath
-    integer              :: N_
+    integer              :: N_,Ntrue
     N_=size(bath)
-    if(N_ < (Norb+1)*Nspin*Nbath)&
-         call error("CHECK_BATH_DIMENSION: error")
+    Ntrue = 2*Nspin*Norb*Nbath
+    if(N_ /= Ntrue)&
+         call error("CHECK_BATH_DIMENSION: wrong dimensions!")
   end subroutine check_bath_dimension
 
 
   !+-------------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : Inquire the correct bath size to allocate the 
+  ! the bath array in the calling program.
   !+-------------------------------------------------------------------+
   function get_bath_size() result(N)
     integer :: N
-    N=(Norb+1)*Nspin*Nbath
+    N=2*Nspin*Norb*Nbath
   end function get_bath_size
 
 
@@ -80,7 +85,7 @@ contains
        open(unit,file=trim(Hfile))
        read(unit,*)
        do i=1,Nbath
-          read(unit,"(90(F13.9,1X))")(ebath(ispin,i),(vbath(iorb,ispin,i),iorb=1,Norb),ispin=1,Nspin)
+          read(unit,"(90(F22.15,1X))")((ebath(ispin,iorb,i),vbath(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
        enddo
        close(unit)
     else
@@ -88,134 +93,127 @@ contains
        call random_number(ran(:))
        do ispin=1,Nspin
           do i=1,Nbath
-             ebath(ispin,i)=(2.d0*ran(i)-1.d0)*real(Nbath,8)/2.d0
-             vbath(1:Norb,ispin,i)=1.d0/sqrt(real(Nbath,8))
+             ebath(ispin,1:Norb,i)=(2.d0*ran(i)-1.d0)*real(Nbath,8)/2.d0
+             vbath(ispin,1:Norb,i)=1.d0/sqrt(real(Nbath,8))
           enddo
        enddo
-
-
     endif
   end subroutine init_bath_ed
 
 
 
   !+-------------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : write out the bath to a given unit with 
+  ! the following column formatting: 
+  ! [(Ek_iorb,Vk_iorb)_iorb=1,Norb]_ispin=1,Nspin
   !+-------------------------------------------------------------------+
   subroutine write_bath(unit)
     integer :: i,unit,ispin,iorb
     if(.not.bath_status)call error("WRITE_BATH: bath not allocated")
-    write(unit,"(90(A13,1X))")("# ek_s"//trim(adjustl(trim(txtfy(ispin)))),&
-         ("Vk^orb"//trim(adjustl(trim(txtfy(iorb))))//"_"//&
-         trim(adjustl(trim(txtfy(ispin)))),iorb=1,Norb),ispin=1,Nspin)
+    write(unit,"(90(A22,1X))")&
+         (("# Ek_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),&
+         "Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
     do i=1,Nbath
-       write(unit,"(90(F13.9,1X))")(ebath(ispin,i),&
-            (vbath(iorb,ispin,i),iorb=1,Norb),ispin=1,Nspin)
+       write(unit,"(90(F22.15,1X))")((ebath(ispin,iorb,i),vbath(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
     enddo
   end subroutine write_bath
 
 
 
   !+-------------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : set the bath components from a given user provided 
+  ! bath-array 
   !+-------------------------------------------------------------------+
   subroutine set_bath(bath)
     real(8),dimension(:) :: bath
-    integer              :: iorb,ispin,stride
-    integer              :: ae,be
-    integer              :: av(Norb),bv(Norb)
+    integer              :: iorb,ispin,stride_spin,stride_orb
+    integer              :: ae,be,av,bv
     if(.not.bath_status)call error("SET_BATH: bath not allocated")
+    call check_bath_dimension(bath)
     do ispin=1,Nspin
-       stride=(ispin-1)*(Norb+1)*Nbath
-       ae=stride + 1
-       be=stride + Nbath
-       ebath(ispin,:) = bath(ae:be)
+       stride_spin=(ispin-1)*Norb*Nbath
        do iorb=1,Norb
-          av(iorb)=stride + iorb*Nbath + 1
-          bv(iorb)=stride +(iorb+1)*Nbath
-          vbath(iorb,ispin,:) = bath(av(iorb):bv(iorb))
+          stride_orb=(iorb-1)*2*Nbath
+          ae=stride_spin + stride_orb + 1
+          be=stride_spin + stride_orb + Nbath
+          av=stride_spin + stride_orb + Nbath + 1
+          bv=stride_spin + stride_orb + Nbath + Nbath
+          ebath(ispin,iorb,1:Nbath) = bath(ae:be)
+          vbath(ispin,iorb,1:Nbath) = bath(av:bv)
        enddo
     enddo
   end subroutine set_bath
 
 
   !+-------------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : copy the bath components back to a 1-dim array 
   !+-------------------------------------------------------------------+
   function copy_bath() result(bath)
-    real(8),dimension((Norb+1)*Nspin*Nbath) :: bath
-    integer                                 :: iorb,ispin,stride
-    integer                                 :: ae,be
-    integer                                 :: av(Norb),bv(Norb)
+    real(8),dimension(2*Nspin*Norb*Nbath) :: bath
+    integer                               :: iorb,ispin,stride_spin,stride_orb
+    integer                               :: ae,be,av,bv
     if(.not.bath_status)call error("COPY_BATH: bath not allocated")
     do ispin=1,Nspin
-       stride=(ispin-1)*(Norb+1)*Nbath
-       ae=stride + 1
-       be=stride + Nbath
-       bath(ae:be) = ebath(ispin,:)
+       stride_spin=(ispin-1)*Norb*Nbath
        do iorb=1,Norb
-          av(iorb)=stride + iorb*Nbath + 1
-          bv(iorb)=stride +(iorb+1)*Nbath
-          bath(av(iorb):bv(iorb)) = vbath(iorb,ispin,:)
+          stride_orb=(iorb-1)*2*Nbath
+          ae=stride_spin + stride_orb + 1
+          be=stride_spin + stride_orb + Nbath
+          av=stride_spin + stride_orb + Nbath + 1
+          bv=stride_spin + stride_orb + Nbath + Nbath
+          bath(ae:be) = ebath(ispin,iorb,1:Nbath)
+          bath(av:bv) = vbath(ispin,iorb,1:Nbath)
        enddo
     enddo
-    ! do ispin=1,Nspin
-    !    a1=1+(ispin-1)*2*Nbath
-    !    b1=Nbath+(ispin-1)*2*Nbath
-    !    a2=1+Nbath+(ispin-1)*2*Nbath
-    !    b2=2*Nbath+(ispin-1)*2*Ntot
-    !    bath(a1:b1) = ebath(ispin,1:Nbath)
-    !    bath(a2:b2) = vbath(ispin,1:Nbath)
-    ! enddo
   end function copy_bath
 
 
 
 
   !+-------------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : given the bath array, compute the hybridization function
+  ! for a given spin and orbital indices ispin,iorb at a given point x
   !+-------------------------------------------------------------------+
-  pure function delta_and(x,bath,orb1,orb2,spin) result(fg)
-    real(8),dimension((Norb+1)*Nspin*Nbath),intent(in) :: bath
-    complex(8),intent(in)                              :: x
-    integer,intent(in)                                 :: orb1,orb2,spin
-    complex(8)                                         :: fg
-    integer                                            :: i,iorb,ispin,stride
-    integer                                            :: ae,be
-    integer                                            :: av(Norb),bv(Norb)
-    real(8),dimension(Nspin,Nbath)                     :: epsk
-    real(8),dimension(Norb,Nspin,Nbath)                :: vpsk
-    do ispin=1,Nspin
-       stride=(ispin-1)*(Norb+1)*Nbath
-       ae=stride + 1
-       be=stride + Nbath
-       epsk(ispin,:) = bath(ae:be)
-       do iorb=1,Norb
-          av(iorb)=stride + iorb*Nbath + 1
-          bv(iorb)=stride +(iorb+1)*Nbath
-          vpsk(iorb,ispin,:) = bath(av(iorb):bv(iorb))
-       enddo
-    enddo
+  pure function delta_and(ispin,iorb,x,bath) result(fg)
+    integer,intent(in)                               :: ispin,iorb
+    complex(8),intent(in)                            :: x
+    real(8),dimension(2*Nspin*Norb*Nbath),intent(in) :: bath
+    complex(8)                                       :: fg
+    integer                                          :: i,stride_spin,stride_orb
+    integer                                          :: ae,be,av,bv
+    real(8),dimension(Nbath)                         :: epsk
+    real(8),dimension(Nbath)                         :: vpsk
+    stride_spin=(ispin-1)*Norb*Nbath
+    stride_orb=(iorb-1)*2*Nbath
+    ae=stride_spin + stride_orb + 1
+    be=stride_spin + stride_orb + Nbath
+    av=stride_spin + stride_orb + Nbath + 1
+    bv=stride_spin + stride_orb + Nbath + Nbath
+    epsk(1:Nbath) = bath(ae:be)
+    vpsk(1:Nbath) = bath(av:bv)
     fg=zero
     do i=1,Nbath
-       fg=fg + vpsk(orb1,spin,i)*vpsk(orb2,spin,i)/(x-epsk(spin,i))
+       fg=fg + vpsk(i)**2/(x-epsk(i))
     enddo
   end function delta_and
 
 
 
+
   !+-------------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : compute the hybridization function for a given spin and 
+  ! orbital indices ispin and iorb at point x, from determined bath 
+  ! components ebath,vbath
   !+-------------------------------------------------------------------+
-  function delta_bath(x,iorb,jorb,ispin) result(fg)
+  function delta_bath(ispin,iorb,x) result(fg)
     complex(8),intent(in)                       :: x
-    integer,intent(in)                          :: iorb,jorb,ispin
+    integer,intent(in)                          :: iorb,ispin
     complex(8)                                  :: fg
     integer                                     :: i
     if(.not.bath_status)call error("DELTA_BATH: bath not allocated")
     fg=zero
     do i=1,Nbath
-       fg=fg + vbath(iorb,ispin,i)*vbath(jorb,ispin,i)/(x-ebath(ispin,i))
+       fg=fg + vbath(ispin,iorb,i)**2/(x-ebath(ispin,iorb,i))
     enddo
   end function delta_bath
 

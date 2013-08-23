@@ -13,6 +13,7 @@ include sfmake.inc
 #EXE=lanced_tddpam_bethe
 #EXE=lanced_tddpam_2imp
 EXE=lanced_hm_test
+#EXE=fulled_hm_test
 DIR =drivers
 DIREXE=$(HOME)/.bin
 

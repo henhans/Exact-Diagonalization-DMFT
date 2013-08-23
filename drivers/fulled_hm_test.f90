@@ -30,7 +30,7 @@ program lancED
   !setup solver
   Nb=get_bath_size()
   allocate(bath(Nb))
-  call init_lanc_ed_solver(bath)
+  call init_full_ed_solver(bath)
 
   !DMFT loop
   iloop=0;converged=.false.
@@ -39,7 +39,7 @@ program lancED
      call start_loop(iloop,nloop,"DMFT-loop")
 
      !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
-     call lanc_ed_solver(bath) 
+     call full_ed_solver(bath) 
 
      !Get the Weiss field/Delta function to be fitted (user defined)
      call get_delta_bethe
