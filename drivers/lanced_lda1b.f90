@@ -26,20 +26,13 @@ program fulled_lda
   !Bath:
   real(8),allocatable    :: Bath(:)
   !The local hybridization function:
-<<<<<<< HEAD
   complex(8),allocatable :: Delta(:)
-=======
-  complex(8),allocatable :: Delta(:,:,:)
->>>>>>> devel_multi-orbital_nomix
   !Hamiltonian input:
   complex(8),allocatable :: Hk(:,:,:)
   real(8),allocatable    :: fg0(:,:,:)
   real(8),allocatable    :: dos_wt(:)
   logical                :: fbethe
-<<<<<<< HEAD
-=======
   real(8)                :: wbath
->>>>>>> devel_multi-orbital_nomix
 
   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   call parse_cmd_variable(rerun,"RERUN",default=.false.)
@@ -67,11 +60,7 @@ program fulled_lda
      !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
      call lanc_ed_solver(bath) 
      !Get the Weiss field/Delta function to be fitted (user defined)
-<<<<<<< HEAD
      allocate(delta(NL))
-=======
-     allocate(delta(Norb,Norb,NL))
->>>>>>> devel_multi-orbital_nomix
      call get_delta
      stop
   endif
@@ -84,10 +73,7 @@ program fulled_lda
   call parse_cmd_variable(file,"FILE",default="hkfile.in")
   call parse_cmd_variable(ntype,"NTYPE",default=0)
   call parse_cmd_variable(fbethe,"FBETHE",default=.false.)
-<<<<<<< HEAD
-=======
   call parse_cmd_variable(wbath,"WBATH",default=1.d0)
->>>>>>> devel_multi-orbital_nomix
 
   !Allocate:
   allocate(wm(NL),wr(Nw),tau(0:Ltau))
@@ -98,11 +84,7 @@ program fulled_lda
   call read_hk(trim(file))
 
   !Allocate Weiss Field:
-<<<<<<< HEAD
   allocate(delta(NL))
-=======
-  allocate(delta(Norb,Norb,NL))
->>>>>>> devel_multi-orbital_nomix
 
   !setup solver
   Nb=get_bath_size()
@@ -122,17 +104,10 @@ program fulled_lda
      call get_delta
 
      !Fit the new bath, starting from the old bath + the supplied delta
-<<<<<<< HEAD
      call chi2_fitgf(delta(:),bath,ichan=1)
 
      !Check convergence (if required change chemical potential)
      converged = check_convergence(delta(:),eps_error,nsuccess,nloop)
-=======
-     call chi2_fitgf(delta,bath,ispin=1)
-
-     !Check convergence (if required change chemical potential)
-     converged = check_convergence(delta(1,1,:),eps_error,nsuccess,nloop)
->>>>>>> devel_multi-orbital_nomix
      if(nread/=0.d0)call search_mu(nobj,converged)
      if(iloop>nloop)converged=.true.
      call end_loop
@@ -157,22 +132,12 @@ contains
           read(50,"(10(2F10.7,1x))")(Hk(iorb,jorb,ik),jorb=1,Nopd)
        enddo
     enddo
-<<<<<<< HEAD
-    dos_wt=1.d0/dfloat(Lk)
-    if(fbethe)then
-       de=2.d0/dfloat(Lk)
-       do ik=1,Lk
-          e = -1.d0 + dfloat(ik-1)*de
-          dos_wt(ik)=dens_bethe(e,1.d0)*de
-          write(10,*)e,dos_wt(ik)
-=======
     dos_wt=2.d0*Wbath/dfloat(Lk)
     if(fbethe)then
        de=2.d0/dfloat(Lk)
        do ik=1,Lk
           e = -wbath + dfloat(ik-1)*de
           dos_wt(ik)=dens_bethe(e,wbath)*de
->>>>>>> devel_multi-orbital_nomix
        enddo
     endif
   end subroutine read_hk
@@ -197,13 +162,8 @@ contains
     delta=zero
     do i=1,NL
        iw     = xi*wm(i)
-<<<<<<< HEAD
        g0d(i) = iw + xmu - delta_and(iw,bath,1)
        sd(i)  = g0d(i) - one/Giw(1,i)      
-=======
-       g0d(i) = iw + xmu - delta_and(iw,bath,1,1,1)
-       sd(i)  = g0d(i) - one/Giw(1,1,1,i)
->>>>>>> devel_multi-orbital_nomix
        zita(1)= iw + xmu - sd(i)
        zita(2)= iw + xmu 
        fg=zero
@@ -213,33 +173,20 @@ contains
        gp(i)  = fg(2,2)
        gd(i)  = fg(1,1)
        !
-<<<<<<< HEAD
        delta(i) = iw+xmu-one/gd(i)-sd(i)
-=======
-       delta(1,1,i) = iw+xmu-one/gd(i)-sd(i)
->>>>>>> devel_multi-orbital_nomix
        !
     enddo
     !
 
     npimp=get_density_fromFFT(gp,beta)
-<<<<<<< HEAD
-    ntotal=nimp+npimp
-=======
     ntotal=nimp(1)+npimp
->>>>>>> devel_multi-orbital_nomix
     write(*,*)"np  =",npimp
     write(*,*)"ntot=",ntotal
 
     do i=1,Nw
        iw=cmplx(wr(i),eps)
-<<<<<<< HEAD
-       g0dr(i) = wr(i) + xmu - delta_and(iw,bath,1)
-       sdr(i)  = g0dr(i) - one/Gwr(1,i)
-=======
        g0dr(i) = wr(i) + xmu - delta_and(iw,bath,1,1,1)
        sdr(i)  = g0dr(i) - one/Gwr(1,1,1,i)
->>>>>>> devel_multi-orbital_nomix
        zita(1) = iw + xmu - sdr(i)
        zita(2) = iw + xmu 
        fg=zero
@@ -250,11 +197,7 @@ contains
        gdr(i)  = fg(1,1)
     enddo
     !Print:
-<<<<<<< HEAD
     call splot("Delta_iw.ed",wm,delta(:))
-=======
-    call splot("Delta_iw.ed",wm,delta(1,1,:))
->>>>>>> devel_multi-orbital_nomix
     call splot("Gdd_iw.ed",wm,gd)
     call splot("Gpp_iw.ed",wm,gp)
     call splot("Sigmadd_iw.ed",wm,sd)
@@ -271,11 +214,7 @@ contains
     call splot("np.ntot.ed",npimp,ntotal)
 
     if(ntype==1)then
-<<<<<<< HEAD
-       nobj=nimp
-=======
        nobj=nimp(1)
->>>>>>> devel_multi-orbital_nomix
     elseif(ntype==2)then
        nobj=npimp
     else
@@ -319,8 +258,8 @@ contains
     gk(2,1) = conjg(gk(1,2))
   end function inverse_gk
 
-<<<<<<< HEAD
-end program
+  <<<<<<< HEAD
+end program fulled_lda
 =======
 end program fulled_lda
 >>>>>>> devel_multi-orbital_nomix
