@@ -8,7 +8,6 @@ MODULE ED_GETGF
   USE ED_AUX_FUNX
   USE ED_GETH
   !
-
   implicit none
   private 
 
@@ -22,75 +21,52 @@ MODULE ED_GETGF
   real(8)                      :: egs
 
 
-
   public :: full_ed_getgf
   public :: lanc_ed_getgf
   public :: full_ed_getchi
 
 contains
 
-  subroutine allocate_grids
-    !Freq. arrays
-    allocate(wm(NL))
-    wm    = pi/beta*real(2*arange(1,NL)-1,8)
-    allocate(wr(Nw))
-    wr    = linspace(wini,wfin,Nw)
-    allocate(tau(0:Ltau))
-    tau   = linspace(0.d0,beta,Ltau+1)
-  end subroutine allocate_grids
-
-
-  !####################################################################
-  !                    FULL DIAGONALIZATION
-  !####################################################################
-  include 'include_fulled_getgf.f90'
-
-
 
   !####################################################################
   !                    LANCZOS DIAGONALIZATION (T=0, GS only)
   !####################################################################
   !+------------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : Evaluate Green's functions using Lanczos algorithm
   !+------------------------------------------------------------------+
   subroutine lanc_ed_getgf()
     integer :: izero,iorb,jorb,ispin
     integer :: isect0
     real(8) :: norm0
-    !SET THE LANCZOS H*v method:
-    call plain_lanczos_set_htimesv_d(spHtimesV)
-    !set grids
     call allocate_grids
-    !Set Max GF iterations
     impGmats=zero
     impGreal=zero
-
-    !Zeta:
     zeta_function=real(numzero,8)
     call start_timer
     do izero=1,numzero 
-       !get gs-sector information
        isect0 =  es_get_sector(groundstate,izero)
        egs    =  es_get_energy(groundstate,izero)
        gsvec  => es_get_vector(groundstate,izero)
        norm0=sqrt(dot_product(gsvec,gsvec))
        if(abs(norm0-1.d0)>1.d-9)call warning("GS"//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0))
-       !
+       call plain_lanczos_set_htimesv_d(spHtimesV_d)
        do ispin=1,Nspin
-          do iorb=1,Norb             
+          do iorb=1,Norb
              call lanc_ed_buildgf(isect0,iorb,ispin)
-          enddo          
+          enddo
        enddo
-       !
+       call plain_lanczos_delete_htimesv_d
        nullify(gsvec)
     enddo
     impGmats=impGmats/zeta_function
     impGreal=impGreal/zeta_function
-    !Print convenience impurity functions:
+    !Print impurity functions:
     call print_imp_gf
     call stop_timer
     deallocate(wm,wr,tau)
   end subroutine lanc_ed_getgf
+
+
 
 
 
@@ -106,22 +82,31 @@ contains
     real(8)             :: norm0,sgn
     real(8),allocatable :: vvinit(:),alfa_(:),beta_(:)
     integer             :: Nitermax
-    call msg("Evaluating diagonal G_imp_Orb"//reg(txtfy(iorb))//reg(txtfy(iorb))//&
-         "_Spin"//reg(txtfy(ispin)),unit=LOGfile)
+    call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin)),unit=LOGfile)
     Nitermax=nGFitermax
     allocate(alfa_(Nitermax),beta_(Nitermax))
+
     !Get site index of the iorb-impurity:
     isite=impIndex(iorb,ispin)
+
     !Get dimension of the gs-sector isect0
     idim0  = getdim(isect0)
-    !Get the +up particle sector information:
+
+    !ADD ONE PARTICLE:
     jsect0 = getCDGsector(ispin,isect0)
     if(jsect0/=0)then 
        jdim0  = getdim(jsect0)
        jup0   = getnup(jsect0)
        jdw0   = getndw(jsect0)
-       write(*,"(A,2I3,I15)")'GetGF sector:',jup0,jdw0,jdim0
-       allocate(vvinit(jdim0));vvinit=0.d0
+       write(*,"(A,2I3,I15)")'add particle:',jup0,jdw0,jdim0
+       ! !##IF SPARSE_MATRIX:
+       call sp_init_matrix(spH0,jdim0)
+       call lanc_ed_geth(jsect0)
+       ! !##ELSE DIRECT H*V PRODUCT:
+       ! call set_Hsector(jsect0)
+       allocate(vvinit(jdim0))
+       !
+       vvinit=0.d0
        do m=1,idim0                                                !loop over |gs> components m
           i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
           call bdecomp(i,ib)                                       !decompose i into binary representation
@@ -134,11 +119,6 @@ contains
        enddo
        norm0=sqrt(dot_product(vvinit,vvinit))
        vvinit=vvinit/norm0
-       ! !##IF SPARSE_MATRIX:
-       call sp_init_matrix(spH0,jdim0)
-       call lanc_ed_geth(jsect0)
-       ! !##ELSE DIRECT H*V PRODUCT:
-       ! call set_Hsector(jsect0)
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
        call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
        call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,1,iorb,ispin)
@@ -147,30 +127,32 @@ contains
        call sp_delete_matrix(spH0)
     endif
     !
-    !REMOVE ONE PARTICLE UP:
+    !
+    !REMOVE ONE PARTICLE:
     jsect0 = getCsector(ispin,isect0)
     if(jsect0/=0)then
        jdim0  = getdim(jsect0)
        jup0    = getnup(jsect0)
        jdw0    = getndw(jsect0)
-       write(*,"(A,2I3,I15)")'GetGF: sector:',jup0,jdw0,jdim0
-       allocate(vvinit(jdim0)) ; vvinit=0.d0
-       do m=1,idim0                                                !loop over |gs> components m
-          i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
-          call bdecomp(i,ib)                                       !decompose i into binary representation
-          if(ib(isite)==1)then                                     !if impurity is empty: proceed
-             call c(isite,i,r)
-             sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
-             j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             vvinit(j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
-          endif
-       enddo
-       norm0=sqrt(dot_product(vvinit,vvinit))
-       vvinit=vvinit/norm0
+       write(*,"(A,2I3,I15)")'del particle:',jup0,jdw0,jdim0
        call sp_init_matrix(spH0,jdim0)
        call lanc_ed_geth(jsect0)
        ! !##ELSE DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
+       allocate(vvinit(jdim0)) 
+       !
+       vvinit=0.d0
+       do m=1,idim0
+          i=Hmap(isect0)%map(m)
+          call bdecomp(i,ib)
+          if(ib(isite)==1)then
+             call c(isite,i,r);sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
+             j=invHmap(jsect0,r)
+             vvinit(j) = sgn*gsvec(m)
+          endif
+       enddo
+       norm0=sqrt(dot_product(vvinit,vvinit))
+       vvinit=vvinit/norm0
        alfa_=0.d0 ; beta_=0.d0
        call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
        call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,-1,iorb,ispin)
@@ -180,6 +162,132 @@ contains
     endif
     deallocate(alfa_,beta_)
   end subroutine lanc_ed_buildgf
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine add_to_lanczos_gf(vnorm,emin,nlanc,alanc,blanc,isign,iorb,ispin)
+    real(8)                                    :: vnorm,emin
+    integer                                    :: nlanc
+    real(8),dimension(nlanc)                   :: alanc,blanc 
+    integer                                    :: isign,iorb,ispin
+    real(8),dimension(size(alanc),size(alanc)) :: Z
+    real(8),dimension(size(alanc))             :: diag,subdiag
+    integer                                    :: i,j,ierr
+    complex(8)                                 :: iw
+    diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
+    forall(i=1:Nlanc)Z(i,i)=1.d0
+    diag(1:Nlanc)    = alanc(1:Nlanc)
+    subdiag(2:Nlanc) = blanc(2:Nlanc)
+    call tql2(Nlanc,diag,subdiag,Z,ierr)
+    do i=1,NL
+       do j=1,nlanc
+          iw=xi*wm(i)
+          impGmats(ispin,iorb,i)=impGmats(ispin,iorb,i) + vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))
+       enddo
+    enddo
+    do i=1,Nw
+       do j=1,nlanc
+          iw=cmplx(wr(i),eps,8)
+          impGreal(ispin,iorb,i)=impGreal(ispin,iorb,i) + vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))
+       enddo
+    enddo
+  end subroutine add_to_lanczos_gf
+
+
+
+
+
+  !####################################################################
+  !                    FULL DIAGONALIZATION
+  !####################################################################
+  !+------------------------------------------------------------------+
+  !PURPOSE  : Evalute green's function and suscpetibility
+  ! using complete spectral decomposition 
+  !+------------------------------------------------------------------+
+  subroutine full_ed_getgf()
+    integer :: iorb,jorb,ispin
+    call allocate_grids
+    impGmats   =zero
+    impGreal   =zero
+    call start_timer
+    do ispin=1,Nspin
+       do iorb=1,Norb
+          call full_ed_buildgf(iorb,ispin)
+       enddo
+       !
+       nullify(gsvec)
+    enddo
+    impGmats=impGmats/zeta_function
+    impGreal=impGreal/zeta_function
+    !Print convenience impurity functions:
+    call print_imp_gf
+    call stop_timer
+    call print_imp_gf
+    deallocate(wm,tau,wr)
+  end subroutine full_ed_getgf
+
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  :  Evalue the spectral sum for impurity Green's function. 
+  !<i|C^+|j>=<in,is,idim|C^+|jn,js,jdim>=C^+_{ij} |
+  !+------------------------------------------------------------------+
+  subroutine full_ed_buildgf(iorb,ispin)
+    integer                 :: iorb,ispin,isite,jsite,nsite
+    real(8)                 :: cdgmat,cc
+    integer,dimension(Ntot) :: ib
+    integer                 :: i,j,k,r,ll,m,in,is
+    integer                 :: idim,jdim,isector,jsector,ia
+    real(8)                 :: Ei,Ej,matcdg
+    real(8)                 :: expterm,peso,de,w0,it,chij1
+    complex(8)              :: iw
+    nsite=1
+    isite=impIndex(iorb,ispin)
+    call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin)),unit=LOGfile)
+    call start_progress(LOGfile)
+    do isector=1,Nsect
+       jsector=getCsector(1,isector);if(jsector==0)cycle
+       call progress(isector,Nsect)
+       idim=getdim(isector)     !i-th sector dimension
+       jdim=getdim(jsector)     !j-th sector dimension
+       do i=1,idim          !loop over the states in the i-th sect.
+          do j=1,jdim       !loop over the states in the j-th sect.
+             cdgmat=0.d0
+             expterm=exp(-beta*espace(isector)%e(i))+exp(-beta*espace(jsector)%e(j))
+             if(expterm < cutoff)cycle
+             !
+             do ll=1,jdim              !loop over the component of |j> (IN state!)
+                m=Hmap(jsector)%map(ll)!map from IN state (j) to full Hilbert space
+                call bdecomp(m,ib)
+                if(ib(isite) == 0)then
+                   call cdg(isite,m,k);cc=dble(k)/dble(abs(k));k=abs(k)
+                   r=invHmap(isector,k)
+                   cdgmat=cdgmat+espace(isector)%M(r,i)*cc*espace(jsector)%M(ll,j)
+                endif
+             enddo
+             Ei=espace(isector)%e(i)
+             Ej=espace(jsector)%e(j)
+             de=Ej-Ei
+             peso=expterm/zeta_function
+             matcdg=peso*cdgmat**2
+             !build Matsubara GF
+             do m=1,NL
+                iw=xi*wm(m)
+                impGmats(ispin,iorb,m)=impGmats(ispin,iorb,m)+matcdg/(iw+de)
+             enddo
+             !build Real-freq. GF
+             do m=1,Nw 
+                w0=wr(m);iw=cmplx(w0,eps)
+                impGreal(ispin,iorb,m)=impGreal(ispin,iorb,m)+matcdg/(iw+de)
+             enddo
+          enddo
+       enddo
+    enddo
+    call stop_progress
+  end subroutine full_ed_buildgf
+
 
 
 
@@ -194,60 +302,107 @@ contains
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine add_to_lanczos_gf(vnorm,emin,nlanc,alanc,blanc,isign,iorb,ispin)
-    real(8)                                    :: vnorm,emin
-    integer                                    :: nlanc
-    real(8),dimension(nlanc)                   :: alanc,blanc 
-    integer                                    :: isign,iorb,ispin
-    real(8),dimension(size(alanc),size(alanc)) :: Z
-    real(8),dimension(size(alanc))             :: diag,subdiag
-    integer                                    :: i,j,ierr
-    complex(8)                                 :: cdummy
-    diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
-    forall(i=1:Nlanc)Z(i,i)=1.d0
-    diag(1:Nlanc)    = alanc(1:Nlanc)
-    subdiag(2:Nlanc) = blanc(2:Nlanc)
-    call tql2(Nlanc,diag,subdiag,Z,ierr)
-    do i=1,NL
-       do j=1,nlanc
-          impGmats(ispin,i)=impGmats(ispin,i) + vnorm**2*Z(1,j)**2/(xi*wm(i) - isign*(diag(j)-emin))
-       enddo
+  subroutine full_ed_getchi()
+    real(8)                  :: cdgmat(Norb),chij(Norb),chitot,spin,spintot
+    integer,dimension(N)     :: ib(Ntot)
+    integer                  :: i,j,k,r,ll,m,in,is,ispin,iorb,jorb,isector
+    integer                  :: idim,ia,unit(3)
+    real(8)                  :: Ei,Ej,cc,peso(Norb),pesotot
+    real(8)                  :: expterm,de,w0,it
+    complex(8)               :: iw
+    real(8),allocatable,dimension(:)      :: vm
+    real(8),allocatable,dimension(:,:)    :: Chitau
+    real(8),allocatable,dimension(:)      :: Chitautot
+    complex(8),allocatable,dimension(:,:) :: Chiw,Chiiw
+    complex(8),allocatable,dimension(:)   :: Chiwtot,Chiiwtot
+
+    call allocate_grids
+    allocate(vm(0:NL))          !bosonic frequencies
+    do i=0,NL
+       vm(i) = pi/beta*2.d0*real(i,8)
     enddo
-    do i=1,Nw
-       do j=1,nlanc
-          impGreal(ispin,i)=impGreal(ispin,i) + vnorm**2*Z(1,j)**2/(cmplx(wr(i),eps,8)-isign*(diag(j)-emin))
-       enddo
-    enddo
-  end subroutine add_to_lanczos_gf
+    allocate(Chitau(Norb,0:Ltau),Chiw(Norb,Nw),Chiiw(Norb,0:NL))
+    allocate(Chitautot(0:Ltau),Chiwtot(Nw),Chiiwtot(0:NL))
 
+    Chitau=0.d0
+    Chiw=zero
+    Chiiw=zero
+    Chitautot=0.d0
+    Chiwtot=zero
+    Chiiwtot=zero
 
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine print_imp_gf
-    integer                      :: i,j,ispin,unit(6)
-    complex(8)                   :: iw
-    complex(8),dimension(1:2,NL) :: G0iw
-    complex(8),dimension(1:2,Nw) :: G0wr
-    unit(1)=free_unit()
-    open(unit(1),file=trim(GMfile)//".ed")
-    unit(2)=free_unit()
-    open(unit(2),file="impG0_iw.ed")
-    unit(3)=free_unit()
-    open(unit(3),file="impSigma_iw.ed")
-    unit(4)=free_unit()
-    open(unit(4),file=trim(GRfile)//".ed")
-    unit(5)=free_unit()
-    open(unit(5),file="impG0_realw.ed")
-    unit(6)=free_unit()
-    open(unit(6),file="impSigma_realw.ed")
-    do ispin=1,Nspin
-       !Get Weiss Fields (from Bath):
-       do i=1,NL
-          iw=xi*wm(i)
-          G0iw(ispin,i)= iw+xmu-delta_bath(iw,ispin)
+    !Spin susceptibility \X(tau). |<i|S_z|j>|^2
+    call msg("Evaluating Chi_Sz",unit=LOGfile)
+    call start_progress(LOGfile)
+    do isector=1,Nsect !loop over <i| total particle number
+       call progress(isector,Nsect)!,unit=LOGfile)!"ETA_chi.ed")
+       idim=getdim(isector)
+       do i=1,idim 
+          do j=1,idim
+             chij=0.d0;chitot=0.d0
+             expterm=exp(-beta*espace(isector)%e(j))
+             if(expterm<cutoff)cycle
+             do ll=1,idim 
+                ia=Hmap(isector)%map(ll)
+                call bdecomp(ia,ib)
+                spintot=0.d0
+                do iorb=1,Norb
+                   spin=real(ib(iorb),8)-real(ib(iorb+Ns),8) !nup - ndw
+                   chij(iorb)=chij(iorb)+espace(isector)%M(ll,i)*spin*espace(isector)%M(ll,j)
+                enddo
+                spintot=spintot+real(ib(iorb),8)-real(ib(iorb+Ns),8)
+                chitot=chitot+espace(isector)%M(ll,i)*spintot*espace(isector)%M(ll,j)
+             enddo
+             Ei=espace(isector)%e(i)
+             Ej=espace(isector)%e(j)
+             de=Ei-Ej
+             peso=chij**2/zeta_function
+             pesotot=chitot**2/zeta_function
+             do iorb=1,Norb
+                !Matsubara (bosonic) frequency
+                if(de>cutoff)chiiw(iorb,0)=chiiw(iorb,0)-peso(iorb)*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/de
+                do m=1,NL
+                   iw=xi*vm(m)
+                   chiiw(iorb,m)=chiiw(iorb,m)+peso(iorb)*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/(iw-de)
+                enddo
+                !Imaginary time:
+                do m=0,Ltau 
+                   it=tau(m)
+                   chitau(iorb,m)=chitau(iorb,m) + exp(-it*espace(isector)%e(i))*&
+                        exp(-(beta-it)*espace(isector)%e(j))*peso(iorb)
+                   ! chitau(iorb,m)=chitau(iorb,m) + peso(iorb)*exp(-beta*Ej)*exp(-it*de)
+                enddo
+                !Real-frequency
+                do m=1,Nw
+                   w0=wr(m);iw=cmplx(w0,eps,8)
+                   !Time-ordered
+                   ! chiw(iorb,m)=chiw(iorb,m)-exp(-beta*espace(isector)%e(j))*&
+                   !      (one/(w0+xi*eps+de) + one/(w0-xi*eps-de))*peso(iorb)
+                   !Retarded = Commutator = response function
+                   chiw(iorb,m)=chiw(iorb,m)+&
+                        exp(-beta*Ej)*peso(iorb)*(exp(-beta*de)-1.d0)/(iw-de)
+                enddo
+             enddo
+             !Matsubara (bosonic) frequency
+             if(de>cutoff)chiiwtot(0)=chiiwtot(0)-pesotot*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/de
+             do m=1,NL
+                iw=xi*vm(m)
+                chiiwtot(m)=chiiwtot(m)+pesotot*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/(iw-de)
+             enddo
+             do m=0,Ltau 
+                it=tau(m)
+                chitautot(m)=chitautot(m) + exp(-it*espace(isector)%e(i))*&
+                     exp(-(beta-it)*espace(isector)%e(j))*pesotot
+                !chitautot(m)=chitautot(m) + pesotot*exp(-beta*Ej)*exp(-it*de)
+             enddo
+             do m=1,Nw
+                w0=wr(m);iw=cmplx(w0,eps,8)
+                ! chiwtot(m)=chiwtot(m)-exp(-beta*espace(isector)%e(j))*&
+                !      (one/(w0+xi*eps+de) + one/(w0-xi*eps-de))*pesotot
+                chiwtot(m)=chiwtot(m)+&
+                     exp(-beta*Ej)*pesotot*(exp(-beta*de)-1.d0)/(iw-de)
+             enddo
+          enddo
        enddo
        do i=1,Nw
           iw=cmplx(wr(i),eps)
@@ -257,22 +412,139 @@ contains
        impSreal(ispin,:) = G0wr(ispin,:) - one/impGreal(ispin,:)
        !Print GFs
     enddo
-    do i=1,NL
-       write(unit(1),"(F18.10,6(F18.10))")wm(i),(dimag(impGmats(ispin,i)),dreal(impGmats(ispin,i)),ispin=1,Nspin)
-       write(unit(2),"(F18.10,6(F18.10))")wm(i),(dimag(one/G0iw(ispin,i)),dreal(one/G0iw(ispin,i)),ispin=1,Nspin)
-       write(unit(3),"(F18.10,6(F18.10))")wm(i),(dimag(impSmats(ispin,i)),dreal(impSmats(ispin,i)),ispin=1,Nspin)
+    call stop_progress
+
+
+    !###########################PRINTING######################################
+    do iorb=1,Norb
+       unit(1)=free_unit()
+       open(unit(1),file=reg(CHIfile)//"_orb"//reg(txtfy(iorb))//"_tau.ed")
+       unit(2)=free_unit()
+       open(unit(2),file=reg(CHIfile)//"_orb"//reg(txtfy(iorb))//"_realw.ed")
+       unit(3)=free_unit()
+       open(unit(3),file=reg(CHIfile)//"_orb"//reg(txtfy(iorb))//"_iw.ed")
+       do i=0,Ltau/2
+          write(unit(1),*)tau(i),chitau(iorb,i)
+       enddo
+       do i=1,Nw
+          if(wr(i)>=0.d0)write(unit(2),*)wr(i),dimag(chiw(iorb,i)),dreal(chiw(iorb,i))
+       enddo
+       do i=0,NL
+          write(unit(3),*)vm(i),dimag(chiiw(iorb,i)),dreal(chiiw(iorb,i))
+       enddo
+       close(unit(1))
+       close(unit(2))
+       close(unit(3))
+    enddo
+    unit(1)=free_unit()
+    open(unit(1),file=trim(CHIfile)//"_tot_tau.ed")
+    unit(2)=free_unit()
+    open(unit(2),file=trim(CHIfile)//"_tot_realw.ed")
+    unit(3)=free_unit()
+    open(unit(3),file=trim(CHIfile)//"_tot_iw.ed")
+    do i=0,Ltau
+       write(unit(1),*)tau(i),chitautot(i)
     enddo
     do i=1,Nw
-       write(unit(4),"(F18.10,6(F18.10))")wr(i),(dimag(impGreal(ispin,i)),dreal(impGreal(ispin,i)),ispin=1,Nspin)
-       write(unit(5),"(F18.10,6(F18.10))")wr(i),(dimag(one/G0wr(ispin,i)),dreal(one/G0wr(ispin,i)),ispin=1,Nspin)
-       write(unit(6),"(F18.10,6(F18.10))")wr(i),(dimag(impSreal(ispin,i)),dreal(impSreal(ispin,i)),ispin=1,Nspin)
+       if(wr(i)>=0.d0)write(unit(2),*)wr(i),dimag(chiwtot(i)),dreal(chiwtot(i))
     enddo
-    do i=1,6
-       close(unit(i))
+    do i=0,NL
+       write(unit(3),*)vm(i),dimag(chiiwtot(i)),dreal(chiiwtot(i))
+    enddo
+    close(unit(1))
+    close(unit(2))
+    close(unit(3))
+    deallocate(Chitau,Chiw,Chiiw,Chitautot,Chiwtot,Chiiwtot)
+    deallocate(wm,tau,wr)
+  end subroutine full_ed_getchi
+
+
+
+
+
+
+
+  !####################################################################
+  !                    COMPUTATIONAL ROUTINES
+  !####################################################################
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine allocate_grids
+    allocate(wm(NL))
+    wm    = pi/beta*real(2*arange(1,NL)-1,8)
+    allocate(wr(Nw))
+    wr    = linspace(wini,wfin,Nw)
+    allocate(tau(0:Ltau))
+    tau   = linspace(0.d0,beta,Ltau+1)
+  end subroutine allocate_grids
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine print_imp_gf
+    integer                             :: i,j,ispin,unit(6),iorb,jorb
+    complex(8)                          :: iw
+    complex(8),dimension(Nspin,Norb,NL) :: G0iw
+    complex(8),dimension(Nspin,Norb,Nw) :: G0wr
+    character(len=20)                   :: prefix
+
+    call msg("Printing the impurity GF")
+    do ispin=1,Nspin
+       do iorb=1,Norb
+          !Get Weiss Fields (from Bath):
+          do i=1,NL
+             iw=xi*wm(i)
+             G0iw(ispin,iorb,i)= (iw+xmu)-delta_bath(ispin,iorb,iw)
+             impSmats(ispin,iorb,i) = G0iw(ispin,iorb,i) - one/impGmats(ispin,iorb,i)
+             G0iw(ispin,iorb,i)= delta_bath(ispin,iorb,iw)
+          enddo
+          do i=1,Nw
+             iw=cmplx(wr(i),eps)
+             G0wr(ispin,iorb,i)= (iw+xmu)-delta_bath(ispin,iorb,iw)
+             impSreal(ispin,iorb,i) = G0wr(ispin,iorb,i) - one/impGreal(ispin,iorb,i)
+             G0wr(ispin,iorb,i)= delta_bath(ispin,iorb,iw)
+          enddo
+       enddo
+    enddo
+
+    !Print the impurity functions:
+    do iorb=1,Norb
+       prefix=reg(GFfile)//"_orb"//reg(txtfy(iorb))
+       unit(1)=free_unit()
+       open(unit(1),file=reg(prefix)//"_iw.ed")
+       unit(2)=free_unit()
+       open(unit(2),file=reg(prefix)//"_realw.ed")
+       unit(3)=free_unit()
+       open(unit(3),file="impSigma_iw.ed")
+       unit(4)=free_unit()
+       open(unit(4),file="impSigma_realw.ed")
+       unit(5)=free_unit()
+       open(unit(5),file="impDelta_iw.ed")
+       unit(6)=free_unit()
+       open(unit(6),file="impDelta_realw.ed")
+       do i=1,NL
+          write(unit(1),"(F26.15,6(F26.15))")wm(i),&
+               (dimag(impGmats(ispin,iorb,i)),dreal(impGmats(ispin,iorb,i)),ispin=1,Nspin)
+          write(unit(3),"(F26.15,6(F26.15))")wm(i),&
+               (dimag(impSmats(ispin,iorb,i)),dreal(impSmats(ispin,iorb,i)),ispin=1,Nspin)
+          write(unit(5),"(F26.15,6(F26.15))")wm(i),&
+               (dimag(G0iw(ispin,iorb,i)),dreal(G0iw(ispin,iorb,i)),ispin=1,Nspin)
+       enddo
+       do i=1,Nw
+          write(unit(2),"(F26.15,6(F26.15))")wm(i),&
+               (dimag(impGreal(ispin,iorb,i)),dreal(impGreal(ispin,iorb,i)),ispin=1,Nspin)
+          write(unit(4),"(F26.15,6(F26.15))")wm(i),&
+               (dimag(impSreal(ispin,iorb,i)),dreal(impSreal(ispin,iorb,i)),ispin=1,Nspin)
+          write(unit(6),"(F26.15,6(F26.15))")wm(i),&
+               (dimag(G0wr(ispin,iorb,i)),dreal(G0wr(ispin,iorb,i)),ispin=1,Nspin)
+       enddo
+       do i=1,6
+          close(unit(i))
+       enddo
     enddo
   end subroutine print_imp_gf
-
-
 
 
 

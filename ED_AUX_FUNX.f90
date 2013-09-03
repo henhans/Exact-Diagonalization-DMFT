@@ -79,8 +79,6 @@ contains
        jsector=getsector(jup,jdw)
        getCDGsector(2,isector)=jsector
     enddo
-
-    startloop=1;lastloop=Nsect
   end subroutine setup_pointers
 
 

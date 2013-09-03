@@ -14,7 +14,11 @@ program fullED
   !Bath:
   real(8),allocatable    :: Bath(:)
   !The local hybridization function:
+<<<<<<< HEAD
   complex(8),allocatable :: Delta(:)
+=======
+  complex(8),allocatable :: Delta(:,:,:)
+>>>>>>> devel_multi-orbital_nomix
 
 
   call read_input("inputED.in")
@@ -26,7 +30,11 @@ program fullED
   wr = linspace(wini,wfin,Nw)
 
   !Allocate Weiss Field:
+<<<<<<< HEAD
   allocate(delta(NL))
+=======
+  allocate(delta(Norb,Norb,NL))
+>>>>>>> devel_multi-orbital_nomix
 
   !setup solver
   Nb=get_bath_size()
@@ -46,11 +54,19 @@ program fullED
      call get_delta_bethe
 
      !Perform the SELF-CONSISTENCY by fitting the new bath
+<<<<<<< HEAD
      call chi2_fitgf(delta(:),bath,ichan=1)
 
      !Check convergence (if required change chemical potential)
      converged = check_convergence(delta(:),eps_error,nsuccess,nloop)
      if(nread/=0.d0)call search_mu(nimp,converged)
+=======
+     call chi2_fitgf(delta,bath,ispin=1)
+
+     !Check convergence (if required change chemical potential)
+     converged = check_convergence(delta(1,1,:),eps_error,nsuccess,nloop)
+     if(nread/=0.d0)call search_mu(nimp(1),converged)
+>>>>>>> devel_multi-orbital_nomix
      if(iloop>nloop)converged=.true.
      call end_loop
   enddo
@@ -68,18 +84,32 @@ contains
 
     do i=1,NL
        iw = xi*wm(i)
+<<<<<<< HEAD
        g0and   = iw + xmu - delta_and(iw,bath,1)
        self(i) = g0and - one/Giw(1,i)
        zita    = iw + xmu - self(i)
        gloc(i) = gfbethe(wm(i),zita,Wband)
        g0loc   = self(i) + one/gloc(i)
        delta(i)= iw + xmu - g0loc
+=======
+       g0and   = iw + xmu - delta_and(iw,bath,1,1,1)
+       self(i) = g0and - one/Giw(1,1,1,i)
+       zita    = iw + xmu - self(i)
+       gloc(i) = gfbethe(wm(i),zita,Wband)
+       g0loc   = self(i) + one/gloc(i)
+       delta(1,1,i)= iw + xmu - g0loc
+>>>>>>> devel_multi-orbital_nomix
     enddo
 
     do i=1,Nw
        iw=cmplx(wr(i),eps)
+<<<<<<< HEAD
        g0and    = wr(i) + xmu - delta_and(wr(i)+zero,bath,1)
        selfr(i) = g0and - one/Gwr(1,i)    
+=======
+       g0and    = wr(i) + xmu - delta_and(wr(i)+zero,bath,1,1,1)
+       selfr(i) = g0and - one/Gwr(1,1,1,i)    
+>>>>>>> devel_multi-orbital_nomix
        zita     = iw + xmu - selfr(i)
        grloc(i) = gfbether(wr(i),zita,Wband)
     enddo
@@ -87,7 +117,11 @@ contains
     call splot("Sigma_iw.ed",wm,self)
     call splot("G_realw.ed",wr,grloc)
     call splot("Sigma_realw.ed",wr,selfr)
+<<<<<<< HEAD
     call splot("Delta_iw.ed",wm,delta(:))
+=======
+    call splot("Delta_iw.ed",wm,delta(1,1,:))
+>>>>>>> devel_multi-orbital_nomix
     call splot("DOS.ed",wr,-dimag(grloc)/pi)
     return    
   end subroutine get_delta_bethe
