@@ -34,7 +34,7 @@ contains
     real(8)                       :: sg1,sg2,sg3,sg4
     real(8),dimension(Norb,Nbath) :: eup,edw
     real(8),dimension(Norb,Nbath) :: vup,vdw
-    real(8)                       :: nup(Norb),ndw(Norb),No(Norb),Nno(Norb),tef,htmp
+    real(8)                       :: nup(Norb),ndw(Norb),tef,htmp
     logical                       :: Jcondition
 
     dim=getdim(isector)
@@ -46,23 +46,21 @@ contains
     do i=1,dim
        m=Hmap(isector)%map(i)!Hmap(isector,i)
        call bdecomp(m,ib)
+
+       htmp=0.d0
+
        do iorb=1,Norb
           nup(iorb)=real(ib(iorb),8)
           ndw(iorb)=real(ib(iorb+Ns),8)
-          no(iorb)=nup(iorb)+ndw(iorb)
-          select case(hfmode)
-          case(.true.)
-             nno(iorb)=(nup(iorb)-0.5d0)*(ndw(iorb)-0.5d0)
-          case (.false.)
-             nno(iorb)=nup(iorb)*ndw(iorb)
-          end select
        enddo
 
        !LOCAL HAMILTONIAN PART:
-       htmp=0.d0
-       htmp = -xmu*sum(no) + heff*(sum(nup)-sum(ndw)) + dot_product(eloc,no)
+       htmp = -xmu*(sum(nup)+sum(ndw)) + heff*(sum(nup)-sum(ndw)) + dot_product(eloc,nup+ndw)
+
        !Density-density interaction: same orbital, opposite spins
-       htmp = htmp + dot_product(uloc,nno)!=\sum=i U_i*(n_iu*n_id)
+       htmp = htmp + dot_product(uloc,nup*ndw)!=\sum=i U_i*(n_u*n_d)_i
+       if(hfmode)htmp=htmp - 0.5d0*dot_product(uloc,nup+ndw) + 0.25d0*sum(uloc)
+
        if(Norb>1)then
           !density-density interaction: different orbitals, opposite spins
           do iorb=1,Norb         ! n_up_i*n_dn_j
@@ -70,13 +68,27 @@ contains
                 htmp = htmp + Ust*(nup(iorb)*ndw(jorb) + nup(jorb)*ndw(iorb))
              enddo
           enddo
+
           !density-density interaction: different orbitals, parallel spins
           !Jhund effect: U``=U`-J smallest of the interactions
           do iorb=1,Norb         ! n_up_i*n_up_j
              do jorb=iorb+1,Norb ! n_dn_i*n_dn_j
-                htmp = htmp + (Ust-J)*(nup(iorb)*nup(jorb) + ndw(iorb)*ndw(jorb))
+                htmp = htmp + (Ust-Jh)*(nup(iorb)*nup(jorb) + ndw(iorb)*ndw(jorb))
              enddo
           enddo
+       endif
+
+       !Hbath: +energy of the bath=\sum_a=1,Norb\sum_{l=1,Nbath}\e^a_l n^a_l
+       do iorb=1,Norb
+          do kp=1,Nbath
+             ms=Norb+(iorb-1)*Nbath + kp
+             htmp =htmp + eup(iorb,kp)*real(ib(ms),8) + edw(iorb,kp)*real(ib(ms+Ns),8)
+          enddo
+       enddo
+       call sp_insert_element(spH0,htmp,i,i)
+
+
+       if(Norb>1)then
           if(Jhflag)then
              !SPIN-EXCHANGE (S-E) and PAIR-HOPPING TERMS
              !S-E: J c^+_iorb_up c^+_jorb_dw c_iorb_dw c_jorb_up  (i.ne.j) 
@@ -136,14 +148,7 @@ contains
        endif
 
 
-       !Hbath: +energy of the bath=\sum_a=1,Norb\sum_{l=1,Nbath}\e^a_l n^a_l
-       do iorb=1,Norb
-          do kp=1,Nbath
-             ms=Norb+(iorb-1)*Nbath + kp
-             htmp =htmp + eup(iorb,kp)*real(ib(ms),8) + edw(iorb,kp)*real(ib(ms+Ns),8)
-          enddo
-       enddo
-       call sp_insert_element(spH0,htmp,i,i)
+
 
 
        !NON-LOCAL PART
@@ -173,6 +178,7 @@ contains
           enddo
        enddo
     enddo
+
     return
   end subroutine lanc_ed_geth
 
@@ -207,23 +213,21 @@ contains
     do i=1,dim
        m=Hmap(isector)%map(i)
        call bdecomp(m,ib)
+
+       htmp=0.d0
+
        do iorb=1,Norb
           nup(iorb)=real(ib(iorb),8)
           ndw(iorb)=real(ib(iorb+Ns),8)
-          no(iorb)=nup(iorb)+ndw(iorb)
-          select case(hfmode)
-          case default
-             nno(iorb)=(nup(iorb)-0.5d0)*(ndw(iorb)-0.5d0)
-          case (.false.)
-             nno(iorb)=nup(iorb)*ndw(iorb)
-          end select
        enddo
 
        !LOCAL HAMILTONIAN PART:
-       htmp=0.d0
-       htmp = -xmu*sum(no) + heff*(sum(nup)-sum(ndw)) + dot_product(eloc,no)
+       htmp = -xmu*(sum(nup)+sum(ndw)) + heff*(sum(nup)-sum(ndw)) + dot_product(eloc,nup+ndw)
+       !+
        !Density-density interaction: same orbital, opposite spins
-       htmp = htmp + dot_product(uloc,nno)!=\sum=i U_i*(n_iu*n_id)
+       htmp = htmp + dot_product(uloc,nup*ndw)!=\sum=i U_i*(n_u*n_d)_i
+       if(hfmode)htmp=htmp - 0.5d0*dot_product(uloc,nup+ndw) + 0.25d0*sum(uloc)
+       !+
        if(Norb>1)then
           !density-density interaction: different orbitals, opposite spins
           do iorb=1,Norb         ! n_up_i*n_dn_j
@@ -238,9 +242,21 @@ contains
                 htmp = htmp + (Ust-J)*(nup(iorb)*nup(jorb) + ndw(iorb)*ndw(jorb))
              enddo
           enddo
+       endif
+       !+
+       !Hbath: +energy of the bath=\sum_a=1,Norb\sum_{l=1,Nbath}\e^a_l n^a_l
+       do iorb=1,Norb
+          do kp=1,Nbath
+             ms=Norb+(iorb-1)*Nbath + kp
+             htmp =htmp + eup(iorb,kp)*real(ib(ms),8) + edw(iorb,kp)*real(ib(ms+Ns),8)
+          enddo
+       enddo
+       !=
+       h(i,i)=htmp
 
+       !SPIN-EXCHANGE (S-E) and PAIR-HOPPING TERMS
+       if(Norb>1)then
           if(Jhflag)then
-             !SPIN-EXCHANGE (S-E) and PAIR-HOPPING TERMS
              !S-E: J c^+_iorb_up c^+_jorb_dw c_iorb_dw c_jorb_up  (i.ne.j) 
              !S-E: J c^+_{iorb} c^+_{jorb+Ns} c_{iorb+Ns} c_{jorb}
              !it shoud rather be (not ordered product):
@@ -295,19 +311,9 @@ contains
                 enddo
              enddo
           endif
-
        endif
 
 
-       !Hbath: +energy of the bath=\sum_a=1,Norb\sum_{l=1,Nbath}\e^a_l n^a_l
-       do iorb=1,Norb
-          do kp=1,Nbath!Norb+1,Ns
-             ms=Norb+(iorb-1)*Nbath + kp
-             htmp =htmp + eup(iorb,kp)*real(ib(ms),8) + edw(iorb,kp)*real(ib(ms+Ns),8)
-             ! htmp =htmp + eup(iorb,kp-Norb)*real(ib(kp),8) + edw(iorb,kp-Norb)*real(ib(kp+Ns),8)
-          enddo
-       enddo
-       h(i,i)=htmp
 
        !NON-LOCAL PART:
        do iorb=1,Norb
