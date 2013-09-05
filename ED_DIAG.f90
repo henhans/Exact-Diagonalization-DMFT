@@ -108,7 +108,8 @@ contains
           call lanc_ed_geth(isector)
           ! !##ELSE DIRECT H*V PRODUCT:
           ! call set_Hsector(isector)
-          call lanczos_arpack(dim,Neigen,Nitermax,eig_values,eig_basis,spHtimesV_d,.false.)
+          call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_d,.false.)
+          
        case (.false.)
           call full_ed_geth(isector,eig_basis)
           call matrix_diagonalize(eig_basis,eig_values,'V','U')
@@ -129,7 +130,7 @@ contains
        deallocate(eig_values,eig_basis)
        !Delete Hamiltonian matrix:
        ! !##IF SPARSE_MATRIX:
-       call sp_delete_matrix(spH0)
+       if(spH0%status)call sp_delete_matrix(spH0)
     enddo
     !
     write(LOGfile,"(A)")"groundstate sector(s):"

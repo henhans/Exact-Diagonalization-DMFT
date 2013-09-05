@@ -216,13 +216,7 @@ contains
        do iorb=1,Norb
           call full_ed_buildgf(iorb,ispin)
        enddo
-       !
-       nullify(gsvec)
     enddo
-    impGmats=impGmats/zeta_function
-    impGreal=impGreal/zeta_function
-    !Print convenience impurity functions:
-    call print_imp_gf
     call stop_timer
     call print_imp_gf
     deallocate(wm,tau,wr)
@@ -404,13 +398,6 @@ contains
              enddo
           enddo
        enddo
-       do i=1,Nw
-          iw=cmplx(wr(i),eps)
-          G0wr(ispin,i)= iw+xmu-delta_bath(iw,ispin)
-       enddo
-       impSmats(ispin,:) = G0iw(ispin,:) - one/impGmats(ispin,:)
-       impSreal(ispin,:) = G0wr(ispin,:) - one/impGreal(ispin,:)
-       !Print GFs
     enddo
     call stop_progress
 
@@ -545,6 +532,8 @@ contains
        enddo
     enddo
   end subroutine print_imp_gf
+
+
 
 
 

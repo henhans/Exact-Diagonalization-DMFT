@@ -295,7 +295,7 @@ contains
           !Jhund effect: U``=U`-J smallest of the interactions
           do iorb=1,Norb         ! n_up_i*n_up_j
              do jorb=iorb+1,Norb ! n_dn_i*n_dn_j
-                htmp = htmp + (Ust-J)*(nup(iorb)*nup(jorb) + ndw(iorb)*ndw(jorb))
+                htmp = htmp + (Ust-Jh)*(nup(iorb)*nup(jorb) + ndw(iorb)*ndw(jorb))
              enddo
           enddo
        endif

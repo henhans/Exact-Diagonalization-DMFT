@@ -146,7 +146,6 @@ contains
     enddo
 
     call get_szr
-    >>>>>>> devel_multi-orbital_nomix
     if(iolegend)call write_legend
 
     loop=loop+1
