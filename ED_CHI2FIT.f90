@@ -26,11 +26,12 @@ contains
     real(8),dimension(2*Nbath)         :: a
     integer                            :: iter,stride_spin,stride_orb,ifirst,ilast,i,j,iorb
     real(8)                            :: chi
-    !
+    !!<MPI
+    !if(mpiID==0)then
+    !!>MPI
     call msg("FIT Delta function:",unit=LOGfile)
     if(size(fg,1)/=Norb)call error("CHI2_FITGF: wrong dimension 1 in Delta_input")
     call check_bath_dimension(bath)
-
 
     Ldelta = size(fg,2)
     allocate(Fdelta(Ldelta))
@@ -63,6 +64,10 @@ contains
     !
     print*," "
     deallocate(Fdelta,Xdelta,Wdelta)
+    !!<MPI
+    ! endif
+    ! call MPI_BCAST(bath,size(bath),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
+    !!>MPI
   end subroutine chi2_fitgf
 
 

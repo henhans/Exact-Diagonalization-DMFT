@@ -33,6 +33,9 @@ contains
     call init_bath_ed
     if(Nspin==2)then
        heff=abs(heff)
+       !!<MPI
+       !if(mpiID==0)write(LOGfile,"(A,F12.9)")"Symmetry Breaking field = ",heff
+       !!>MPI
        write(LOGfile,"(A,F12.9)")"Symmetry Breaking field = ",heff
        ebath(1,:,:)     = ebath(1,:,:)     + heff
        ebath(Nspin,:,:) = ebath(Nspin,:,:) - heff

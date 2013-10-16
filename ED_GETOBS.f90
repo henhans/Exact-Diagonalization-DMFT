@@ -33,6 +33,10 @@ contains
     real(8)                      :: factor
     real(8),dimension(:),pointer :: gsvec
 
+    !!<MPI
+    !if(mpiID==0)then
+    !!>MPI
+
     factor=real(numzero,8)
     nimp  = 0.d0
     nupimp = 0.d0
@@ -49,7 +53,10 @@ contains
        idw0  = getndw(isect0)
        gsvec  => es_get_vector(groundstate,izero)
        norm0=sqrt(dot_product(gsvec,gsvec))
-       if(abs(norm0-1.d0)>1.d-9)call warning("GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0))
+       if(abs(norm0-1.d0)>1.d-9)then
+          write(*,*) "GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0)
+          stop
+       endif
        !
        do i=1,dim0
           m=Hmap(isect0)%map(i)
@@ -68,7 +75,6 @@ contains
              enddo
           enddo
        enddo
-       !
        nullify(gsvec)
     enddo
     nimp  = nimp/factor
@@ -78,6 +84,7 @@ contains
     magimp = magimp/factor
     m2imp  = m2imp/factor
 
+    allocate(simp(Norb,Nspin),zimp(Norb,Nspin),rimp(Norb,Nspin))
     call get_szr
 
     if(iolegend)call write_legend
@@ -94,6 +101,10 @@ contains
     endif
     write(LOGfile,*)""
     deallocate(simp,zimp,rimp)
+    !!<MPI
+    ! endif
+    ! call MPI_BCAST(nimp,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
+    !!>MPI
   end subroutine lanc_ed_getobs
 
 
@@ -113,6 +124,11 @@ contains
     real(8)                  :: Ei,nup(Norb),ndw(Norb),peso
     real(8)                  :: w
     logical                  :: last
+
+    !!<MPI
+    !if(mpiID==0)then
+    !!>MPI
+
     nimp   =0.d0
     nupimp =0.d0
     ndwimp =0.d0
@@ -145,6 +161,7 @@ contains
        enddo
     enddo
 
+    allocate(simp(Norb,Nspin),zimp(Norb,Nspin),rimp(Norb,Nspin))
     call get_szr
     if(iolegend)call write_legend
 
@@ -160,6 +177,10 @@ contains
     endif
     write(LOGfile,*)""
     deallocate(simp,zimp,rimp)
+    !!<MPI
+    ! endif
+    ! call MPI_BCAST(nimp,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
+    !!>MPI
   end subroutine full_ed_getobs
 
 
@@ -175,7 +196,6 @@ contains
     integer                  :: i,j,ispin,iorb,isector
     real(8)                  :: wm1,wm2
     wm1 = pi/beta ; wm2=3.d0*pi/beta
-    allocate(simp(Norb,Nspin),zimp(Norb,Nspin),rimp(Norb,Nspin))
     do ispin=1,Nspin
        do iorb=1,Norb
           simp(iorb,ispin) = dimag(impSmats(ispin,iorb,1)) - &

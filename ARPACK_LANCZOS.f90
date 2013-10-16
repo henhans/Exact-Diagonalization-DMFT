@@ -473,8 +473,7 @@ contains
 
 
 
-
-
+  !!<MPI
   ! !+-------------------------------------------------------------------+
   ! !PURPOSE  : 
   ! !    This routine shows how to use P_ARPACK to find a few eigenvalues
@@ -536,7 +535,6 @@ contains
   !   mpiQ = Ns/mpiSIZE
   !   mpiR = 0
   !   if(mpiID == mpiSIZE-1)mpiR=mod(Ns,mpiSIZE)
-
   !   !=========================================================================
   !   !  Specifications for ARPACK usage are set below:
   !   !  0) N   = Ns set the dimension of the problem
@@ -556,7 +554,6 @@ contains
   !   n      = maxn
   !   nev    = maxnev
   !   ncv    = maxncv
-
   !   !=========================================================================
   !   ! Setup distribution of data to nodes:
   !   ldv = mpiQ+mpiR
@@ -570,10 +567,8 @@ contains
   !      print *, ' ERROR with _SDRV1: NCV is greater than MAXNCV '
   !      return
   !   end if
-
   !   allocate(ax(ldv),resid(ldv),workd(3*ldv),v(ldv,maxncv),&
   !        d(maxncv,2),workl(maxncv*(maxncv+8)),select(maxncv))
-
   !   !=========================================================================
   !   !  Specification of stopping rules and initial
   !   !  conditions before calling SSAUPD
@@ -602,7 +597,6 @@ contains
   !   ido    = 0
   !   bmat   = 'I'
   !   which  = 'SA'
-
   !   !=========================================================================
   !   !  Specification of Algorithm Mode:
   !   !  This program uses the exact shift strategy
@@ -615,9 +609,7 @@ contains
   !   maxitr = Nitermax
   !   iparam(1) = 1
   !   iparam(3) = maxitr
-  !   iparam(7) = 1
-
-
+  !   iparam(7) = 
   !   !=========================================================================
   !   !  MAIN LOOP (Reverse communication loop)
   !   !  Repeatedly call PSSAUPD and take actions indicated by parameter 
@@ -630,7 +622,6 @@ contains
   !      !    y <--- OP*x ; workd(ipntr(1))=input, workd(ipntr(2))=output
   !      call hprod(mpiQ,mpiR,ldv,n,workd(ipntr(1)),workd(ipntr(2)))
   !   end do
-
   !   !=========================================================================
   !   !  Post-Process using SSEUPD.
   !   if(info<0)then
@@ -663,7 +654,6 @@ contains
   !         call MPI_ALLREDUCE(evec_tmp,evec(:,j),Ns,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,mpiERR)
   !      enddo
   !      nconv =  iparam(5)
-
   !      !=========================================================================
   !      !  Compute the residual norm
   !      !    ||  A*x - lambda*x ||
@@ -683,7 +673,6 @@ contains
   !      !    end do
   !      !    if(verb)call dmout(6,nconv,2,d,maxncv,-6,'Ritz values and relative residuals')
   !      ! end if
-
   !      if(mpiID==0)then
   !         if(info==1) then
   !            write(*,'(a)' ) ' '
@@ -693,7 +682,6 @@ contains
   !            write(*,'(a)' ) '  No shifts could be applied during implicit '&
   !                 //'Arnoldi update, try increasing NCV.'
   !         end if
-
   !         if(verb)then
   !            write(*,'(a)') ''
   !            write(*,'(a)') 'ARPACK - SSSIMP:'
@@ -715,11 +703,6 @@ contains
   !   call mpi_barrier(MPI_COMM_WORLD,mpiErr)
   !   deallocate(ax,resid,workd,v,d,workl,select)
   ! end subroutine lanczos_parpack
+  !!>MPI
 
 end module ARPACK_LANCZOS
-
-
-
-
-
-! >>>>>>> devel_multi-orbital_nomix

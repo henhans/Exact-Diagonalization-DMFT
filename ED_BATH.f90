@@ -34,18 +34,29 @@ MODULE ED_BATH
 
 contains
 
+
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : Allocate the ED bath
+  !+-------------------------------------------------------------------+
   subroutine allocate_bath()
     allocate(ebath(Nspin,Norb,Nbath),vbath(Nspin,Norb,Nbath))
     bath_status=.true.
   end subroutine allocate_bath
 
 
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : Deallocate the ED bath
+  !+-------------------------------------------------------------------+
   subroutine deallocate_bath()
     deallocate(ebath,vbath)
     bath_status=.false.
   end subroutine deallocate_bath
 
 
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : Check if the dimension of the bath array are consistent
+  !+-------------------------------------------------------------------+
   subroutine check_bath_dimension(bath)
     real(8),dimension(:) :: bath
     integer              :: N_,Ntrue
@@ -75,12 +86,14 @@ contains
     integer :: i,iorb,ispin,unit
     logical :: IOfile
     real(8) :: ran(Nbath)
-    character(len=100) :: foo
+    !!<MPI
+    !if(mpiID==0)then
+    !!!>MPI
     if(bath_status)call deallocate_bath
     call allocate_bath
     inquire(file=trim(Hfile),exist=IOfile)
     if(IOfile)then
-       write(LOGfile,"(A)")bg_green('Reading bath/xmu from file')
+       write(LOGfile,"(A)")bg_green('Reading bath from file')
        unit = free_unit()
        open(unit,file=trim(Hfile))
        read(unit,*)
@@ -90,7 +103,7 @@ contains
        close(unit)
     else
        write(LOGfile,"(A)")bg_red('Generating bath from scratch')
-       call random_number(ran(:))
+       call random_number(ran(:)) !default Fortran RNG: based on KISS
        do ispin=1,Nspin
           do i=1,Nbath
              ebath(ispin,1:Norb,i)=(2.d0*ran(i)-1.d0)*real(Nbath,8)/2.d0
@@ -98,7 +111,13 @@ contains
           enddo
        enddo
     endif
+    !!<MPI
+    ! endif
+    ! call MPI_BCAST(ebath(1:Nspin,1:Nbath),Nspin*Nbath,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
+    ! call MPI_BCAST(vbath(1:Nspin,1:Nbath),Nspin*Nbath,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
+    !!>MPI
   end subroutine init_bath_ed
+
 
 
 
@@ -109,13 +128,19 @@ contains
   !+-------------------------------------------------------------------+
   subroutine write_bath(unit)
     integer :: i,unit,ispin,iorb
-    if(.not.bath_status)call error("WRITE_BATH: bath not allocated")
+    !!<MPI
+    ! if(mpiID==0)then
+    !!>MPI
+    if(.not.bath_status)stop "WRITE_BATH: bath not allocated"
     write(unit,"(90(A22,1X))")&
          (("# Ek_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),&
          "Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
     do i=1,Nbath
        write(unit,"(90(F22.15,1X))")((ebath(ispin,iorb,i),vbath(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
     enddo
+    !!<MPI
+    !endif
+    !!>MPI
   end subroutine write_bath
 
 
@@ -128,7 +153,7 @@ contains
     real(8),dimension(:) :: bath
     integer              :: iorb,ispin,stride_spin,stride_orb
     integer              :: ae,be,av,bv
-    if(.not.bath_status)call error("SET_BATH: bath not allocated")
+    if(.not.bath_status)stop "SET_BATH: bath not allocated"
     call check_bath_dimension(bath)
     do ispin=1,Nspin
        stride_spin=(ispin-1)*Norb*Nbath
@@ -152,7 +177,7 @@ contains
     real(8),dimension(2*Nspin*Norb*Nbath) :: bath
     integer                               :: iorb,ispin,stride_spin,stride_orb
     integer                               :: ae,be,av,bv
-    if(.not.bath_status)call error("COPY_BATH: bath not allocated")
+    if(.not.bath_status)stop "COPY_BATH: bath not allocated"
     do ispin=1,Nspin
        stride_spin=(ispin-1)*Norb*Nbath
        do iorb=1,Norb
@@ -210,7 +235,7 @@ contains
     integer,intent(in)                          :: iorb,ispin
     complex(8)                                  :: fg
     integer                                     :: i
-    if(.not.bath_status)call error("DELTA_BATH: bath not allocated")
+    if(.not.bath_status)stop "DELTA_BATH: bath not allocated"
     fg=zero
     do i=1,Nbath
        fg=fg + vbath(ispin,iorb,i)**2/(x-ebath(ispin,iorb,i))

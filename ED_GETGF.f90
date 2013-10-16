@@ -1,5 +1,9 @@
 !###################################################################
 !PURPOSE  : Build the impurity Green's function using spectral sum 
+!NOTE: in the MPI implementation we may require all the nodes to 
+!evaluate the GF, this is safer, simpler and works for both Lanc &
+!Ed. For Lanc we can indeed assign the contribution from each state 
+!to different node and accumulate the result at the end.
 !AUTHORS  : Adriano Amaricci
 !###################################################################
 MODULE ED_GETGF
@@ -13,7 +17,7 @@ MODULE ED_GETGF
 
   !Frequency and time arrays:
   !=========================================================
-  real(8),dimension(:),allocatable :: wm,tau,wr
+  real(8),dimension(:),allocatable :: wm,tau,wr,vm
 
   !Lanczos shared variables
   !=========================================================
@@ -48,25 +52,29 @@ contains
        egs    =  es_get_energy(groundstate,izero)
        gsvec  => es_get_vector(groundstate,izero)
        norm0=sqrt(dot_product(gsvec,gsvec))
-       if(abs(norm0-1.d0)>1.d-9)call warning("GS"//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0))
-       call plain_lanczos_set_htimesv_d(spHtimesV_d)
+       if(abs(norm0-1.d0)>1.d-9)then
+          write(*,*) "GS"//reg(txtfy(izero))//"is not normalized:"//reg(txtfy(norm0))
+          stop
+       endif
+       call lanczos_plain_set_htimesv_d(spHtimesV_d)
        do ispin=1,Nspin
           do iorb=1,Norb
              call lanc_ed_buildgf(isect0,iorb,ispin)
           enddo
        enddo
-       call plain_lanczos_delete_htimesv_d
+       call lanczos_plain_delete_htimesv_d
        nullify(gsvec)
     enddo
     impGmats=impGmats/zeta_function
     impGreal=impGreal/zeta_function
     !Print impurity functions:
+    !!<MPI
+    !call print_imp_gf  !only the master write the GF. 
+    !!>MPI
     call print_imp_gf
     call stop_timer
-    deallocate(wm,wr,tau)
+    deallocate(wm,wr,tau,vm)
   end subroutine lanc_ed_getgf
-
-
 
 
 
@@ -98,11 +106,13 @@ contains
        jdim0  = getdim(jsect0)
        jup0   = getnup(jsect0)
        jdw0   = getndw(jsect0)
+       !!<MPI
+       !write(*,"(A,2I3,I15)")'add particle:',jup0,jdw0,jdim0
+       !!>MPI
        write(*,"(A,2I3,I15)")'add particle:',jup0,jdw0,jdim0
-       ! !##IF SPARSE_MATRIX:
        call sp_init_matrix(spH0,jdim0)
        call lanc_ed_geth(jsect0)
-       ! !##ELSE DIRECT H*V PRODUCT:
+       ! !##DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
        allocate(vvinit(jdim0))
        !
@@ -120,10 +130,9 @@ contains
        norm0=sqrt(dot_product(vvinit,vvinit))
        vvinit=vvinit/norm0
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
-       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
+       call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
        call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,1,iorb,ispin)
        deallocate(vvinit)
-       ! !##IF SPARSE_MATRIX:
        call sp_delete_matrix(spH0)
     endif
     !
@@ -134,7 +143,9 @@ contains
        jdim0  = getdim(jsect0)
        jup0    = getnup(jsect0)
        jdw0    = getndw(jsect0)
-       write(*,"(A,2I3,I15)")'del particle:',jup0,jdw0,jdim0
+       !!<MPI
+       !write(*,"(A,2I3,I15)")'del particle:',jup0,jdw0,jdim0
+       !!>MPI
        call sp_init_matrix(spH0,jdim0)
        call lanc_ed_geth(jsect0)
        ! !##ELSE DIRECT H*V PRODUCT:
@@ -154,14 +165,14 @@ contains
        norm0=sqrt(dot_product(vvinit,vvinit))
        vvinit=vvinit/norm0
        alfa_=0.d0 ; beta_=0.d0
-       call plain_lanczos_tridiag(vvinit,alfa_,beta_,nitermax)
+       call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
        call add_to_lanczos_gf(norm0,egs,nitermax,alfa_,beta_,-1,iorb,ispin)
        deallocate(vvinit)
-       ! !##IF SPARSE_MATRIX:
        call sp_delete_matrix(spH0)
     endif
     deallocate(alfa_,beta_)
   end subroutine lanc_ed_buildgf
+
 
 
   !+------------------------------------------------------------------+
@@ -218,8 +229,11 @@ contains
        enddo
     enddo
     call stop_timer
+    !!<MPI
+    !call print_imp_gf
+    !!>MPI
     call print_imp_gf
-    deallocate(wm,tau,wr)
+    deallocate(wm,tau,wr,vm)
   end subroutine full_ed_getgf
 
 
@@ -304,17 +318,14 @@ contains
     real(8)                  :: Ei,Ej,cc,peso(Norb),pesotot
     real(8)                  :: expterm,de,w0,it
     complex(8)               :: iw
-    real(8),allocatable,dimension(:)      :: vm
+    
     real(8),allocatable,dimension(:,:)    :: Chitau
     real(8),allocatable,dimension(:)      :: Chitautot
     complex(8),allocatable,dimension(:,:) :: Chiw,Chiiw
     complex(8),allocatable,dimension(:)   :: Chiwtot,Chiiwtot
 
     call allocate_grids
-    allocate(vm(0:NL))          !bosonic frequencies
-    do i=0,NL
-       vm(i) = pi/beta*2.d0*real(i,8)
-    enddo
+
     allocate(Chitau(Norb,0:Ltau),Chiw(Norb,Nw),Chiiw(Norb,0:NL))
     allocate(Chitautot(0:Ltau),Chiwtot(Nw),Chiiwtot(0:NL))
 
@@ -403,6 +414,9 @@ contains
 
 
     !###########################PRINTING######################################
+    !!<MPI
+    !if(mpiID==0)then
+    !!>MPI
     do iorb=1,Norb
        unit(1)=free_unit()
        open(unit(1),file=reg(CHIfile)//"_orb"//reg(txtfy(iorb))//"_tau.ed")
@@ -441,8 +455,12 @@ contains
     close(unit(1))
     close(unit(2))
     close(unit(3))
+    !!<MPI
+    !endif
+    !!>MPI
     deallocate(Chitau,Chiw,Chiiw,Chitautot,Chiwtot,Chiiwtot)
     deallocate(wm,tau,wr)
+    
   end subroutine full_ed_getchi
 
 
@@ -459,11 +477,16 @@ contains
   !+------------------------------------------------------------------+
   subroutine allocate_grids
     allocate(wm(NL))
-    wm    = pi/beta*real(2*arange(1,NL)-1,8)
+    wm     = pi/beta*real(2*arange(1,NL)-1,8)
+    allocate(vm(0:NL))          !bosonic frequencies
+    vm(0:) = pi/beta*real(2*arange(0,NL),8)
+    ! do i=0,NL
+    !    vm(i) = pi/beta*2.d0*real(i,8)
+    ! enddo
     allocate(wr(Nw))
-    wr    = linspace(wini,wfin,Nw)
+    wr     = linspace(wini,wfin,Nw)
     allocate(tau(0:Ltau))
-    tau   = linspace(0.d0,beta,Ltau+1)
+    tau(0:)= linspace(0.d0,beta,Ltau+1)
   end subroutine allocate_grids
 
 

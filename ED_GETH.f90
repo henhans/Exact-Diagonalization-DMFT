@@ -12,6 +12,9 @@ MODULE ED_GETH
   public :: full_ed_geth
   public :: lanc_ed_geth
   public :: spHtimesV_d,spHtimesV_c
+  !!<MPI
+  !public :: spHtimesV_mpi 
+  !!>MPI
   public :: set_Hsector
 
   integer :: Hsector
@@ -475,7 +478,8 @@ contains
 
 
   !+------------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : Perform the matrix-vector product H*v used in the
+  ! Lanczos algorithm using serial double real, complex, and MPI (commented)
   !+------------------------------------------------------------------+
   subroutine spHtimesV_d(N,v,Hv)
     integer              :: N
@@ -493,20 +497,31 @@ contains
     call sp_matrix_vector_product(N,spH0,v,Hv)
   end subroutine SpHtimesV_c
 
-
-  ! subroutine spHtimesV(N,v,Hv)
-  !   integer              :: N
-  !   real(8),dimension(N) :: v
-  !   real(8),dimension(N) :: Hv
-  !   ! if(.not.spH0%status)call error("Error LANCZOS/HtimesV: sparse matrix not allocated.")
-  !   ! if(N /= spH0%size)call error("Error in LANCZOS/HtimesV: wrong dimensions")  
-  !   Hv=zero
-  !   call sp_matrix_vector_product(N,spH0,v,Hv)
-  ! end subroutine SpHtimesV
+  !!<MPI
+  ! subroutine spHtimesV_mpi(Q,R,Nloc,N,v,Hv)
+  !   integer                 :: Q,R,Nloc,N
+  !   real(8),dimension(Nloc) :: v,Hv
+  !   real(8),dimension(N)    :: vin,vout
+  !   integer                 :: i,j
+  !   vout=0.d0
+  !   do i=mpiID*Q+1,(mpiID+1)*Q+R
+  !      vout(i)=v(i-mpiID*Q)
+  !   enddo
+  !   call MPI_AllReduce(vout,vin,N,MPI_Double_Precision,MPI_Sum,MPI_Comm_World,mpiErr)
+  !   vout=0.d0
+  !   call sp_matrix_vector_product_mpi(Q,R,N,spH0,vin,vout)
+  !   Hv=0.d0
+  !   do i=mpiID*Q+1,(mpiID+1)*Q+R
+  !      Hv(i-mpiID*Q)=vout(i)
+  !   enddo
+  ! end subroutine SpHtimesV_mpi
+  !!>MPI
 
 
   ! !+------------------------------------------------------------------+
-  ! !PURPOSE  : 
+  ! !PURPOSE  : Direct Matrix-vector multiplication H*v used in 
+  ! !Lanczos algorithm. this DOES NOT store the H-matrix (slower but 
+  ! !more memory efficient)
   ! !+------------------------------------------------------------------+
   ! subroutine HtimesV(Nv,v,Hv)
   !   integer                  :: Nv

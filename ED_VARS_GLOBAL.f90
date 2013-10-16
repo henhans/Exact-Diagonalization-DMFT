@@ -4,7 +4,7 @@ MODULE ED_VARS_GLOBAL
   USE TIMER
   USE PARSE_CMD
   USE IOTOOLS
-  USE MATRIX, only: matrix_diagonalize,matrix_inverse
+  USE MATRIX, only: matrix_diagonalize
   USE OPTIMIZE
   USE TOOLS, only: arange,linspace
   !LOCAL
@@ -12,6 +12,10 @@ MODULE ED_VARS_GLOBAL
   USE EIGEN_SPACE
   USE PLAIN_LANCZOS
   USE ARPACK_LANCZOS
+  !PARALLEL:
+  !!<MPI
+  !USE MPI
+  !!>MPI
   implicit none
 
   !GIT VERSION
@@ -47,8 +51,8 @@ MODULE ED_VARS_GLOBAL
   real(8)              :: cutoff         !cutoff for spectral summation
   real(8)              :: eps_error      !
   integer              :: nLancitermax   !Max number of Lanczos iterations
-  integer :: nLanceigen     !Max number of required eigenvalues per sector
-  integer :: nLancblock     !Max block used in Lanczos iterations	
+  integer              :: nLanceigen     !Max number of required eigenvalues per sector
+  integer              :: nLancblock     !Max block used in Lanczos iterations	
   integer              :: nGFitermax     !Max number of iteration in resolvant tri-diagonalization
   integer              :: cgNitmax       !Max number of iteration in the fit
   real(8)              :: cgFtol         !Tolerance in the cg fit
@@ -249,6 +253,9 @@ contains
     ndw=Ns-nup
     NP=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
     NP=NP*(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
+    !!<MPI
+    ! if(mpiID==0)then
+    !!>MPI
     write(*,*)"CONTROL PARAMETERS"
     write(*,nml=EDvars)
     write(*,*)"--------------------------------------------"
@@ -265,7 +272,9 @@ contains
     open(50,file=trim(adjustl(trim(USEDinput))))
     write(50,nml=EDvars)
     close(50)
-
+    !!<MPI
+    ! endif
+    !!>MPI
     !Some check:
     if(Nfit>NL)Nfit=NL
     if(Norb>3)stop "Norb > 3 ERROR. Need to open the code.." 
