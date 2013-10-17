@@ -80,14 +80,14 @@ MODULE ED_VARS_GLOBAL
 
   !Eigenvalues,Eigenvectors FULL DIAGONALIZATION
   !=========================================================
-  type(eigenspace),dimension(:),allocatable :: espace
+  type(full_espace),dimension(:),allocatable :: espace
 
 
-  !Ground state variables LANCZOS DIAGONALIZATINO
+  !Ground state variables LANCZOS DIAGONALIZATION
   !=========================================================
-  integer                                 :: numzero
-  type(eig_space)                         :: groundstate
-  type(sparse_matrix)                     :: spH0
+  integer                                :: numzero
+  type(sparse_espace)                    :: groundstate
+  type(sparse_matrix)                    :: spH0
 
 
   !Partition function

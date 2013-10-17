@@ -24,7 +24,6 @@ MODULE ED_GETGF
   real(8),dimension(:),pointer :: gsvec
   real(8)                      :: egs
 
-
   public :: full_ed_getgf
   public :: lanc_ed_getgf
   public :: full_ed_getchi
@@ -48,9 +47,9 @@ contains
     zeta_function=real(numzero,8)
     call start_timer
     do izero=1,numzero 
-       isect0 =  es_get_sector(groundstate,izero)
-       egs    =  es_get_energy(groundstate,izero)
-       gsvec  => es_get_vector(groundstate,izero)
+       isect0 =  es_pop_sector(groundstate,izero)
+       egs    =  es_pop_energy(groundstate,izero)
+       gsvec  => es_pop_vector(groundstate,izero)
        norm0=sqrt(dot_product(gsvec,gsvec))
        if(abs(norm0-1.d0)>1.d-9)then
           write(*,*) "GS"//reg(txtfy(izero))//"is not normalized:"//reg(txtfy(norm0))
@@ -117,14 +116,14 @@ contains
        allocate(vvinit(jdim0))
        !
        vvinit=0.d0
-       do m=1,idim0                                                !loop over |gs> components m
-          i=Hmap(isect0)%map(m)                                    !map m to full-Hilbert space state i
-          call bdecomp(i,ib)                                       !decompose i into binary representation
-          if(ib(isite)==0)then                                     !if impurity is empty: proceed
+       do m=1,idim0                                !loop over |gs> components m
+          i=Hmap(isect0)%map(m)                    !map m to full-Hilbert space state i
+          call bdecomp(i,ib)                       !decompose i into binary representation
+          if(ib(isite)==0)then                     !if impurity is empty: proceed
              call cdg(isite,i,r)
-             sgn=dfloat(r)/dfloat(abs(r));r=abs(r)                 !apply cdg_up (1), bring from i to r
-             j=invHmap(jsect0,r)                                   !map r back to cdg_up sector jsect0
-             vvinit(j) = sgn*gsvec(m)                                !build the cdg_up|gs> state
+             sgn=dfloat(r)/dfloat(abs(r));r=abs(r) !apply cdg_up (1), bring from i to r
+             j=invHmap(jsect0,r)                   !map r back to cdg_up sector jsect0
+             vvinit(j) = sgn*gsvec(m)              !build the cdg_up|gs> state
           endif
        enddo
        norm0=sqrt(dot_product(vvinit,vvinit))

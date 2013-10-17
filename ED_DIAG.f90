@@ -83,7 +83,6 @@ contains
     real(8),allocatable :: eig_values(:)
     real(8),allocatable :: eig_basis(:,:)
     logical             :: isolve
-
     if(.not.groundstate%status)groundstate=es_init_espace()
     call es_free_espace(groundstate)
     oldzero=1000.d0
@@ -92,32 +91,29 @@ contains
     call start_progress(LOGfile)
     do isector=1,Nsect
        call progress(isector,Nsect)
-       dim=getdim(isector)
        dim     = getdim(isector)
        Neigen  = min(dim,nLanceigen)
        Nitermax= min(dim,nLancitermax)
        Nblock  = max(nLancblock,5*Neigen+10)
        Nblock  = min(dim,Nblock)
        isolve  = .true.
-       If((Neigen==Nitermax).AND.&
-            (Neigen==Nblock).AND.&
-            (Neigen==dim))isolve=.false.
+       If((Neigen==Nitermax).AND.(Neigen==Nblock).AND.(Neigen==dim))isolve=.false.
        allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
        eig_values=0.d0 ; eig_basis=0.d0
        select case(isolve)
        case (.true.)
-          ! !##IF SPARSE_MATRIX:
           call sp_init_matrix(spH0,dim)
           call lanc_ed_geth(isector)
-          ! !##ELSE DIRECT H*V PRODUCT:
+          ! !##IF DIRECT H*V PRODUCT:
           ! call set_Hsector(isector)
           call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_d,.false.)
-          
+
        case (.false.)
           call full_ed_geth(isector,eig_basis)
           call matrix_diagonalize(eig_basis,eig_values,'V','U')
           if(dim==1)eig_basis(dim,dim)=1.d0
        end select
+
        enemin=eig_values(1)  
        if (enemin < oldzero-10.d-9) then
           numzero=1
@@ -126,20 +122,20 @@ contains
           call es_insert_state(groundstate,enemin,eig_basis(1:dim,1),isector)
        elseif(abs(enemin-oldzero) <= 1.d-9)then
           numzero=numzero+1
-          if (numzero > Nsect)call error('too many gs')
+          if (numzero > Nsect)stop "ed_diag: too many gs"
           oldzero=min(oldzero,enemin)
           call es_insert_state(groundstate,enemin,eig_basis(1:dim,1),isector)
        endif
+
+
        deallocate(eig_values,eig_basis)
-       !Delete Hamiltonian matrix:
-       ! !##IF SPARSE_MATRIX:
        if(spH0%status)call sp_delete_matrix(spH0)
     enddo
     !
     write(LOGfile,"(A)")"groundstate sector(s):"
     do izero=1,numzero
-       isect0= es_get_sector(groundstate,izero)
-       egs   = es_get_energy(groundstate,izero)
+       isect0= es_pop_sector(groundstate,izero)
+       egs   = es_pop_energy(groundstate,izero)
        nup0  = getnup(isect0)
        ndw0  = getndw(isect0)
        dim0  = getdim(isect0)
@@ -151,6 +147,10 @@ contains
     close(3)
     call stop_progress
   end subroutine lanc_ed_diag
+
+
+
+
 
 
 
