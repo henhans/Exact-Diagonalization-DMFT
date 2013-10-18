@@ -88,7 +88,7 @@ MODULE ED_VARS_GLOBAL
   !=========================================================
   integer                                :: numzero
   type(sparse_espace)                    :: groundstate
-  type(sparse_espace)                    :: excstate
+  type(sparse_espace)                    :: state_list
   type(sparse_matrix)                    :: spH0
   integer,allocatable,dimension(:)       :: neigen_sector
 

@@ -47,9 +47,9 @@ contains
     zeta_function=real(numzero,8)
     call start_timer
     do izero=1,numzero 
-       isect0 =  es_pop_sector(groundstate,izero)
-       egs    =  es_pop_energy(groundstate,izero)
-       gsvec  => es_pop_vector(groundstate,izero)
+       isect0 =  es_return_sector(groundstate,izero)
+       egs    =  es_return_energy(groundstate,izero)
+       gsvec  => es_return_vector(groundstate,izero)
        norm0=sqrt(dot_product(gsvec,gsvec))
        if(abs(norm0-1.d0)>1.d-9)then
           write(*,*) "GS"//reg(txtfy(izero))//"is not normalized:"//reg(txtfy(norm0))

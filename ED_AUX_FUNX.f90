@@ -59,8 +59,6 @@ contains
     allocate(getCsector(2,Nsect))
     allocate(getCDGsector(2,Nsect))
     allocate(neigen_sector(Nsect))
-    neigen_sector = lanc_neigen   !init every sector to required eigenstates
-
 
     !check finiteT
     finiteT=.false.
@@ -104,6 +102,7 @@ contains
           dimdw=(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
           dim=dimup*dimdw
           getdim(isector)=dim
+          neigen_sector(isector) = min(dim,lanc_neigen)   !init every sector to required eigenstates
           allocate(Hmap(isector)%map(dim))
           call build_sector(nup,ndw,dim,&
                Hmap(isector)%map(:),invHmap(isector,:))

@@ -28,40 +28,54 @@ contains
     integer             :: nup0,ndw0,isect0,dim0,izero
     integer             :: info,i,j
     integer             :: Nitermax,Neigen,Nblock
-    real(8)             :: oldzero,enemin,egs
+    real(8)             :: oldzero,enemin,egs,emax
     real(8),allocatable :: eig_values(:)
     real(8),allocatable :: eig_basis(:,:)
     logical             :: lanc_solve
+    !
+    real(8) :: e
+    !
     if(.not.groundstate%status)groundstate=es_init_espace()
     call es_free_espace(groundstate)
+    !<finiteT
+    if(.not.state_list%status)state_list=es_init_espace()
+    call es_free_espace(state_list)
+    !>finiteT
     oldzero=1000.d0
+    emax=1000.d0
     numzero=0
     call msg("Get Hamiltonian:",unit=LOGfile)
     call start_progress(LOGfile)
     sector: do isector=1,Nsect
-       call progress(isector,Nsect)
+       !call progress(isector,Nsect)
        dim     = getdim(isector)
-       Neigen  = min(dim,lanc_neigen)
+       Neigen  = min(dim,neigen_sector(isector))!lanc_neigen)
+       print*,isector,Neigen,dim
        Nitermax= min(dim,lanc_niter)
-       Nblock  = min(dim,5*Neigen+10)
+       Nblock  = min(dim,5*Neigen+2)
        !
-       lanc_solve  = .true. ; if(Dim<=10)lanc_solve=.false.
+       allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
+       lanc_solve  = .true. ; if(Neigen==dim)lanc_solve=.false.
        !
        if(lanc_solve)then
-          allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
           eig_values=0.d0 ; eig_basis=0.d0 
           call sp_init_matrix(spH0,dim)
           call ed_geth(isector)
           call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_d,.false.)
        else
-          allocate(eig_values(Dim),eig_basis(Dim,Dim))
           eig_values=0.d0 ; eig_basis=0.d0 
           call ed_geth(isector,eig_basis)
           call matrix_diagonalize(eig_basis,eig_values,'V','U')
           if(dim==1)eig_basis(dim,dim)=1.d0
        endif
-       !
-       enemin=eig_values(1)  
+
+       !try to add each obtained state to the list if its energy is smaller than emax
+       do i=1,Neigen
+          call es_add_state(state_list,eig_values(i),eig_basis(1:dim,i),isector,size=lanc_nstates,verbose=.true.)
+       enddo
+
+       !this find the ground state
+       enemin=eig_values(1)
        if (enemin < oldzero-10.d-9) then
           numzero=1
           oldzero=enemin
@@ -79,11 +93,18 @@ contains
        !
     enddo sector
     call stop_progress
+    do i=1,state_list%size
+       e      = es_return_energy(state_list,i)
+       isect0 = es_return_sector(state_list,i)
+       nup0  = getnup(isect0)
+       ndw0  = getndw(isect0)
+       write(*,"(i3,f25.18,2i3)"),i,e,nup0,ndw0
+    enddo
     !
     write(LOGfile,"(A)")"groundstate sector(s):"
     do izero=1,numzero
-       isect0= es_pop_sector(groundstate,izero)
-       egs   = es_pop_energy(groundstate,izero)
+       isect0= es_return_sector(groundstate,izero)
+       egs   = es_return_energy(groundstate,izero)
        nup0  = getnup(isect0)
        ndw0  = getndw(isect0)
        dim0  = getdim(isect0)

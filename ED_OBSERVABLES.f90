@@ -47,11 +47,11 @@ contains
     case default
        do izero=1,numzero   
           !GET THE GROUNDSTATE (make some checks)
-          isect0 = es_pop_sector(groundstate,izero)
+          isect0 = es_return_sector(groundstate,izero)
           dim0   = getdim(isect0)
           iup0   = getnup(isect0)
           idw0   = getndw(isect0)
-          gsvec  => es_pop_vector(groundstate,izero)
+          gsvec  => es_return_vector(groundstate,izero)
           norm0=sqrt(dot_product(gsvec,gsvec))
           if(abs(norm0-1.d0)>1.d-9)then
              write(*,*) "GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0)
