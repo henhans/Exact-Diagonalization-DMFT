@@ -6,70 +6,19 @@ module ED_DIAG
   USE ED_VARS_GLOBAL
   USE ED_BATH
   USE ED_AUX_FUNX
-  USE ED_GETH
-  USE ED_GETGF
-  USE ED_GETOBS
+  USE ED_HAMILTONIAN
   implicit none
   private
 
-  public :: init_full_ed_solver
-  public :: full_ed_solver
-  public :: init_lanc_ed_solver
-  public :: lanc_ed_solver
-
+  public :: lanc_ed_diag
+  public :: full_ed_diag
+  public :: setup_eigenspace
+  public :: reset_eigenspace
 contains
 
-  !####################################################################
-  !                    LANCZOS DIAGONALIZATION (T=0, GS only)
-  !####################################################################
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine init_lanc_ed_solver(bath)
-    real(8),dimension(:),intent(inout) :: bath
-    integer                            :: i   
-    call msg("INIT SOLVER, SETUP EIGENSPACE",unit=LOGfile)
-    call check_bath_dimension(bath)
-    call init_bath_ed
-    if(Nspin==2)then
-       heff=abs(heff)
-       !!<MPI
-       !if(mpiID==0)write(LOGfile,"(A,F12.9)")"Symmetry Breaking field = ",heff
-       !!>MPI
-       write(LOGfile,"(A,F12.9)")"Symmetry Breaking field = ",heff
-       ebath(1,:,:)     = ebath(1,:,:)     + heff
-       ebath(Nspin,:,:) = ebath(Nspin,:,:) - heff
-       heff=0.d0
-    endif
-    call setup_pointers
-    call write_bath(LOGfile)
-    bath = copy_bath()
-    call deallocate_bath
-    call msg("SET STATUS TO 0 in ED_SOLVER",unit=LOGfile)
-  end subroutine init_lanc_ed_solver
 
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine lanc_ed_solver(bath)
-    real(8),dimension(:),intent(in) :: bath
-    integer :: unit
-    call msg("ED SOLUTION",unit=LOGfile)
-    call check_bath_dimension(bath)
-    call allocate_bath
-    call set_bath(bath)
-    call lanc_ed_diag
-    call lanc_ed_getgf
-    call lanc_ed_getobs
-    unit=free_unit()
-    open(unit,file=trim(Hfile))
-    call write_bath(unit)
-    close(unit)
-    call deallocate_bath
-  end subroutine lanc_ed_solver
-
-
+  !+-------------------------------------------------------------------+
+  !                    LANCZOS DIAGONALIZATION
   !+-------------------------------------------------------------------+
   !PURPOSE  : Setup the Hilbert space, create the Hamiltonian, get the
   ! GS, build the Green's functions calling all the necessary routines
@@ -82,38 +31,36 @@ contains
     real(8)             :: oldzero,enemin,egs
     real(8),allocatable :: eig_values(:)
     real(8),allocatable :: eig_basis(:,:)
-    logical             :: isolve
+    logical             :: lanc_solve
     if(.not.groundstate%status)groundstate=es_init_espace()
     call es_free_espace(groundstate)
     oldzero=1000.d0
     numzero=0
     call msg("Get Hamiltonian:",unit=LOGfile)
     call start_progress(LOGfile)
-    do isector=1,Nsect
+    sector: do isector=1,Nsect
        call progress(isector,Nsect)
        dim     = getdim(isector)
-       Neigen  = min(dim,nLanceigen)
-       Nitermax= min(dim,nLancitermax)
-       Nblock  = max(nLancblock,5*Neigen+10)
-       Nblock  = min(dim,Nblock)
-       isolve  = .true.
-       If((Neigen==Nitermax).AND.(Neigen==Nblock).AND.(Neigen==dim))isolve=.false.
-       allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
-       eig_values=0.d0 ; eig_basis=0.d0
-       select case(isolve)
-       case (.true.)
+       Neigen  = min(dim,lanc_neigen)
+       Nitermax= min(dim,lanc_niter)
+       Nblock  = min(dim,5*Neigen+10)
+       !
+       lanc_solve  = .true. ; if(Dim<=10)lanc_solve=.false.
+       !
+       if(lanc_solve)then
+          allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
+          eig_values=0.d0 ; eig_basis=0.d0 
           call sp_init_matrix(spH0,dim)
-          call lanc_ed_geth(isector)
-          ! !##IF DIRECT H*V PRODUCT:
-          ! call set_Hsector(isector)
+          call ed_geth(isector)
           call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_d,.false.)
-
-       case (.false.)
-          call full_ed_geth(isector,eig_basis)
+       else
+          allocate(eig_values(Dim),eig_basis(Dim,Dim))
+          eig_values=0.d0 ; eig_basis=0.d0 
+          call ed_geth(isector,eig_basis)
           call matrix_diagonalize(eig_basis,eig_values,'V','U')
           if(dim==1)eig_basis(dim,dim)=1.d0
-       end select
-
+       endif
+       !
        enemin=eig_values(1)  
        if (enemin < oldzero-10.d-9) then
           numzero=1
@@ -126,11 +73,12 @@ contains
           oldzero=min(oldzero,enemin)
           call es_insert_state(groundstate,enemin,eig_basis(1:dim,1),isector)
        endif
-
-
+       !
        deallocate(eig_values,eig_basis)
        if(spH0%status)call sp_delete_matrix(spH0)
-    enddo
+       !
+    enddo sector
+    call stop_progress
     !
     write(LOGfile,"(A)")"groundstate sector(s):"
     do izero=1,numzero
@@ -145,99 +93,32 @@ contains
     open(3,file='egs.ed',access='append')
     write(3,*)egs
     close(3)
-    call stop_progress
   end subroutine lanc_ed_diag
 
 
 
-
-
-
-
-  !####################################################################
+  !+-------------------------------------------------------------------+
   !                    FULL DIAGONALIZATION
-  !####################################################################
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine init_full_ed_solver(bath)
-    real(8),dimension(:),intent(inout) :: bath
-    integer                            :: i   
-    call msg("INIT SOLVER, SETUP EIGENSPACE",unit=LOGfile)
-    call check_bath_dimension(bath)
-    call allocate_bath
-    call init_bath_ed
-    if(Nspin==2)then
-       heff=abs(heff)
-       if(mpiID==0)write(LOGfile,"(A,F12.9)")"Symmetry Breaking field = ",heff
-       ebath(1,:,:)     = ebath(1,:,:)     + heff
-       ebath(Nspin,:,:) = ebath(Nspin,:,:) - heff
-       heff=0.d0
-    endif
-    call setup_pointers
-    call setup_eigenspace
-    call write_bath(LOGfile)
-    bath = copy_bath()
-    call deallocate_bath
-    call msg("SET STATUS TO 0 in ED_SOLVER",unit=LOGfile)
-  end subroutine init_full_ed_solver
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine full_ed_solver(bath)
-    real(8),dimension(:),intent(in) :: bath
-    integer                         :: unit
-    call msg("ED SOLUTION",unit=LOGfile)
-    call check_bath_dimension(bath)
-    call allocate_bath
-    call set_bath(bath)
-    call reset_eigenspace()
-    call full_ed_diag
-    call full_ed_getgf
-    if(chiflag)call full_ed_getchi
-    call full_ed_getobs
-    unit=free_unit()
-    open(unit,file=trim(Hfile))
-    call write_bath(unit)
-    close(unit)
-    call deallocate_bath
-  end subroutine full_ed_solver
-
-
   !+-------------------------------------------------------------------+
   !PURPOSE  : Setup the Hilbert space, create the Hamiltonian, get the
   ! GS, build the Green's functions calling all the necessary routines
-  !+------------------------------------------------------------------+
+  !+-------------------------------------------------------------------+
   subroutine full_ed_diag
-    integer :: in,is,isector,dim
+    integer                  :: info,i,j,in,is,isector,dim
     real(8),dimension(Nsect) :: e0 
-    integer                  :: info,i,j
-    integer                  :: lwork
+    real(8)                  :: egs
     e0=0.d0
     call msg("Get Hamiltonian:",unit=LOGfile)
     call start_progress(LOGfile)
     do isector=1,Nsect
        call progress(isector,Nsect)
        dim=getdim(isector)
-       call full_ed_geth(isector,espace(isector)%M(:,:))
+       call ed_geth(isector,espace(isector)%M(:,:))
        call matrix_diagonalize(espace(isector)%M,espace(isector)%e,'V','U')
        e0(isector)=minval(espace(isector)%e)
     enddo
     call stop_progress
-    call findgs(e0)
-    return
-  end subroutine full_ed_diag
-
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+-------------------------------------------------------------------+
-  subroutine findgs(e0)
-    integer :: i,isector,dim
-    real(8) :: egs
-    real(8),dimension(Nsect) :: e0 
+    !
     egs=minval(e0)
     forall(isector=1:Nsect)espace(isector)%e = espace(isector)%e - egs
     !Get the partition function Z and rescale energies
@@ -249,15 +130,21 @@ contains
        enddo
     enddo
     call msg("DIAG resume:",unit=LOGfile)
-    if(mpiID==0)then
-       write(LOGfile,"(A,f18.12)")'egs  =',egs
-       write(LOGfile,"(A,f18.12)")'Z    =',zeta_function    
-       write(LOGfile,*)""
-       open(3,file='egs.ed',access='append')
-       write(3,*)egs
-       close(3)
-    endif
-  end subroutine findgs
+    !!<MPI
+    ! if(mpiID==0)then
+    !!>MPI
+    write(LOGfile,"(A,f18.12)")'egs  =',egs
+    write(LOGfile,"(A,f18.12)")'Z    =',zeta_function    
+    write(LOGfile,*)""
+    open(3,file='egs.ed',access='append')
+    write(3,*)egs
+    close(3)
+    !!<MPI
+    ! endif
+    !!>MPI
+    return
+  end subroutine full_ed_diag
+
 
 
   !+------------------------------------------------------------------+
@@ -284,5 +171,7 @@ contains
        espace(isector)%M=0.d0
     end forall
   end subroutine reset_eigenspace
+
+
 
 end MODULE ED_DIAG

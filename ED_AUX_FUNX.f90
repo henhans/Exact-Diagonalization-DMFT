@@ -6,13 +6,79 @@ MODULE ED_AUX_FUNX
   USE ED_VARS_GLOBAL
   implicit none
   private
+
+  public :: init_ed_structure
+  public :: setup_pointers
   public :: build_sector
   public :: bdecomp
   public :: c,cdg
-  public :: setup_pointers
   public :: search_mu
 
 contains
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : Init calculation
+  !+------------------------------------------------------------------+
+  subroutine init_ed_structure
+    integer          :: i,NP,nup,ndw
+    !!<MPI
+    ! if(mpiID==0)then
+    !!>MPI
+    nup=Ns/2
+    ndw=Ns-nup
+    NP=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
+    NP=NP*(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
+    write(*,*)"Summary:"
+    write(*,*)"--------------------------------------------"
+    write(*,*)'| Number of impurities         = ',Norb
+    write(*,*)'| Number of bath/impurity      = ',Nbath
+    write(*,*)'| Total # of Bath sites/spin   = ',Nbo
+    write(*,*)'| Total # of sites/spin        = ',Ns
+    write(*,*)'| Maximum dimension            = ',NP
+    write(*,*)'| Total size, Hilber space dim.= ',Ntot,NN
+    write(*,*)'| Number of sectors            = ',Nsect
+    write(*,*)"--------------------------------------------"
+    print*,''
+    !!<MPI
+    ! endif
+    !!>MPI
+
+    !Norb=# of impurity orbitals
+    !Nbath=# of bath sites per orbital
+    !Ns=total number of sites
+    !Nbo=total number of bath sites (all sites - impurity sites)
+    Ns=(Nbath+1)*Norb
+    Nbo   = Ns-Norb
+    Ntot  = 2*Ns
+    NN    = 2**Ntot
+    Nsect = (Ns+1)*(Ns+1)
+    allocate(impIndex(Norb,2))
+    allocate(Hmap(Nsect),invHmap(Nsect,NN))
+    allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect))
+    allocate(getsector(0:Ns,0:Ns))
+    allocate(getCsector(2,Nsect))
+    allocate(getCDGsector(2,Nsect))
+    allocate(neigen_sector(Nsect))
+    neigen_sector = lanc_neigen   !init every sector to required eigenstates
+
+
+    !check finiteT
+    finiteT=.false.
+    if(lanc_neigen>1)finiteT=.true.
+
+    !Some check:
+    if(Nfit>NL)Nfit=NL
+    if(Norb>3)stop "Norb > 3 ERROR. I guess you need to open the code at this point..." 
+    if(nerr > eps_error) nerr=eps_error    
+
+    !allocate functions
+    allocate(impGmats(Nspin,Norb,NL),impSmats(Nspin,Norb,NL))
+    allocate(impGreal(Nspin,Norb,Nw),impSreal(Nspin,Norb,Nw))
+
+    !allocate observables
+    allocate(nimp(Norb),dimp(Norb),nupimp(Norb),ndwimp(Norb),magimp(Norb))
+    allocate(m2imp(Norb,Norb))
+  end subroutine init_ed_structure
 
 
 
@@ -250,6 +316,22 @@ contains
     write(10,*)ndelta,nindex
     close(10)
   end subroutine search_mu
+
+
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : calculate the Heaviside  function
+  !+------------------------------------------------------------------+
+  recursive function factorial(n) result(f)
+    integer            :: f
+    integer,intent(in) :: n
+    if(n<=0)then
+       f=1
+    else
+       f=n*factorial(n-1)
+    end if
+  end function factorial
 
 
 

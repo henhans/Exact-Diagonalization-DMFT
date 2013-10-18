@@ -1,14 +1,13 @@
 !########################################################################
 !PURPOSE  : Obtain some physical quantities and print them out
 !########################################################################
-MODULE ED_GETOBS
+MODULE ED_OBSERVABLES
   USE ED_VARS_GLOBAL
   USE ED_AUX_FUNX
   implicit none
   private
 
-  public       :: full_ed_getobs
-  public       :: lanc_ed_getobs
+  public       :: ed_getobs
 
   logical,save        :: iolegend=.true.
   integer,save        :: loop=0
@@ -16,20 +15,19 @@ MODULE ED_GETOBS
 
 contains 
 
-  !####################################################################
-  !                    LANCZOS DIAGONALIZATION (T=0, GS only)
-  !####################################################################
   !+-------------------------------------------------------------------+
   !PURPOSE  : Evaluate and print out many interesting physical qties
   !+-------------------------------------------------------------------+
-  subroutine lanc_ed_getobs()
+  subroutine ed_getobs()
     integer,dimension(Ntot)      :: ib
     integer                      :: i,j
     integer                      :: k,r
+    integer                      :: ia,isector
     integer                      :: izero,isect0,jsect0,m
-    integer                      :: dim0,iup0,idw0,iorb,jorb,ispin
+    integer                      :: dim,dim0,iup,iup0,idw,idw0
+    integer                      :: iorb,jorb,ispin
     real(8)                      :: gs
-    real(8)                      :: norm0,sgn,nup(Norb),ndw(Norb)
+    real(8)                      :: Ei,norm0,sgn,nup(Norb),ndw(Norb),peso
     real(8)                      :: factor
     real(8),dimension(:),pointer :: gsvec
 
@@ -45,44 +43,74 @@ contains
     magimp = 0.d0
     m2imp  = 0.d0
 
-    do izero=1,numzero   
-       !GET THE GROUNDSTATE (make some checks)
-       isect0 = es_pop_sector(groundstate,izero)
-       dim0   = getdim(isect0)
-       iup0   = getnup(isect0)
-       idw0   = getndw(isect0)
-       gsvec  => es_pop_vector(groundstate,izero)
-       norm0=sqrt(dot_product(gsvec,gsvec))
-       if(abs(norm0-1.d0)>1.d-9)then
-          write(*,*) "GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0)
-          stop
-       endif
-       !
-       do i=1,dim0
-          m=Hmap(isect0)%map(i)
-          call bdecomp(m,ib)
-          gs=gsvec(i)
-          do iorb=1,Norb
-             nup(iorb)=real(ib(iorb),8)
-             ndw(iorb)=real(ib(iorb+Ns),8)
-             nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*gs**2
-             nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*gs**2
-             ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*gs**2
-             dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*gs**2
-             magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*gs**2
-             do jorb=1,Norb
-                m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs**2*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))
+    select case(ed_type)
+    case default
+       do izero=1,numzero   
+          !GET THE GROUNDSTATE (make some checks)
+          isect0 = es_pop_sector(groundstate,izero)
+          dim0   = getdim(isect0)
+          iup0   = getnup(isect0)
+          idw0   = getndw(isect0)
+          gsvec  => es_pop_vector(groundstate,izero)
+          norm0=sqrt(dot_product(gsvec,gsvec))
+          if(abs(norm0-1.d0)>1.d-9)then
+             write(*,*) "GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0)
+             stop
+          endif
+          !
+          do i=1,dim0
+             m=Hmap(isect0)%map(i)
+             call bdecomp(m,ib)
+             gs=gsvec(i)
+             do iorb=1,Norb
+                nup(iorb)=real(ib(iorb),8)
+                ndw(iorb)=real(ib(iorb+Ns),8)
+                nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*gs**2
+                nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*gs**2
+                ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*gs**2
+                dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*gs**2
+                magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*gs**2
+                do jorb=1,Norb
+                   m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs**2*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))
+                enddo
+             enddo
+          enddo
+          nullify(gsvec)
+       enddo
+       nimp  = nimp/factor
+       nupimp = nupimp/factor
+       ndwimp = ndwimp/factor
+       dimp   = dimp/factor
+       magimp = magimp/factor
+       m2imp  = m2imp/factor
+
+    case ('full')
+       do isector=1,Nsect
+          dim=getdim(isector)
+          do i=1,dim
+             Ei=espace(isector)%e(i)
+             peso=exp(-beta*Ei)/zeta_function
+             if(peso < cutoff)cycle
+             do j=1,dim
+                ia=Hmap(isector)%map(j)
+                gs=espace(isector)%M(j,i)
+                call bdecomp(ia,ib)
+                do iorb=1,Norb
+                   nup(iorb)=real(ib(iorb),8)
+                   ndw(iorb)=real(ib(iorb+Ns),8)
+                   nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*peso*gs**2
+                   nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*peso*gs**2
+                   ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*peso*gs**2
+                   dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*peso*gs**2
+                   magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*peso*gs**2
+                   do jorb=1,Norb
+                      m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs**2*peso*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))
+                   enddo
+                enddo
              enddo
           enddo
        enddo
-       nullify(gsvec)
-    enddo
-    nimp  = nimp/factor
-    nupimp = nupimp/factor
-    ndwimp = ndwimp/factor
-    dimp   = dimp/factor
-    magimp = magimp/factor
-    m2imp  = m2imp/factor
+    end select
 
     allocate(simp(Norb,Nspin),zimp(Norb,Nspin),rimp(Norb,Nspin))
     call get_szr
@@ -105,83 +133,10 @@ contains
     ! endif
     ! call MPI_BCAST(nimp,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
     !!>MPI
-  end subroutine lanc_ed_getobs
+  end subroutine ed_getobs
 
 
 
-
-  !####################################################################
-  !                    FULL DIAGONALIZATION
-  !####################################################################
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : Evaluate and print out many interesting physical qties
-  !+-------------------------------------------------------------------+
-  subroutine full_ed_getobs()
-    integer,dimension(Ntot)  :: ib
-    integer                  :: i,j,ispin,ia,isector
-    integer                  :: dim,iup,idw,iorb,jorb
-    real(8)                  :: gs
-    real(8)                  :: Ei,nup(Norb),ndw(Norb),peso
-    real(8)                  :: w
-    logical                  :: last
-
-    !!<MPI
-    !if(mpiID==0)then
-    !!>MPI
-
-    nimp   =0.d0
-    nupimp =0.d0
-    ndwimp =0.d0
-    dimp   =0.d0
-    magimp =0.d0
-    m2imp  =0.d0
-    do isector=1,Nsect
-       dim=getdim(isector)
-       do i=1,dim
-          Ei=espace(isector)%e(i)
-          peso=exp(-beta*Ei)/zeta_function
-          if(peso < cutoff)cycle
-          do j=1,dim
-             ia=Hmap(isector)%map(j)
-             gs=espace(isector)%M(j,i)
-             call bdecomp(ia,ib)
-             do iorb=1,Norb
-                nup(iorb)=real(ib(iorb),8)
-                ndw(iorb)=real(ib(iorb+Ns),8)
-                nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*peso*gs**2
-                nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*peso*gs**2
-                ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*peso*gs**2
-                dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*peso*gs**2
-                magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*peso*gs**2
-                do jorb=1,Norb
-                   m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs**2*peso*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))
-                enddo
-             enddo
-          enddo
-       enddo
-    enddo
-
-    allocate(simp(Norb,Nspin),zimp(Norb,Nspin),rimp(Norb,Nspin))
-    call get_szr
-    if(iolegend)call write_legend
-
-    loop=loop+1
-    call write_to_unit_column()
-
-    call msg("Main observables:",unit=LOGfile)
-    write(LOGfile,"(A,10f18.10)")"nimp=  ",(nimp(iorb),iorb=1,Norb)
-    write(LOGfile,"(A,10f18.12)")"docc=  ",(dimp(iorb),iorb=1,Norb)
-    write(LOGfile,"(A,10f18.12)")"mom2=  ",(m2imp(iorb,iorb),iorb=1,Norb)
-    if(Nspin==2)then
-       write(LOGfile,"(A,10f18.12)")"mag=   ",(magimp(iorb),iorb=1,Norb)
-    endif
-    write(LOGfile,*)""
-    deallocate(simp,zimp,rimp)
-    !!<MPI
-    ! endif
-    ! call MPI_BCAST(nimp,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-    !!>MPI
-  end subroutine full_ed_getobs
 
 
 
@@ -322,4 +277,4 @@ contains
   end subroutine write_to_unit_column
 
 
-end MODULE ED_GETOBS
+end MODULE ED_OBSERVABLES

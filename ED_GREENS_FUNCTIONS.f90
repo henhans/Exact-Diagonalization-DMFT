@@ -6,11 +6,11 @@
 !to different node and accumulate the result at the end.
 !AUTHORS  : Adriano Amaricci
 !###################################################################
-MODULE ED_GETGF
+MODULE ED_GREENS_FUNCTIONS
   USE ED_VARS_GLOBAL
   USE ED_BATH
   USE ED_AUX_FUNX
-  USE ED_GETH
+  USE ED_HAMILTONIAN
   !
   implicit none
   private 
@@ -24,8 +24,8 @@ MODULE ED_GETGF
   real(8),dimension(:),pointer :: gsvec
   real(8)                      :: egs
 
-  public :: full_ed_getgf
   public :: lanc_ed_getgf
+  public :: full_ed_getgf
   public :: full_ed_getchi
 
 contains
@@ -90,7 +90,7 @@ contains
     real(8),allocatable :: vvinit(:),alfa_(:),beta_(:)
     integer             :: Nitermax
     call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin)),unit=LOGfile)
-    Nitermax=nGFitermax
+    Nitermax=lanc_nGFiter
     allocate(alfa_(Nitermax),beta_(Nitermax))
 
     !Get site index of the iorb-impurity:
@@ -110,7 +110,7 @@ contains
        !!>MPI
        write(*,"(A,2I3,I15)")'add particle:',jup0,jdw0,jdim0
        call sp_init_matrix(spH0,jdim0)
-       call lanc_ed_geth(jsect0)
+       call ed_geth(jsect0)
        ! !##DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
        allocate(vvinit(jdim0))
@@ -146,7 +146,7 @@ contains
        !write(*,"(A,2I3,I15)")'del particle:',jup0,jdw0,jdim0
        !!>MPI
        call sp_init_matrix(spH0,jdim0)
-       call lanc_ed_geth(jsect0)
+       call ed_geth(jsect0)
        ! !##ELSE DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
        allocate(vvinit(jdim0)) 
@@ -317,7 +317,7 @@ contains
     real(8)                  :: Ei,Ej,cc,peso(Norb),pesotot
     real(8)                  :: expterm,de,w0,it
     complex(8)               :: iw
-    
+
     real(8),allocatable,dimension(:,:)    :: Chitau
     real(8),allocatable,dimension(:)      :: Chitautot
     complex(8),allocatable,dimension(:,:) :: Chiw,Chiiw
@@ -458,8 +458,8 @@ contains
     !endif
     !!>MPI
     deallocate(Chitau,Chiw,Chiiw,Chitautot,Chiwtot,Chiiwtot)
-    deallocate(wm,tau,wr)
-    
+    deallocate(wm,tau,wr,vm)
+
   end subroutine full_ed_getchi
 
 
@@ -559,4 +559,4 @@ contains
 
 
 
-end MODULE ED_GETGF
+end MODULE ED_GREENS_FUNCTIONS

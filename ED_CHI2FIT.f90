@@ -2,7 +2,7 @@
 !PURPOSE  : Perform the \Chi^2 fit procedure on the Delta function
 !########################################################################
 MODULE ED_CHI2FIT
-  USE ED_VARS_GLOBAL, only: zero,xi,pi,beta,CGtype,LOGfile,cgNitmax,cgFtol,Nbath,Norb,&
+  USE ED_VARS_GLOBAL, only: zero,xi,pi,beta,cg_type,LOGfile,cg_niter,cg_ftol,Nbath,Norb,&
        msg,txtfy,reg,arange,fmin_cg,splot,error
   USE ED_BATH
   USE ED_AUX_FUNX
@@ -38,7 +38,7 @@ contains
     allocate(Xdelta(Ldelta))
     allocate(Wdelta(Ldelta))
     Xdelta = pi/beta*real(2*arange(1,Ldelta)-1,8)
-    select case(CGtype)
+    select case(CG_type)
     case(0)
        Wdelta=(/(1.d0,i=1,Ldelta)/)
     case(1)
@@ -56,7 +56,7 @@ contains
        ifirst=stride_spin + stride_orb + 1
        ilast =stride_spin + stride_orb + Nbath + Nbath
        a(:) = bath(ifirst:ilast)
-       call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cgNitmax,ftol=cgFtol)
+       call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
        bath(ifirst:ilast) = a(:)
        call dump_fit_result(a,ispin,iorb)
        write(*,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter

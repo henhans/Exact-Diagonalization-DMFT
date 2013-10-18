@@ -6,7 +6,7 @@
 !IMPORTANT: The ED solver uses HFmode=.true. 
 !by default this means that chemical potential 
 !SHOULD NOT include the U/2 shift.
-program fulled_lda
+program ed_lda1b
   USE DMFT_ED
   USE FFTGF
   USE TOOLS
@@ -16,7 +16,7 @@ program fulled_lda
   integer                :: Norb_d,Norb_p,Nopd,Nineq
   logical                :: converged
   real(8)                :: kx,ky,foo,ntotal,npimp
-  real(8),allocatable    :: wm(:),wr(:),tau(:)
+  real(8),allocatable    :: wm(:),wr(:)
   complex(8)             :: iw
   !variables for the model:
   character(len=32)      :: file
@@ -34,32 +34,29 @@ program fulled_lda
   logical                :: fbethe
   real(8)                :: wbath
 
-  !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  !+++++++++++++++++RERUN MODE+++++++++++++++++++++++++++++++++++++++
   call parse_cmd_variable(rerun,"RERUN",default=.false.)
   if(rerun)then
      write(*,*)"+RERUN-mode: solve one and exit"
      call read_input("used.inputED.in")
-     open(10,file=trim(OFILE),status='old')
-     read(10,*)foo,xmu
-     close(10)
+     ! open(10,file=trim(OFILE),status='old')
+     ! read(10,*)foo,xmu
+     ! close(10)
      print*,"mu=",xmu
      inquire(file=trim(Hfile),exist=BOOL)
      if(.not.BOOL)then
         print*,"can't find ",trim(Hfile),". Exiting.."
         stop
      endif
-     allocate(wm(NL),wr(Nw),tau(0:Ltau))
+     allocate(wm(NL),wr(Nw))
      wm = pi/beta*real(2*arange(1,NL)-1,8)
      wr = linspace(wini,wfin,Nw)
-     tau = linspace(0.d0,beta,Ltau+1)
      call read_hk('hkfile.in')
      !setup solver
      Nb=get_bath_size()
      allocate(bath(Nb))
-     call init_lanc_ed_solver(bath)
-     !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
-     call lanc_ed_solver(bath) 
-     !Get the Weiss field/Delta function to be fitted (user defined)
+     call init_ed_solver(bath)
+     call ed_solver(bath) 
      allocate(delta(NL))
      call get_delta
      stop
@@ -68,28 +65,30 @@ program fulled_lda
 
 
 
-
   call read_input("inputED.in")
+  !parse additional variables
   call parse_cmd_variable(file,"FILE",default="hkfile.in")
   call parse_cmd_variable(ntype,"NTYPE",default=0)
   call parse_cmd_variable(fbethe,"FBETHE",default=.false.)
   call parse_cmd_variable(wbath,"WBATH",default=1.d0)
 
+
   !Allocate:
-  allocate(wm(NL),wr(Nw),tau(0:Ltau))
+  allocate(wm(NL),wr(Nw))
   wm = pi/beta*real(2*arange(1,NL)-1,8)
   wr = linspace(wini,wfin,Nw)
-  tau = linspace(0.d0,beta,Ltau+1)
 
+  !Read Hamiltoanian H(k)
   call read_hk(trim(file))
 
   !Allocate Weiss Field:
   allocate(delta(NL))
 
-  !setup solver
+  !Setup solver
   Nb=get_bath_size()
   allocate(bath(Nb))
-  call init_lanc_ed_solver(bath)
+  call init_ed_solver(bath)
+
 
   !DMFT loop
   iloop=0;converged=.false.
@@ -98,7 +97,7 @@ program fulled_lda
      call start_loop(iloop,nloop,"DMFT-loop")
 
      !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
-     call lanc_ed_solver(bath) 
+     call ed_solver(bath) 
 
      !Get the Weiss field/Delta function to be fitted (user defined)
      call get_delta
@@ -109,7 +108,7 @@ program fulled_lda
      !Check convergence (if required change chemical potential)
      converged = check_convergence(delta(:),eps_error,nsuccess,nloop)
      if(nread/=0.d0)call search_mu(nobj,converged)
-     if(iloop>nloop)converged=.true.
+     if(iloop>=nloop)converged=.true.
      call end_loop
   enddo
 
@@ -158,12 +157,11 @@ contains
     complex(8)                :: iw,zita(2),fg(Nopd,Nopd)
     complex(8),dimension(NL)  :: gp,gd,sp,sd,g0d
     complex(8),dimension(Nw)  :: gpr,gdr,spr,sdr,g0dr
-    real(8),dimension(0:Ltau) :: gptau,gdtau
     delta=zero
     do i=1,NL
        iw     = xi*wm(i)
        g0d(i) = iw + xmu - delta_and(iw,bath,1)
-       sd(i)  = g0d(i) - one/Giw(1,i)      
+       sd(i)  = g0d(i) - one/impGmats(1,i)      
        zita(1)= iw + xmu - sd(i)
        zita(2)= iw + xmu 
        fg=zero
@@ -177,16 +175,15 @@ contains
        !
     enddo
     !
-
     npimp=get_density_fromFFT(gp,beta)
     ntotal=nimp(1)+npimp
     write(*,*)"np  =",npimp
     write(*,*)"ntot=",ntotal
-
+    !
     do i=1,Nw
        iw=cmplx(wr(i),eps)
-       g0dr(i) = wr(i) + xmu - delta_and(iw,bath,1,1,1)
-       sdr(i)  = g0dr(i) - one/Gwr(1,1,1,i)
+       g0dr(i) = wr(i) + xmu - delta_and(iw,bath,1)!delta_and(wr(i)+zero,bath,1)
+       sdr(i)  = g0dr(i) - one/impGreal(1,i)
        zita(1) = iw + xmu - sdr(i)
        zita(2) = iw + xmu 
        fg=zero
@@ -201,18 +198,14 @@ contains
     call splot("Gdd_iw.ed",wm,gd)
     call splot("Gpp_iw.ed",wm,gp)
     call splot("Sigmadd_iw.ed",wm,sd)
-
     call splot("G0dd_realw.ed",wr,one/g0dr)
     call splot("Gdd_realw.ed",wr,gdr)
     call splot("Gpp_realw.ed",wr,gpr)
     call splot("DOSdd.ed",wr,-dimag(gdr)/pi)
     call splot("DOSpp.ed",wr,-dimag(gpr)/pi)
-
     call splot("Sigmadd_realw.ed",wr,sdr)
-
     call splot("np.ntot.ed.all",npimp,ntotal,append=.true.)
     call splot("np.ntot.ed",npimp,ntotal)
-
     if(ntype==1)then
        nobj=nimp(1)
     elseif(ntype==2)then
@@ -220,10 +213,7 @@ contains
     else
        nobj=ntotal
     endif
-
   end subroutine get_delta
-
-
 
 
   function inverse_g0k(iw,hk) result(g0k)
@@ -242,6 +232,7 @@ contains
     g0k(2,1) = conjg(g0k(1,2))
   end function inverse_g0k
 
+
   function inverse_gk(zeta,hk) result(gk)
     integer                     :: i,M
     complex(8),dimension(2,2)   :: hk
@@ -258,11 +249,7 @@ contains
     gk(2,1) = conjg(gk(1,2))
   end function inverse_gk
 
-  <<<<<<< HEAD
-end program fulled_lda
-=======
-end program fulled_lda
->>>>>>> devel_multi-orbital_nomix
+end program ed_lda1b
 
 
 

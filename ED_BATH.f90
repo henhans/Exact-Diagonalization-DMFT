@@ -34,8 +34,6 @@ MODULE ED_BATH
 
 contains
 
-
-
   !+-------------------------------------------------------------------+
   !PURPOSE  : Allocate the ED bath
   !+-------------------------------------------------------------------+
@@ -88,7 +86,7 @@ contains
     real(8) :: ran(Nbath)
     !!<MPI
     !if(mpiID==0)then
-    !!!>MPI
+!!!>MPI
     if(bath_status)call deallocate_bath
     call allocate_bath
     inquire(file=trim(Hfile),exist=IOfile)

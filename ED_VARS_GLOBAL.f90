@@ -43,20 +43,21 @@ MODULE ED_VARS_GLOBAL
   real(8)              :: eps            !broadening
   real(8)              :: wini,wfin      !
   integer              :: Nsuccess       !
-  real(8)              :: weight         !
-  real(8)              :: heff           !
   logical              :: Jhflag         !spin-exchange and pair-hopping flag.
   logical              :: chiflag        !
   logical              :: HFmode         !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
   real(8)              :: cutoff         !cutoff for spectral summation
   real(8)              :: eps_error      !
-  integer              :: nLancitermax   !Max number of Lanczos iterations
-  integer              :: nLanceigen     !Max number of required eigenvalues per sector
-  integer              :: nLancblock     !Max block used in Lanczos iterations	
-  integer              :: nGFitermax     !Max number of iteration in resolvant tri-diagonalization
-  integer              :: cgNitmax       !Max number of iteration in the fit
-  real(8)              :: cgFtol         !Tolerance in the cg fit
-  integer              :: cgType         !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
+  integer              :: lanc_niter     !Max number of Lanczos iterations
+  integer              :: lanc_neigen    !Max number of required eigenvalues per sector
+  integer              :: lanc_ngfiter   !Max number of iteration in resolvant tri-diagonalization
+  integer              :: lanc_nstates   !Max number of states kept in the finite T calculation
+  integer              :: cg_niter       !Max number of iteration in the fit
+  real(8)              :: cg_Ftol        !Tolerance in the cg fit
+  integer              :: cg_Type        !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
+  logical              :: finiteT        !flag for finite temperature calculation
+  character(len=4)     :: ed_type        !flag to set ed method solution: lanc=lanczos method, full=full diagonalization
+
 
   !Dimension of the functions:
   !=========================================================
@@ -67,15 +68,15 @@ MODULE ED_VARS_GLOBAL
   !Some maps between sectors and full Hilbert space (pointers)
   !=========================================================
   type HSmap
-     integer,dimension(:),pointer :: map
+     integer,dimension(:),pointer      :: map
   end type HSmap
   type(HSmap),dimension(:),allocatable :: Hmap
-  integer,allocatable,dimension(:,:) :: invHmap
-  integer,allocatable,dimension(:,:) :: getsector
-  integer,allocatable,dimension(:,:) :: getCsector
-  integer,allocatable,dimension(:,:) :: getCDGsector
-  integer,allocatable,dimension(:,:) :: impIndex
-  integer,allocatable,dimension(:)   :: getdim,getnup,getndw
+  integer,allocatable,dimension(:,:)   :: invHmap
+  integer,allocatable,dimension(:,:)   :: getsector
+  integer,allocatable,dimension(:,:)   :: getCsector
+  integer,allocatable,dimension(:,:)   :: getCDGsector
+  integer,allocatable,dimension(:,:)   :: impIndex
+  integer,allocatable,dimension(:)     :: getdim,getnup,getndw
 
 
   !Eigenvalues,Eigenvectors FULL DIAGONALIZATION
@@ -87,8 +88,9 @@ MODULE ED_VARS_GLOBAL
   !=========================================================
   integer                                :: numzero
   type(sparse_espace)                    :: groundstate
+  type(sparse_espace)                    :: excstate
   type(sparse_matrix)                    :: spH0
-
+  integer,allocatable,dimension(:)       :: neigen_sector
 
   !Partition function
   !=========================================================
@@ -124,14 +126,14 @@ MODULE ED_VARS_GLOBAL
 
   namelist/EDvars/Norb,Nbath,Nspin,&       
        beta,xmu,nloop,uloc,Ust,Jh,Eloc,   &
-       eps,wini,wfin,heff,      &
+       eps,wini,wfin,      &
        NL,Nw,Ltau,Nfit,         &
        nread,nerr,ndelta,       &
        chiflag,Jhflag,cutoff,HFmode,   &
        eps_error,Nsuccess,      &
-       nLancitermax,nLancblock,nLanceigen, &
-       nGFitermax,&
-       cgNitmax,cgFtol,cgType,   &
+       ed_type,&
+       lanc_neigen,lanc_niter,lanc_ngfiter,lanc_nstates,&
+       cg_niter,cg_ftol,cg_type,   &
        Hfile,Ofile,GFfile,CHIfile,LOGfile
 
 contains
@@ -143,7 +145,6 @@ contains
   !+-------------------------------------------------------------------+
   subroutine read_input(INPUTunit)
     character(len=*) :: INPUTunit
-    integer          :: i,NP,nup,ndw
     logical          :: control
 
     !ModelConf
@@ -162,29 +163,27 @@ contains
     Jhflag     =.false.
     hfmode     =.true.
     !parameters
-    NL         = 1024
-    Nw         = 1024
-    Ltau       = 500
-    Nfit       = 1024
-    eps        = 0.005d0
+    NL         = 2000
+    Nw         = 2000
+    Ltau       = 1000
+    Nfit       = 1000
+    eps        = 0.01d0
     nread      = 0.d0
     nerr       = 1.d-4
     ndelta     = 0.1d0
     wini       =-4.d0
     wfin       = 4.d0
-    heff       = 0.d0
     cutoff     = 1.d-9
     eps_error  = 1.d-5
     nsuccess   = 2
-    nLancitermax = 512
-    nLanceigen = 1
-    nLancblock = 5*nLanceigen+10
-    nGFitermax = 100
-    cgNitmax   = 1000
-    nGFitermax = 100
-    cgNitmax   = 200
-    cgFtol     = 1.d-9
-    cgType     = 0
+    lanc_niter = 512
+    lanc_neigen = 1
+    lanc_ngfiter = 100
+    lanc_nstates = 20
+    cg_niter   = 200
+    cg_Ftol     = 1.d-9
+    cg_Type     = 0
+    ed_type    = 'lanc'
     !ReadUnits
     Hfile  ="hamiltonian.restart"
     GFfile ="impG"
@@ -231,100 +230,32 @@ contains
     call parse_cmd_variable(hfmode,"HFMODE")
     call parse_cmd_variable(eps,"EPS")
     call parse_cmd_variable(cutoff,"CUTOFF")
-    call parse_cmd_variable(heff,"HEFF")
-    call parse_cmd_variable(nGFitermax,"NGFITERMAX")
-    call parse_cmd_variable(nLancitermax,"NLANCITERMAX")
-    call parse_cmd_variable(nLancblock,"NLANCBLOCK")
-    call parse_cmd_variable(nLanceigen,"NLANCEIGEN")
-    call parse_cmd_variable(cgNitmax,"CGNITMAX")
-    call parse_cmd_variable(cgFtol,"CGFTOL")
-    call parse_cmd_variable(cgType,"CGTYPE")
+    call parse_cmd_variable(lanc_neigen,"LANC_NEIGEN")
+    call parse_cmd_variable(lanc_niter,"LANC_NITER")
+    call parse_cmd_variable(lanc_nstates,"LANC_NSTATES")
+    call parse_cmd_variable(lanc_ngfiter,"LANC_NGFITER")
+    call parse_cmd_variable(cg_niter,"CG_NITER")
+    call parse_cmd_variable(cg_ftol,"CG_FTOL")
+    call parse_cmd_variable(cg_Type,"CG_TYPE")
+    call parse_cmd_variable(ed_Type,"ED_TYPE")
     call parse_cmd_variable(Hfile,"HFILE")
     call parse_cmd_variable(Ofile,"OFILE")
     call parse_cmd_variable(GFfile,"GFFILE")
     call parse_cmd_variable(CHIfile,"CHIFILE")
     call parse_cmd_variable(LOGfile,"LOGFILE")
 
-    call version(revision)
-
-    call allocate_system_structure()
-
-    nup=Ns/2
-    ndw=Ns-nup
-    NP=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
-    NP=NP*(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
     !!<MPI
     ! if(mpiID==0)then
     !!>MPI
-    write(*,*)"CONTROL PARAMETERS"
-    write(*,nml=EDvars)
-    write(*,*)"--------------------------------------------"
-    write(*,*)'| Number of impurities         = ',Norb
-    write(*,*)'| Number of bath/impurity      = ',Nbath
-    write(*,*)'| Total # of Bath sites/spin   = ',Nbo
-    write(*,*)'| Total # of sites/spin        = ',Ns
-    write(*,*)'| Maximum dimension            = ',NP
-    write(*,*)'| Total size, Hilber space dim.= ',Ntot,NN
-    write(*,*)'| Number of sectors            = ',Nsect
-    write(*,*)"--------------------------------------------"
-    print*,''
-    USEDinput="used."//INPUTunit
-    open(50,file=trim(adjustl(trim(USEDinput))))
+    open(50,file="used."//INPUTunit)
     write(50,nml=EDvars)
     close(50)
+    write(*,*)"CONTROL PARAMETERS"
+    write(*,nml=EDvars)
+    call version(revision)
     !!<MPI
     ! endif
     !!>MPI
-    !Some check:
-    if(Nfit>NL)Nfit=NL
-    if(Norb>3)stop "Norb > 3 ERROR. Need to open the code.." 
-    if(nerr > eps_error) nerr=eps_error    
-
-    !allocate functions
-    allocate(impGmats(Nspin,Norb,NL),impSmats(Nspin,Norb,NL))
-    allocate(impGreal(Nspin,Norb,Nw),impSreal(Nspin,Norb,Nw))
-
-
-    allocate(nimp(Norb),dimp(Norb),nupimp(Norb),ndwimp(Norb),magimp(Norb))
-    allocate(m2imp(Norb,Norb))
   end subroutine read_input
-
-
-  !+-------------------------------------------------------------------+
-  !PROGRAM  : 
-  !TYPE     : subroutine
-  !PURPOSE  : 
-  !+-------------------------------------------------------------------+
-  subroutine allocate_system_structure()
-    !Norb=# of impurity orbitals
-    !Nbath=# of bath sites per orbital
-    !Ns=total number of sites
-    !Nbo=total number of bath sites (all sites - impurity sites)
-    Ns=(Nbath+1)*Norb
-    Nbo   = Ns-Norb
-    Ntot  = 2*Ns
-    NN    = 2**Ntot
-    Nsect = (Ns+1)*(Ns+1)
-    allocate(impIndex(Norb,2))
-    allocate(Hmap(Nsect),invHmap(Nsect,NN))
-    allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect))
-    allocate(getsector(0:Ns,0:Ns))
-    allocate(getCsector(2,Nsect))
-    allocate(getCDGsector(2,Nsect))
-  end subroutine allocate_system_structure
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : calculate the Heaviside  function
-  !+------------------------------------------------------------------+
-  recursive function factorial(n) result(f)
-    integer            :: f
-    integer,intent(in) :: n
-    if(n<=0)then
-       f=1
-    else
-       f=n*factorial(n-1)
-    end if
-  end function factorial
 
 END MODULE ED_VARS_GLOBAL
