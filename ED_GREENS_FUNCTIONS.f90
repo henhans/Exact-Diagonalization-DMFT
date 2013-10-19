@@ -38,18 +38,29 @@ contains
   !PURPOSE  : Evaluate Green's functions using Lanczos algorithm
   !+------------------------------------------------------------------+
   subroutine lanc_ed_getgf()
-    integer :: izero,iorb,jorb,ispin
-    integer :: isect0
+    integer :: izero,iorb,jorb,ispin,i
+    integer :: isect0,nup0,ndw0
     real(8) :: norm0
     call allocate_grids
     impGmats=zero
     impGreal=zero
-    zeta_function=real(numzero,8)
+    print*,zeta_function
+    !zeta_function=real(numzero,8)
+    !
+    ! egs=es_return_energy(state_list,1)
+    ! do i=1,state_list%size
+    !    e             = es_return_energy(state_list,i)
+    !    zeta_function = zeta_function + exp(-beta*(e-egs))
+    ! enddo
+    !
     call start_timer
-    do izero=1,numzero 
-       isect0 =  es_return_sector(groundstate,izero)
-       egs    =  es_return_energy(groundstate,izero)
-       gsvec  => es_return_vector(groundstate,izero)
+    do izero=1,state_list%size!numzero 
+       isect0 =  es_return_sector(state_list,izero)!groundstate,izero)
+       egs    =  es_return_energy(state_list,izero)!groundstate,izero)
+       gsvec  => es_return_vector(state_list,izero)!groundstate,izero)
+       nup0  = getnup(isect0)
+       ndw0  = getndw(isect0)
+       write(*,"(i3,f25.18,2i3)")izero,egs,nup0,ndw0
        norm0=sqrt(dot_product(gsvec,gsvec))
        if(abs(norm0-1.d0)>1.d-9)then
           write(*,*) "GS"//reg(txtfy(izero))//"is not normalized:"//reg(txtfy(norm0))
@@ -58,7 +69,7 @@ contains
        call lanczos_plain_set_htimesv_d(spHtimesV_d)
        do ispin=1,Nspin
           do iorb=1,Norb
-             call lanc_ed_buildgf(isect0,iorb,ispin)
+             call lanc_ed_buildgf(isect0,iorb,ispin,iverbose=.true.)
           enddo
        enddo
        call lanczos_plain_delete_htimesv_d
@@ -68,7 +79,7 @@ contains
     impGreal=impGreal/zeta_function
     !Print impurity functions:
     !!<MPI
-    !call print_imp_gf  !only the master write the GF. 
+    !if(mpiID==0)call print_imp_gf  !only the master write the GF. 
     !!>MPI
     call print_imp_gf
     call stop_timer
@@ -80,7 +91,7 @@ contains
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine lanc_ed_buildgf(isect0,iorb,ispin)
+  subroutine lanc_ed_buildgf(isect0,iorb,ispin,iverbose)
     integer             :: iorb,ispin,isite,isect0
     integer             :: nlanc,idim0,jsect0
     integer             :: jup0,jdw0,jdim0
@@ -89,6 +100,9 @@ contains
     real(8)             :: norm0,sgn
     real(8),allocatable :: vvinit(:),alfa_(:),beta_(:)
     integer             :: Nitermax
+    logical,optional    :: iverbose
+    logical             :: iverbose_
+    iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
     call msg("Evaluating G_imp_Orb"//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin)),unit=LOGfile)
     Nitermax=lanc_nGFiter
     allocate(alfa_(Nitermax),beta_(Nitermax))
@@ -106,9 +120,9 @@ contains
        jup0   = getnup(jsect0)
        jdw0   = getndw(jsect0)
        !!<MPI
-       !write(*,"(A,2I3,I15)")'add particle:',jup0,jdw0,jdim0
+       !if(iverbose_.AND.mpiID==0)write(*,"(A,2I3,I15)")'add particle:',jup0,jdw0,jdim0
        !!>MPI
-       write(*,"(A,2I3,I15)")'add particle:',jup0,jdw0,jdim0
+       if(iverbose_)write(*,"(A,2I3,I15)")'add particle:',jup0,jdw0,jdim0
        call sp_init_matrix(spH0,jdim0)
        call ed_geth(jsect0)
        ! !##DIRECT H*V PRODUCT:
@@ -143,8 +157,9 @@ contains
        jup0    = getnup(jsect0)
        jdw0    = getndw(jsect0)
        !!<MPI
-       !write(*,"(A,2I3,I15)")'del particle:',jup0,jdw0,jdim0
+       !if(iverbose_.AND.mpiID==0)write(*,"(A,2I3,I15)")'del particle:',jup0,jdw0,jdim0
        !!>MPI
+       if(iverbose_)write(*,"(A,2I3,I15)")'del particle:',jup0,jdw0,jdim0
        call sp_init_matrix(spH0,jdim0)
        call ed_geth(jsect0)
        ! !##ELSE DIRECT H*V PRODUCT:
@@ -178,7 +193,7 @@ contains
   !PURPOSE  : 
   !+------------------------------------------------------------------+
   subroutine add_to_lanczos_gf(vnorm,emin,nlanc,alanc,blanc,isign,iorb,ispin)
-    real(8)                                    :: vnorm,emin
+    real(8)                                    :: vnorm,emin,ezero,peso
     integer                                    :: nlanc
     real(8),dimension(nlanc)                   :: alanc,blanc 
     integer                                    :: isign,iorb,ispin
@@ -186,6 +201,11 @@ contains
     real(8),dimension(size(alanc))             :: diag,subdiag
     integer                                    :: i,j,ierr
     complex(8)                                 :: iw
+    !
+    ezero = es_return_energy(state_list,1) !get the gs energy
+    peso = exp(-beta*(emin-ezero))
+    print*,ezero,peso
+    !
     diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
     forall(i=1:Nlanc)Z(i,i)=1.d0
     diag(1:Nlanc)    = alanc(1:Nlanc)
@@ -194,13 +214,17 @@ contains
     do i=1,NL
        do j=1,nlanc
           iw=xi*wm(i)
-          impGmats(ispin,iorb,i)=impGmats(ispin,iorb,i) + vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))
+          impGmats(ispin,iorb,i)=impGmats(ispin,iorb,i) + &
+               exp(-beta*(emin-ezero))*vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))
+          !vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))
        enddo
     enddo
     do i=1,Nw
        do j=1,nlanc
           iw=cmplx(wr(i),eps,8)
-          impGreal(ispin,iorb,i)=impGreal(ispin,iorb,i) + vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))
+          impGreal(ispin,iorb,i)=impGreal(ispin,iorb,i) + &
+               exp(-beta*(emin-ezero))*vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))
+          !vnorm**2*Z(1,j)**2/(iw-isign*(diag(j)-emin))
        enddo
     enddo
   end subroutine add_to_lanczos_gf
@@ -297,15 +321,6 @@ contains
 
 
 
-
-
-
-
-
-
-  !####################################################################
-  !                    COMPUTATIONAL ROUTINES
-  !####################################################################
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+

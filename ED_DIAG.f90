@@ -14,8 +14,8 @@ module ED_DIAG
   public :: full_ed_diag
   public :: setup_eigenspace
   public :: reset_eigenspace
-contains
 
+contains
 
   !+-------------------------------------------------------------------+
   !                    LANCZOS DIAGONALIZATION
@@ -50,20 +50,18 @@ contains
        !call progress(isector,Nsect)
        dim     = getdim(isector)
        Neigen  = min(dim,neigen_sector(isector))!lanc_neigen)
-       print*,isector,Neigen,dim
        Nitermax= min(dim,lanc_niter)
        Nblock  = min(dim,5*Neigen+2)
        !
        allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
+       eig_values=0.d0 ; eig_basis=0.d0 
        lanc_solve  = .true. ; if(Neigen==dim)lanc_solve=.false.
        !
        if(lanc_solve)then
-          eig_values=0.d0 ; eig_basis=0.d0 
           call sp_init_matrix(spH0,dim)
           call ed_geth(isector)
           call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_d,.false.)
        else
-          eig_values=0.d0 ; eig_basis=0.d0 
           call ed_geth(isector,eig_basis)
           call matrix_diagonalize(eig_basis,eig_values,'V','U')
           if(dim==1)eig_basis(dim,dim)=1.d0
@@ -71,7 +69,7 @@ contains
 
        !try to add each obtained state to the list if its energy is smaller than emax
        do i=1,Neigen
-          call es_add_state(state_list,eig_values(i),eig_basis(1:dim,i),isector,size=lanc_nstates,verbose=.true.)
+          call es_add_state(state_list,eig_values(i),eig_basis(1:dim,i),isector,size=lanc_nstates,verbose=.false.)
        enddo
 
        !this find the ground state
@@ -93,12 +91,16 @@ contains
        !
     enddo sector
     call stop_progress
+    egs=es_return_energy(state_list,1)
+    zeta_function=0.d0
+    !zeta_function=real(numzero,8)
     do i=1,state_list%size
        e      = es_return_energy(state_list,i)
        isect0 = es_return_sector(state_list,i)
        nup0  = getnup(isect0)
        ndw0  = getndw(isect0)
        write(*,"(i3,f25.18,2i3)"),i,e,nup0,ndw0
+       zeta_function = zeta_function + exp(-beta*(e-egs))
     enddo
     !
     write(LOGfile,"(A)")"groundstate sector(s):"
@@ -110,7 +112,7 @@ contains
        dim0  = getdim(isect0)
        write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
     enddo
-    write(LOGfile,"(1A6,I4)")'Z   =',numzero
+    write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function!numzero
     open(3,file='egs.ed',access='append')
     write(3,*)egs
     close(3)

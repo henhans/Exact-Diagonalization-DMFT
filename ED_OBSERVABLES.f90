@@ -27,7 +27,7 @@ contains
     integer                      :: dim,dim0,iup,iup0,idw,idw0
     integer                      :: iorb,jorb,ispin
     real(8)                      :: gs
-    real(8)                      :: Ei,norm0,sgn,nup(Norb),ndw(Norb),peso
+    real(8)                      :: Ei,Egs,norm0,sgn,nup(Norb),ndw(Norb),peso
     real(8)                      :: factor
     real(8),dimension(:),pointer :: gsvec
 
@@ -35,7 +35,8 @@ contains
     !if(mpiID==0)then
     !!>MPI
 
-    factor=real(numzero,8)
+    ! factor=real(numzero,8)
+    Egs = es_return_energy(state_list,1)
     nimp  = 0.d0
     nupimp = 0.d0
     ndwimp = 0.d0
@@ -45,13 +46,16 @@ contains
 
     select case(ed_type)
     case default
-       do izero=1,numzero   
+       do izero=1,state_list%size!numzero    
           !GET THE GROUNDSTATE (make some checks)
-          isect0 = es_return_sector(groundstate,izero)
+          isect0 = es_return_sector(state_list,izero)!groundstate,izero)
+          Ei     = es_return_energy(state_list,izero)
+          print*,Ei,Egs
           dim0   = getdim(isect0)
           iup0   = getnup(isect0)
           idw0   = getndw(isect0)
-          gsvec  => es_return_vector(groundstate,izero)
+          gsvec  => es_return_vector(state_list,izero)!groundstate,izero)
+          peso=exp(-beta*(Ei-Egs))
           norm0=sqrt(dot_product(gsvec,gsvec))
           if(abs(norm0-1.d0)>1.d-9)then
              write(*,*) "GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0)
@@ -65,24 +69,24 @@ contains
              do iorb=1,Norb
                 nup(iorb)=real(ib(iorb),8)
                 ndw(iorb)=real(ib(iorb+Ns),8)
-                nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*gs**2
-                nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*gs**2
-                ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*gs**2
-                dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*gs**2
-                magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*gs**2
+                nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*gs**2*peso
+                nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*gs**2*peso
+                ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*gs**2*peso
+                dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*gs**2*peso
+                magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*gs**2*peso
                 do jorb=1,Norb
-                   m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs**2*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))
+                   m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs**2*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*peso
                 enddo
              enddo
           enddo
           nullify(gsvec)
        enddo
-       nimp  = nimp/factor
-       nupimp = nupimp/factor
-       ndwimp = ndwimp/factor
-       dimp   = dimp/factor
-       magimp = magimp/factor
-       m2imp  = m2imp/factor
+       nimp  = nimp/zeta_function
+       nupimp = nupimp/zeta_function
+       ndwimp = ndwimp/zeta_function
+       dimp   = dimp/zeta_function
+       magimp = magimp/zeta_function
+       m2imp  = m2imp/zeta_function
 
     case ('full')
        do isector=1,Nsect
