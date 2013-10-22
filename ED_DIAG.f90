@@ -56,7 +56,6 @@ contains
        lanc_solve  = .true. ; if(Neigen==dim)lanc_solve=.false.
        !
        if(lanc_solve)then
-          call sp_init_matrix(spH0,dim)
           call ed_geth(isector)
           call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_d,.false.)
        else

@@ -40,10 +40,11 @@ contains
     flanc=.true. ; if(present(h))flanc=.false.
 
     if(flanc)then
-       if(.not.spH0%status)then
-          print*,"ED_GETH: spH0 not initialized at sector:"//txtfy(isector)
-          stop
+       if(spH0%status)then
+          print*,"ED_GETH: spH0 was already initialized in sector:"//txtfy(isector)
+          call sp_delete_matrix(spH0) 
        endif
+       call sp_init_matrix(spH0,dim)
     else
        if(size(h,1)/=dim)stop "ED_GETH: wrong dimension 1 of H"
        if(size(h,2)/=dim)stop "ED_GETH: wrong dimension 2 of H"
@@ -99,7 +100,7 @@ contains
        if(flanc)then
           call sp_insert_element(spH0,htmp,i,i)
        else
-          h(i,i)=htmp
+          h(i,i)=h(i,i)+htmp
        endif
 
 
@@ -133,7 +134,7 @@ contains
                       call sp_insert_element(spH0,htmp,i,j)
                       call sp_insert_element(spH0,htmp,j,i)
                    else
-                      h(i,j)=htmp
+                      h(i,j)=h(i,j)+htmp
                       h(j,i)=h(i,j)
                    endif
                 endif
@@ -162,7 +163,7 @@ contains
                       call sp_insert_element(spH0,htmp,i,j)
                       call sp_insert_element(spH0,htmp,j,i)
                    else
-                      h(i,j)=htmp
+                      h(i,j)=h(i,j)+htmp
                       h(j,i)=h(i,j)
                    endif
                 endif
@@ -186,7 +187,7 @@ contains
                    call sp_insert_element(spH0,htmp,i,j)
                    call sp_insert_element(spH0,htmp,j,i)
                 else
-                   h(i,j)=htmp
+                   h(i,j)=h(i,j)+htmp
                    h(j,i)=h(i,j)
                 endif
              endif
@@ -201,7 +202,7 @@ contains
                    call sp_insert_element(spH0,htmp,i,j)
                    call sp_insert_element(spH0,htmp,j,i)
                 else
-                   h(i,j)=htmp
+                   h(i,j)=h(i,j)+htmp
                    h(j,i)=h(i,j)
                 endif
              endif

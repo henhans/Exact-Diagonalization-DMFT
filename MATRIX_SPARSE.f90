@@ -11,7 +11,6 @@ MODULE MATRIX_SPARSE
   implicit none
   private
 
-
   type sparse_element
      private
      real(8)                               :: val  !value of the entry: double precision
@@ -25,7 +24,6 @@ MODULE MATRIX_SPARSE
      integer                               :: size    !size of the list
      type(sparse_element),pointer          :: root    !head/root of the list\== list itself
   end type sparse_row
-
 
   type sparse_matrix
      integer                               :: size
@@ -128,23 +126,35 @@ contains
     integer, intent(in)               :: column
     type(sparse_element),pointer      :: p,c
     integer                           :: i
+    logical :: iadd
     p => row%root
     c => p%next
+    iadd = .false.                !check if column already exist
     do                            !traverse the list
        if(.not.associated(c))exit !empty list or end of the list
-       if(column <= c%col)exit
+       if(c%col == column)then
+          iadd=.true.
+          exit
+       endif
+       if(c%col > column)exit
        p => c
        c => c%next
     end do
-    allocate(p%next)                !Create a new element in the list
-    p%next%val = value
-    p%next%col = column
-    row%size   = row%size+1
-    if(.not.associated(c))then !end of the list special case (current=>current%next)
-       p%next%next  => null()
+
+    if(iadd)then
+       c%val=c%val + value
     else
-       p%next%next  => c      !the %next of the new node come to current
-    end if
+       allocate(p%next)                !Create a new element in the list
+       p%next%val = value
+       p%next%col = column
+       row%size   = row%size+1
+       if(.not.associated(c))then !end of the list special case (current=>current%next)
+          p%next%next  => null()
+       else
+          p%next%next  => c      !the %next of the new node come to current
+       end if
+    endif
+
   end subroutine insert_element_in_row_d
 
   subroutine insert_element_in_row_c(row,value,column)
@@ -153,23 +163,33 @@ contains
     integer, intent(in)               :: column
     type(sparse_element),pointer      :: p,c
     integer                           :: i
+    logical :: iadd
     p => row%root
     c => p%next
+    iadd = .false.                !check if column already exist
     do                            !traverse the list
        if(.not.associated(c))exit !empty list or end of the list
+       if(c%col == column)then
+          iadd=.true.
+          exit
+       endif
        if(column <= c%col)exit
        p => c
        c => c%next
     end do
-    allocate(p%next)                !Create a new element in the list
-    p%next%cval= value
-    p%next%col = column
-    row%size   = row%size+1
-    if(.not.associated(c))then !end of the list special case (current=>current%next)
-       p%next%next  => null()
+    if(iadd)then
+       c%cval=c%cval + value
     else
-       p%next%next  => c      !the %next of the new node come to current
-    end if
+       allocate(p%next)                !Create a new element in the list
+       p%next%cval= value
+       p%next%col = column
+       row%size   = row%size+1
+       if(.not.associated(c))then !end of the list special case (current=>current%next)
+          p%next%next  => null()
+       else
+          p%next%next  => c      !the %next of the new node come to current
+       end if
+    endif
   end subroutine insert_element_in_row_c
 
 
@@ -553,6 +573,7 @@ contains
     type(sparse_element),pointer          :: c
     integer                               :: i
     vout=0.d0
+    !$omp parallel do shared (Ndim,sparse,vout,vin) private (i,c) schedule(static,1) if(Ndim>5000)
     do i=1,Ndim
        c => sparse%row(i)%root%next       
        matmul: do  
@@ -561,6 +582,7 @@ contains
           c => c%next  !traverse list
        end do matmul
     end do
+    !$omp end parallel do
   end subroutine sp_matrix_vector_product_dd
   !+------------------------------------------------------------------+
   subroutine sp_matrix_vector_product_dc(Ndim,sparse,vin,vout)
@@ -570,27 +592,19 @@ contains
     complex(8),dimension(Ndim),intent(inout) :: vout
     type(sparse_element),pointer             :: c
     integer                                  :: i
-    ! if(.not.sparse%status)then
-    !    print*,"Error SPARSE/matrix_vector_product: sparse matrix not allocated."
-    !    stop
-    ! endif
-    ! if(Ndim/=sparse%size)then
-    !    print*,"Error SPARSE/matrix_vector_product: wrong dimensions matrix vector."
-    !    stop
-    ! endif
+    ! if(.not.sparse%status)stop "Error SPARSE/matrix_vector_product: sparse matrix not allocated."
+    ! if(Ndim/=sparse%size)stop "Error SPARSE/matrix_vector_product: wrong dimensions matrix vector."
     vout=cmplx(0.d0,0.d0,8)
+    !$omp parallel do shared (Ndim,sparse,vout,vin) private (i,c) schedule(static,1) if(Ndim>5000)
     do i=1,Ndim
        c => sparse%row(i)%root%next       
        matmul: do  
           if(.not.associated(c))exit matmul
-          ! if(c%col > ndim)then
-          !    print*,"Error SPARSE_MATRIX/sp_matrix_vector_product: column index > size(vector)!"
-          !    stop
-          ! endif
           vout(i) = vout(i) + c%val*vin(c%col)
           c => c%next  !traverse list
        end do matmul
     end do
+    !$omp end parallel do
   end subroutine sp_matrix_vector_product_dc
 
   subroutine sp_matrix_vector_product_cc(Ndim,sparse,vin,vout)
@@ -601,6 +615,7 @@ contains
     type(sparse_element),pointer             :: c
     integer                                  :: i
     vout=cmplx(0.d0,0.d0,8)
+    !$omp parallel do shared (Ndim,sparse,vout,vin) private (i,c) schedule(static,1) if(Ndim>5000)
     do i=1,Ndim
        c => sparse%row(i)%root%next       
        matmul: do  
@@ -609,6 +624,7 @@ contains
           c => c%next  !traverse list
        end do matmul
     end do
+    !$omp end parallel do
   end subroutine sp_matrix_vector_product_cc
 
 

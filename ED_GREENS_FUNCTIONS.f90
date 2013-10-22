@@ -180,7 +180,6 @@ contains
     allocate(alfa_(Nitermax),beta_(Nitermax))
     !Get site index of the iorb-impurity:
     isite=impIndex(iorb,ispin)
-    !Get dimension of the gs-sector isect0
     idim0  = getdim(isect0)
     !ADD ONE PARTICLE:
     jsect0 = getCDGsector(ispin,isect0)
@@ -196,7 +195,6 @@ contains
        !!<MPI
        !endif
        !!>MPI
-       call sp_init_matrix(spH0,jdim0)
        call ed_geth(jsect0)
        ! !##DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
@@ -237,7 +235,6 @@ contains
        !!<MPI
        !endif
        !!>MPI
-       call sp_init_matrix(spH0,jdim0)
        call ed_geth(jsect0)
        ! !##ELSE DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
@@ -284,17 +281,14 @@ contains
     iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
     Nitermax=lanc_nGFiter
     allocate(alfa_(Nitermax),beta_(Nitermax))
-    !Get dimension of the gs-sector isect0
     idim0  = getdim(isect0)
     if(isect0/=0)then 
        iup0   = getnup(isect0)
        idw0   = getndw(isect0)
-       call sp_init_matrix(spH0,idim0)
        call ed_geth(isect0)
        ! !##DIRECT H*V PRODUCT:
        ! call set_Hsector(isect0)
        allocate(vvinit(idim0))
-       !
        vvinit=0.d0
        do m=1,idim0                     !loop over |gs> components m
           i=Hmap(isect0)%map(m)
@@ -310,7 +304,6 @@ contains
        deallocate(vvinit)
        call sp_delete_matrix(spH0)
     endif
-    !
     deallocate(alfa_,beta_)
   end subroutine lanc_ed_buildchi
 
@@ -383,10 +376,10 @@ contains
        de = diag(j)-Ei
        if(de>0.d0)then
           peso = pesoBZ*vnorm**2*Z(1,j)**2
-          if(de>cutoff)chiiw(iorb,0)=chiiw(iorb,0) - peso*(exp(-beta*de)-1.d0)/(isign*de)
+          if(de>cutoff)chiiw(iorb,0)=chiiw(iorb,0) - peso*(exp(-beta*de)-1.d0)/de
           do i=1,NL
              iw=xi*vm(i)
-             chiiw(iorb,i)=chiiw(iorb,i) + peso*(exp(-beta*de)-1.d0)/(iw-isign*de)
+             chiiw(iorb,i)=chiiw(iorb,i) + peso*(exp(-beta*de)-1.d0)/(iw-de)
           enddo
           !
           do i=1,Nw
@@ -400,6 +393,8 @@ contains
        endif
     enddo
   end subroutine add_to_lanczos_chi
+
+
 
 
 
