@@ -24,25 +24,6 @@ contains
     !!<MPI
     ! if(mpiID==0)then
     !!>MPI
-    nup=Ns/2
-    ndw=Ns-nup
-    NP=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
-    NP=NP*(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
-    write(*,*)"Summary:"
-    write(*,*)"--------------------------------------------"
-    write(*,*)'| Number of impurities         = ',Norb
-    write(*,*)'| Number of bath/impurity      = ',Nbath
-    write(*,*)'| Total # of Bath sites/spin   = ',Nbo
-    write(*,*)'| Total # of sites/spin        = ',Ns
-    write(*,*)'| Maximum dimension            = ',NP
-    write(*,*)'| Total size, Hilber space dim.= ',Ntot,NN
-    write(*,*)'| Number of sectors            = ',Nsect
-    write(*,*)"--------------------------------------------"
-    print*,''
-    !!<MPI
-    ! endif
-    !!>MPI
-
     !Norb=# of impurity orbitals
     !Nbath=# of bath sites per orbital
     !Ns=total number of sites
@@ -52,6 +33,27 @@ contains
     Ntot  = 2*Ns
     NN    = 2**Ntot
     Nsect = (Ns+1)*(Ns+1)
+    !
+    nup=Ns/2
+    ndw=Ns-nup
+    NP=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
+    NP=NP*(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
+    write(*,*)"Summary:"
+    write(*,*)"--------------------------------------------"
+    write(*,*)'Number of impurities         = ',Norb
+    write(*,*)'Number of bath/impurity      = ',Nbath
+    write(*,*)'Total # of Bath sites/spin   = ',Nbo
+    write(*,*)'Total # of sites/spin        = ',Ns
+    write(*,*)'Maximum dimension            = ',NP
+    write(*,*)'Total size, Hilber space dim.= ',Ntot,NN
+    write(*,*)'Number of sectors            = ',Nsect
+    write(*,*)"--------------------------------------------"
+    print*,''
+    !!<MPI
+    ! endif
+    !!>MPI
+
+
     allocate(impIndex(Norb,2))
     allocate(Hmap(Nsect),invHmap(Nsect,NN))
     allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect))
@@ -61,8 +63,35 @@ contains
     allocate(neigen_sector(Nsect))
 
     !check finiteT
-    finiteT=.false.
-    if(lanc_neigen>1)finiteT=.true.
+    !finiteT=.false.
+    !if(lanc_neigen>1)finiteT=.true.
+    finiteT=.true.              !assume doing finite T per default
+    if(lanc_nstates==1)then     !is you only want to keep 1 state
+       lanc_neigen=1            !set the required eigen per sector to 1 see later for neigen_sector
+       finiteT=.false.          !set to do zero temperature calculations
+       write(*,*)"--------------------------------------------"
+       write(LOGfile,"(A)")"Required Lanc_Nstates=1 => set T=0 calculation"
+       write(*,*)"--------------------------------------------"
+       write(*,*)""
+    endif
+
+    !check whether lanc_neigen and lanc_states are even (we do want to keep doublet among states)
+    if(finiteT)then
+       if(mod(lanc_neigen,2)/=0)then
+          lanc_neigen=lanc_neigen+1
+          write(*,*)"--------------------------------------------"
+          write(LOGfile,*)"Increased Lanc_Neigen:",lanc_neigen
+          write(*,*)"--------------------------------------------"
+          write(*,*)""
+       endif
+       if(mod(lanc_nstates,2)/=0)then
+          lanc_nstates=lanc_nstates+1
+          write(*,*)"--------------------------------------------"
+          write(LOGfile,*)"Increased Lanc_Nstates:",lanc_nstates
+          write(*,*)"--------------------------------------------"
+          write(*,*)""
+       endif
+    endif
 
     !Some check:
     if(Nfit>NL)Nfit=NL
@@ -89,7 +118,7 @@ contains
     integer                          :: nup,ndw,jup,jdw
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
-    call msg("Setting up pointers:")
+    write(LOGfile,"(A)")"Setting up pointers:"
     call start_timer
     isector=0
     do nup=0,Ns

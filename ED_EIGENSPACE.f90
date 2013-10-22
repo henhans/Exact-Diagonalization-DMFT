@@ -51,6 +51,7 @@ module EIGEN_SPACE
   public :: es_return_energy       !get the energy of a state       !checked
   public :: es_return_vector       !get the vector of a state       !checked
   public :: es_return_cvector      !get the vector of a state       !checked
+  public :: es_return_groundstates !get the number of degenerate GS !checked
   !
 
 contains        !some routine to perform simple operation on the lists
@@ -282,6 +283,8 @@ contains        !some routine to perform simple operation on the lists
 
 
 
+
+
   !+------------------------------------------------------------------+
   !PURPOSE  : remove last element from the list, if +n is given remove 
   ! the n-th element, if +e is given remove the state with state%e=e
@@ -319,7 +322,33 @@ contains        !some routine to perform simple operation on the lists
 
 
 
-
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  function es_return_groundstates(space) result(numzero)
+    type(sparse_espace),intent(in) :: space
+    integer                        :: numzero,pos
+    type(sparse_estate),pointer    :: p,c
+    real(8)                        :: oldzero,enemin
+    if(.not.space%status) stop "es_return_groundstates: espace not allocated"
+    oldzero=1000.d0
+    numzero=0
+    c => space%root
+    pos=0
+    do 
+       c => c%next
+       pos=pos+1
+       if(.not.associated(c))exit !end of the list
+       enemin = c%e
+       if (enemin < oldzero-10.d-9) then
+          numzero=1
+          oldzero=enemin
+       elseif(abs(enemin-oldzero) <= 1.d-9)then
+          numzero=numzero+1
+          oldzero=min(oldzero,enemin)
+       endif
+    end do
+  end function es_return_groundstates
 
 
   !+------------------------------------------------------------------+

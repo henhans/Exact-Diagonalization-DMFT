@@ -60,8 +60,7 @@ contains
     integer              :: N_,Ntrue
     N_=size(bath)
     Ntrue = 2*Nspin*Norb*Nbath
-    if(N_ /= Ntrue)&
-         call error("CHECK_BATH_DIMENSION: wrong dimensions!")
+    if(N_ /= Ntrue)stop "CHECK_BATH_DIMENSION: wrong dimensions!"
   end subroutine check_bath_dimension
 
 
@@ -91,7 +90,8 @@ contains
     call allocate_bath
     inquire(file=trim(Hfile),exist=IOfile)
     if(IOfile)then
-       write(LOGfile,"(A)")bg_green('Reading bath from file')
+       write(LOGfile,"(A)")'Reading bath from file'
+       write(LOGfile,"(A)")'- - - - - - - - - - - -'
        unit = free_unit()
        open(unit,file=trim(Hfile))
        read(unit,*)

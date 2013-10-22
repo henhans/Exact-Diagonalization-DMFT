@@ -51,7 +51,7 @@ MODULE ED_VARS_GLOBAL
   integer              :: lanc_niter     !Max number of Lanczos iterations
   integer              :: lanc_neigen    !Max number of required eigenvalues per sector
   integer              :: lanc_ngfiter   !Max number of iteration in resolvant tri-diagonalization
-  integer              :: lanc_nstates   !Max number of states kept in the finite T calculation
+  integer              :: lanc_nstates   !Max number of states hold in the finite T calculation
   integer              :: cg_niter       !Max number of iteration in the fit
   real(8)              :: cg_Ftol        !Tolerance in the cg fit
   integer              :: cg_Type        !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
@@ -84,10 +84,9 @@ MODULE ED_VARS_GLOBAL
   type(full_espace),dimension(:),allocatable :: espace
 
 
-  !Ground state variables LANCZOS DIAGONALIZATION
+  !Variables for DIAGONALIZATION
   !=========================================================
-  integer                                :: numzero
-  type(sparse_espace)                    :: groundstate
+  integer                                :: numgs
   type(sparse_espace)                    :: state_list
   type(sparse_matrix)                    :: spH0
   integer,allocatable,dimension(:)       :: neigen_sector
@@ -147,6 +146,15 @@ contains
     character(len=*) :: INPUTunit
     logical          :: control
 
+    !!<MPI
+    ! if(mpiID==0)then
+    !!>MPI
+    call version(revision)
+    !!<MPI
+    ! endif
+    !!>MPI
+
+    !DEFAULT VALUES OF THE PARAMETERS:
     !ModelConf
     Norb       = 1
     Nbath      = 4
@@ -156,7 +164,7 @@ contains
     Jh         = 0.d0
     Eloc       = 0.d0
     xmu        = 0.d0
-    beta       = 50.d0
+    beta       = 500.d0
     !Loops
     nloop      = 100
     chiflag    =.true.
@@ -179,7 +187,7 @@ contains
     lanc_niter = 512
     lanc_neigen = 1
     lanc_ngfiter = 100
-    lanc_nstates = 20
+    lanc_nstates = 1            !set to T=0 calculation
     cg_niter   = 200
     cg_Ftol     = 1.d-9
     cg_Type     = 0
@@ -252,10 +260,10 @@ contains
     close(50)
     write(*,*)"CONTROL PARAMETERS"
     write(*,nml=EDvars)
-    call version(revision)
     !!<MPI
     ! endif
     !!>MPI
+
   end subroutine read_input
 
 END MODULE ED_VARS_GLOBAL

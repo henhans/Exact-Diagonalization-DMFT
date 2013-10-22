@@ -25,7 +25,7 @@ contains
     integer                      :: ia,isector
     integer                      :: izero,isect0,jsect0,m
     integer                      :: dim,dim0,iup,iup0,idw,idw0
-    integer                      :: iorb,jorb,ispin
+    integer                      :: iorb,jorb,ispin,numstates
     real(8)                      :: gs
     real(8)                      :: Ei,Egs,norm0,sgn,nup(Norb),ndw(Norb),peso
     real(8)                      :: factor
@@ -34,31 +34,30 @@ contains
     !!<MPI
     !if(mpiID==0)then
     !!>MPI
-
-    ! factor=real(numzero,8)
-    Egs = es_return_energy(state_list,1)
+    write(LOGfile,"(A)")"Evaluating Observables:"
+    Egs = state_list%emin       !es_return_energy(state_list,1)
     nimp  = 0.d0
     nupimp = 0.d0
     ndwimp = 0.d0
     dimp   = 0.d0
     magimp = 0.d0
     m2imp  = 0.d0
-
     select case(ed_type)
     case default
-       do izero=1,state_list%size!numzero    
-          !GET THE GROUNDSTATE (make some checks)
-          isect0 = es_return_sector(state_list,izero)!groundstate,izero)
+       numstates=numgs
+       if(finiteT)numstates=state_list%size
+       do izero=1,numstates
+          isect0 = es_return_sector(state_list,izero)
           Ei     = es_return_energy(state_list,izero)
-          print*,Ei,Egs
           dim0   = getdim(isect0)
           iup0   = getnup(isect0)
           idw0   = getndw(isect0)
-          gsvec  => es_return_vector(state_list,izero)!groundstate,izero)
-          peso=exp(-beta*(Ei-Egs))
+          gsvec  => es_return_vector(state_list,izero)
+          peso   = 1.d0
+          if(finiteT)peso=exp(-beta*(Ei-Egs))
           norm0=sqrt(dot_product(gsvec,gsvec))
           if(abs(norm0-1.d0)>1.d-9)then
-             write(*,*) "GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0)
+             write(LOGfile,*) "GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0)
              stop
           endif
           !
@@ -123,8 +122,6 @@ contains
 
     loop=loop+1
     call write_to_unit_column()
-
-    call msg("Main observables:",unit=LOGfile)
     write(LOGfile,"(A,10f18.12)")"nimp=  ",(nimp(iorb),iorb=1,Norb)
     write(LOGfile,"(A,10f18.12)")"docc=  ",(dimp(iorb),iorb=1,Norb)
     write(LOGfile,"(A,10f18.12)")"mom2=  ",(m2imp(iorb,iorb),iorb=1,Norb)
