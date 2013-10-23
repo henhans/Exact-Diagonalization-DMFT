@@ -12,6 +12,10 @@ MODULE ED_VARS_GLOBAL
   USE EIGEN_SPACE
   USE PLAIN_LANCZOS
   USE ARPACK_LANCZOS
+  !PARALLEL:
+  !!<MPI
+  !USE MPI
+  !!>MPI
   implicit none
 
   !GIT VERSION
@@ -25,31 +29,35 @@ MODULE ED_VARS_GLOBAL
   !Nbath=Ns-1=numero di siti del bagno (sistema - impurezza)
   !NP=dimensione del sottospazio piu' grande (settore).
   !=========================================================
-  integer :: Ns,Norb,Nspin,Nbath,Ntot,NN,Nsect
+  integer :: Ns,Nbo,Norb,Nspin,Nbath,Ntot,NN,Nsect
 
 
   !Global variables
   !=========================================================
-  integer :: nloop          !max dmft loop variables
-  real(8) :: u              !local,non-local interaction
-  real(8) :: xmu            !chemical potential
-  real(8) :: beta           !inverse temperature
-  real(8) :: eps            !broadening
-  real(8) :: wini,wfin      !
-  integer :: Nsuccess       !
-  real(8) :: weight         !
-  real(8) :: heff           !
-  logical :: chiflag        !
-  logical :: HFmode         !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
-  real(8) :: cutoff         !cutoff for spectral summation
-  real(8) :: eps_error      !
-  integer :: nLancitermax   !Max number of Lanczos iterations
-  integer :: nLanceigen     !Max number of required eigenvalues per sector
-  integer :: nLancblock     !Max block used in Lanczos iterations
-  integer :: nGFitermax     !Max number of iteration in GF tri-diagonalization
-  integer :: cgNitmax       !Max number of iteration in the fit
-  real(8) :: cgFtol         !Tolerance in the cg fit
-  integer :: cgType         !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
+  integer              :: nloop          !max dmft loop variables
+  real(8),dimension(3) :: Uloc           !local interactions
+  real(8)              :: Ust,Jh         !intra-orbitals interactions
+  real(8),dimension(3) :: eloc           !local energies
+  real(8)              :: xmu            !chemical potential
+  real(8)              :: beta           !inverse temperature
+  real(8)              :: eps            !broadening
+  real(8)              :: wini,wfin      !
+  integer              :: Nsuccess       !
+  logical              :: Jhflag         !spin-exchange and pair-hopping flag.
+  logical              :: chiflag        !
+  logical              :: HFmode         !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
+  real(8)              :: cutoff         !cutoff for spectral summation
+  real(8)              :: eps_error      !
+  integer              :: lanc_niter     !Max number of Lanczos iterations
+  integer              :: lanc_neigen    !Max number of required eigenvalues per sector
+  integer              :: lanc_ngfiter   !Max number of iteration in resolvant tri-diagonalization
+  integer              :: lanc_nstates   !Max number of states hold in the finite T calculation
+  integer              :: cg_niter       !Max number of iteration in the fit
+  real(8)              :: cg_Ftol        !Tolerance in the cg fit
+  integer              :: cg_Type        !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
+  logical              :: finiteT        !flag for finite temperature calculation
+  character(len=4)     :: ed_type        !flag to set ed method solution: lanc=lanczos method, full=full diagonalization
+
 
   !Dimension of the functions:
   !=========================================================
@@ -60,41 +68,39 @@ MODULE ED_VARS_GLOBAL
   !Some maps between sectors and full Hilbert space (pointers)
   !=========================================================
   type HSmap
-     integer,dimension(:),pointer :: map
+     integer,dimension(:),pointer      :: map
   end type HSmap
   type(HSmap),dimension(:),allocatable :: Hmap
-  integer,allocatable,dimension(:,:) :: invHmap
-  integer,allocatable,dimension(:,:) :: getsector
-  integer,allocatable,dimension(:,:) :: getCsector
-  integer,allocatable,dimension(:,:) :: getCDGsector
-  integer,allocatable,dimension(:,:) :: impIndex
-  integer,allocatable,dimension(:)   :: getdim,getnup,getndw
-  integer                            :: startloop,lastloop
-
+  integer,allocatable,dimension(:,:)   :: invHmap
+  integer,allocatable,dimension(:,:)   :: getsector
+  integer,allocatable,dimension(:,:)   :: getCsector
+  integer,allocatable,dimension(:,:)   :: getCDGsector
+  integer,allocatable,dimension(:,:)   :: impIndex
+  integer,allocatable,dimension(:)     :: getdim,getnup,getndw
 
 
   !Eigenvalues,Eigenvectors FULL DIAGONALIZATION
   !=========================================================
-  type(eigenspace),dimension(:),allocatable :: espace
+  type(full_espace),dimension(:),allocatable :: espace
 
 
-  !Ground state variables LANCZOS DIAGONALIZATINO
+  !Variables for DIAGONALIZATION
   !=========================================================
-  integer                                 :: numzero
-  type(eig_space)                         :: groundstate
-  type(sparse_matrix)                     :: spH0
-
+  integer                                :: numgs
+  type(sparse_espace)                    :: state_list
+  type(sparse_matrix)                    :: spH0
+  integer,allocatable,dimension(:)       :: neigen_sector
 
   !Partition function
   !=========================================================
   real(8) :: zeta_function
 
 
-  !Functions for GETGFUNX (names must be changed)
+  !Functions for GETGFUNX
   !=========================================================
-  complex(8),allocatable,dimension(:,:) :: impGmats,impSmats
-  complex(8),allocatable,dimension(:,:) :: impGreal,impSreal
-  
+  complex(8),allocatable,dimension(:,:,:) :: impGmats,impSmats
+  complex(8),allocatable,dimension(:,:,:) :: impGreal,impSreal
+
 
 
   !Variables for fixed density mu-loop 
@@ -103,11 +109,13 @@ MODULE ED_VARS_GLOBAL
 
   !Qties needed to get energy
   !=========================================================
-  real(8) ::  nimp,dimp,nupimp,ndwimp,magimp,m2imp
+
+  real(8),dimension(:),allocatable   ::  nimp,dimp,nupimp,ndwimp,magimp
+  real(8),dimension(:,:),allocatable ::  m2imp
 
 
   !NML READ/WRITE UNITS
-  character(len=32) :: Hfile,Ofile,GMfile,GRfile,CTfile,CWfile
+  character(len=32) :: Hfile,Ofile,GFfile,CHIfile
   integer           :: LOGfile
 
 
@@ -115,17 +123,17 @@ MODULE ED_VARS_GLOBAL
   character(len=32) :: USEDinput
 
 
-  namelist/EDvars/Ns,Norb,Nspin,&       
-       beta,xmu,nloop,u,        &
-       eps,wini,wfin,heff,      &
+  namelist/EDvars/Norb,Nbath,Nspin,&       
+       beta,xmu,nloop,uloc,Ust,Jh,Eloc,   &
+       eps,wini,wfin,      &
        NL,Nw,Ltau,Nfit,         &
        nread,nerr,ndelta,       &
-       chiflag,cutoff,HFmode,   &
+       chiflag,Jhflag,cutoff,HFmode,   &
        eps_error,Nsuccess,      &
-       nLancitermax,nLancblock,nLanceigen, &
-       nGFitermax,&
-       cgNitmax,cgFtol,cgType,   &
-       Hfile,Ofile,GMfile,GRfile,CTfile,CWfile,LOGfile
+       ed_type,&
+       lanc_neigen,lanc_niter,lanc_ngfiter,lanc_nstates,&
+       cg_niter,cg_ftol,cg_type,   &
+       Hfile,Ofile,GFfile,CHIfile,LOGfile
 
 contains
 
@@ -136,48 +144,58 @@ contains
   !+-------------------------------------------------------------------+
   subroutine read_input(INPUTunit)
     character(len=*) :: INPUTunit
-    integer          :: i,NP,nup,ndw
     logical          :: control
 
+    !!<MPI
+    ! if(mpiID==0)then
+    !!>MPI
+    call version(revision)
+    !!<MPI
+    ! endif
+    !!>MPI
+
+    !DEFAULT VALUES OF THE PARAMETERS:
     !ModelConf
-    Ns         = 5
     Norb       = 1
+    Nbath      = 4
     Nspin      = 1
-    u          = 2.d0
+    Uloc       = [ 2.d0, 0.d0, 0.d0 ]
+    Ust        = 0.d0
+    Jh         = 0.d0
+    Eloc       = 0.d0
     xmu        = 0.d0
-    beta       = 50.d0
+    beta       = 500.d0
     !Loops
     nloop      = 100
     chiflag    =.true.
+    Jhflag     =.false.
     hfmode     =.true.
     !parameters
-    NL         = 1024
-    Nw         = 1024
-    Ltau       = 500
-    Nfit       = 1024
-    eps        = 0.005d0
+    NL         = 2000
+    Nw         = 2000
+    Ltau       = 1000
+    Nfit       = 1000
+    eps        = 0.01d0
     nread      = 0.d0
     nerr       = 1.d-4
     ndelta     = 0.1d0
     wini       =-4.d0
     wfin       = 4.d0
-    heff       = 0.d0
     cutoff     = 1.d-9
     eps_error  = 1.d-5
     nsuccess   = 2
-    nLancitermax = 512
-    nLanceigen = 1
-    nLancblock = 5*nLanceigen+10
-    nGFitermax = 100
-    cgNitmax   = 1000
-    cgFtol     = 1.d-9
-    cgType     = 0
+    lanc_niter = 512
+    lanc_neigen = 1
+    lanc_ngfiter = 100
+    lanc_nstates = 1            !set to T=0 calculation
+    cg_niter   = 200
+    cg_Ftol     = 1.d-9
+    cg_Type     = 0
+    ed_type    = 'lanc'
     !ReadUnits
     Hfile  ="hamiltonian.restart"
-    GMfile ="impG_iw"
-    GRfile ="impG_realw"
-    CTfile ="Chi_tau"
-    CWfile ="Chi_realw"    
+    GFfile ="impG"
+    CHIfile ="Chi"
     Ofile  ="observables"
     LOGfile=6
 
@@ -195,12 +213,15 @@ contains
        stop
     endif
 
-    call parse_cmd_variable(Ns,"NS")
-    call parse_cmd_variable(Norb,"NORB")
+    call parse_cmd_variable(Norb,"NORB")    
+    call parse_cmd_variable(Nbath,"NBATH")
     call parse_cmd_variable(Nspin,"NSPIN")
     call parse_cmd_variable(beta,"BETA")
     call parse_cmd_variable(xmu,"XMU")
-    call parse_cmd_variable(u,"U")
+    call parse_cmd_variable(uloc,"ULOC")
+    call parse_cmd_variable(ust,"UST")
+    call parse_cmd_variable(Jh,"JH")
+    call parse_cmd_variable(eloc,"ELOC")
     call parse_cmd_variable(nloop,"NLOOP")
     call parse_cmd_variable(eps_error,"EPS_ERROR")
     call parse_cmd_variable(nsuccess,"NSUCCESS")
@@ -211,95 +232,38 @@ contains
     call parse_cmd_variable(nread,"NREAD")
     call parse_cmd_variable(nerr,"NERR")
     call parse_cmd_variable(ndelta,"NDELTA")
-    call parse_cmd_variable(wini,"WINI","WMIN")
-    call parse_cmd_variable(wfin,"WFIN","WMAX")
+    call parse_cmd_variable(wini,"WINI")
+    call parse_cmd_variable(wfin,"WFIN")
     call parse_cmd_variable(chiflag,"CHIFLAG")
     call parse_cmd_variable(hfmode,"HFMODE")
     call parse_cmd_variable(eps,"EPS")
     call parse_cmd_variable(cutoff,"CUTOFF")
-    call parse_cmd_variable(heff,"HEFF")
-    call parse_cmd_variable(nGFitermax,"NGFITERMAX")
-    call parse_cmd_variable(nLancitermax,"NLANCITERMAX")
-    call parse_cmd_variable(nLancblock,"NLANCBLOCK")
-    call parse_cmd_variable(nLanceigen,"NLANCEIGEN")
-    call parse_cmd_variable(cgNitmax,"CGNITMAX")
-    call parse_cmd_variable(cgFtol,"CGFTOL")
-    call parse_cmd_variable(cgType,"CGTYPE")
+    call parse_cmd_variable(lanc_neigen,"LANC_NEIGEN")
+    call parse_cmd_variable(lanc_niter,"LANC_NITER")
+    call parse_cmd_variable(lanc_nstates,"LANC_NSTATES")
+    call parse_cmd_variable(lanc_ngfiter,"LANC_NGFITER")
+    call parse_cmd_variable(cg_niter,"CG_NITER")
+    call parse_cmd_variable(cg_ftol,"CG_FTOL")
+    call parse_cmd_variable(cg_Type,"CG_TYPE")
+    call parse_cmd_variable(ed_Type,"ED_TYPE")
     call parse_cmd_variable(Hfile,"HFILE")
     call parse_cmd_variable(Ofile,"OFILE")
-    call parse_cmd_variable(GMfile,"GMFILE")
-    call parse_cmd_variable(GRfile,"GRFILE")
-    call parse_cmd_variable(CTfile,"CTFILE")
-    call parse_cmd_variable(CWfile,"CWFILE")
+    call parse_cmd_variable(GFfile,"GFFILE")
+    call parse_cmd_variable(CHIfile,"CHIFILE")
     call parse_cmd_variable(LOGfile,"LOGFILE")
 
-    call version(revision)
-
-    call allocate_system_structure()
-
-    nup=Ns/2
-    ndw=Ns-nup
-    NP=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
-    NP=NP*(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
-    write(*,*)"CONTROL PARAMETERS"
-    write(*,nml=EDvars)
-    write(*,*)"--------------------------------------------"
-    write(*,*)'| Total number of sites/spin   = ',Ns
-    write(*,*)'| Maximum dimension            = ',NP
-    write(*,*)'| Number of impurities         = ',Norb
-    write(*,*)'| Bath`s number of sites/spin  = ',Nbath
-    write(*,*)'| Total size, Hilber space dim.= ',Ntot,NN
-    write(*,*)'| Number of sectors            = ',Nsect
-    write(*,*)"--------------------------------------------"
-    print*,''
-    USEDinput="used."//INPUTunit
-    open(50,file=trim(adjustl(trim(USEDinput))))
+    !!<MPI
+    ! if(mpiID==0)then
+    !!>MPI
+    open(50,file="used."//INPUTunit)
     write(50,nml=EDvars)
     close(50)
-
-    !Some check:
-    if(Nfit>NL)Nfit=NL
-    if(Norb>1)call abort("Norb > 1 is not yet supported!")
-    if(nerr > eps_error) nerr=eps_error
-
-    !allocate functions
-    allocate(impGmats(Nspin,NL),impSmats(Nspin,NL))
-    allocate(impGreal(Nspin,Nw),impSreal(Nspin,Nw))
+    write(*,*)"CONTROL PARAMETERS"
+    write(*,nml=EDvars)
+    !!<MPI
+    ! endif
+    !!>MPI
 
   end subroutine read_input
-
-
-
-  !+-------------------------------------------------------------------+
-  !PROGRAM  : 
-  !TYPE     : subroutine
-  !PURPOSE  : 
-  !+-------------------------------------------------------------------+
-  subroutine allocate_system_structure()
-    Nbath = Ns-Norb
-    Ntot  = 2*Ns
-    NN    = 2**Ntot
-    Nsect = (Ns+1)*(Ns+1)
-    allocate(impIndex(Norb,2))
-    allocate(Hmap(Nsect),invHmap(Nsect,NN))
-    allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect))
-    allocate(getsector(0:Ns,0:Ns))
-    allocate(getCsector(2,Nsect))
-    allocate(getCDGsector(2,Nsect))
-  end subroutine allocate_system_structure
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : calculate the Heaviside  function
-  !+------------------------------------------------------------------+
-  recursive function factorial(n) result(f)
-    integer            :: f
-    integer,intent(in) :: n
-    if(n<=0)then
-       f=1
-    else
-       f=n*factorial(n-1)
-    end if
-  end function factorial
 
 END MODULE ED_VARS_GLOBAL

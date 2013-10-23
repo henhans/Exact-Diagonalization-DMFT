@@ -8,15 +8,16 @@ MODULE PLAIN_LANCZOS_HTIMESV_INTERFACE
      end subroutine lanc_htimesv_d
      !
      subroutine lanc_htimesv_c(n,vin,vout)
-       integer :: n
+       integer    :: n
        complex(8) :: vin(n)
        complex(8) :: vout(n)
      end subroutine lanc_htimesv_c
-     !
+     !<MPI
      ! subroutine lanc_htimesv_mpi(Q,R,nloc,n,vin,vout)
      !   integer                 :: Q,R,nloc,n
      !   real(8),dimension(nloc) :: vin,vout
      ! end subroutine lanc_htimesv_mpi
+     !>MPI
   end interface
 END MODULE PLAIN_LANCZOS_HTIMESV_INTERFACE
 
@@ -27,58 +28,69 @@ MODULE PLAIN_LANCZOS
   private
   procedure(lanc_htimesv_d),pointer :: dp_hprod
   procedure(lanc_htimesv_c),pointer :: cp_hprod
+  logical                           :: verb=.false.
+  real(8)                           :: threshold_=1.d-12
+  real(8)                           :: ncheck_=10
+  complex(8),parameter              :: zero=(0.d0,0.d0),one=(1.d0,0.d0),xi=(0.d0,1.d0)
 
-  logical :: verb=.false.
-  real(8) :: threshold_=1.d-12
-  real(8) :: ncheck_=10
-
-  interface plain_lanczos_iteration
-     module procedure plain_lanczos_iteration_d,plain_lanczos_iteration_c
-  end interface plain_lanczos_iteration
-  !
-  interface plain_lanczos_tridiag
-     module procedure plain_lanczos_tridiag_d,plain_lanczos_tridiag_c
-  end interface plain_lanczos_tridiag
-
-  public :: plain_lanczos_set_htimesv_d
-  public :: plain_lanczos_set_htimesv_c
-  public :: plain_lanczos_delete_htimesv_d
-  public :: plain_lanczos_delete_htimesv_c
-  !
-  public :: plain_lanczos_iteration
-  !
-  public :: plain_lanczos_tridiag
-  !
-  public :: plain_lanczos_get_groundstate
+  !<DEBUG
+  !yet I have to decide if interfaces are useful here, for the time being
+  !I keep direct call.
+  !>DEBUG
+  public :: lanczos_plain_set_htimesv_d
+  public :: lanczos_plain_set_htimesv_c
+  public :: lanczos_plain_delete_htimesv_d
+  public :: lanczos_plain_delete_htimesv_c
+  public :: lanczos_plain_iteration_d
+  public :: lanczos_plain_iteration_c
+  public :: lanczos_plain_tridiag_d
+  public :: lanczos_plain_tridiag_c
+  public :: lanczos_plain_d
+  public :: lanczos_plain_c
   !
   public :: tql2
 
 contains
 
 
-  subroutine plain_lanczos_set_htimesv_d(Hprod)
+  !---------------------------------------------------------------------
+  !Purpose: set the H*v function operator (use abstract interface)
+  !---------------------------------------------------------------------
+  subroutine lanczos_plain_set_htimesv_d(Hprod)
     procedure(lanc_htimesv_d)  :: Hprod
     if(associated(dp_hprod))nullify(dp_hprod)
     dp_hprod=>Hprod
-  end subroutine plain_lanczos_set_htimesv_d
+  end subroutine lanczos_plain_set_htimesv_d
   !
-  subroutine plain_lanczos_set_htimesv_c(Hprod)
+  subroutine lanczos_plain_set_htimesv_c(Hprod)
     procedure(lanc_htimesv_c)  :: Hprod
     if(associated(cp_hprod))nullify(cp_hprod)
     cp_hprod=>Hprod
-  end subroutine plain_lanczos_set_htimesv_c
+  end subroutine lanczos_plain_set_htimesv_c
 
 
-  subroutine plain_lanczos_delete_htimesv_d()
+  !---------------------------------------------------------------------
+  !Purpose: delete the H*v function operator (use abstract interface)
+  !---------------------------------------------------------------------
+  subroutine lanczos_plain_delete_htimesv_d()
     if(associated(dp_hprod))nullify(dp_hprod)
-  end subroutine plain_lanczos_delete_htimesv_d
+  end subroutine lanczos_plain_delete_htimesv_d
   !
-  subroutine plain_lanczos_delete_htimesv_c()
+  subroutine lanczos_plain_delete_htimesv_c()
     if(associated(cp_hprod))nullify(cp_hprod)
-  end subroutine plain_lanczos_delete_htimesv_c
+  end subroutine lanczos_plain_delete_htimesv_c
 
 
-  subroutine plain_lanczos_iteration_d(iter,vin,vout,a,b)
+  !---------------------------------------------------------------------
+  !Purpose: plain homebrew lanczos iteration (no orthogonalization)
+  !note: the a,b variables are real, even in the complex matrix case
+  !to understand why check out the Gollub-Van Loan textbook.
+  !a it is easy: hermiticity->diag\in\RRR
+  !b: is fixed by requiring |b|^2 = <v,v> thus you can only fix the 
+  !the absolute value. A lemma shows that the phase can be chosen 
+  !identically zero
+  !---------------------------------------------------------------------
+  subroutine lanczos_plain_iteration_d(iter,vin,vout,a,b)
     real(8),dimension(:),intent(inout)         :: vin
     real(8),dimension(size(vin)),intent(inout) :: vout
     real(8),dimension(size(vin))               :: dummy,tmp
@@ -88,7 +100,7 @@ contains
     ns_=size(vin)
     if(iter==1)then
        norm=sqrt(dot_product(vin,vin))
-       if(norm==0.d0)stop "plain_lanczos_iteration: norm =0!!"
+       if(norm==0.d0)stop "lanczos_plain_iteration: norm =0!!"
        vin=vin/norm
        b=0.d0
     end if
@@ -99,9 +111,9 @@ contains
     b = sqrt(dot_product(dummy,dummy))
     vout = vin
     vin = dummy/b
-  end subroutine plain_lanczos_iteration_d
+  end subroutine lanczos_plain_iteration_d
   !
-  subroutine plain_lanczos_iteration_c(iter,vin,vout,a,b)
+  subroutine lanczos_plain_iteration_c(iter,vin,vout,a,b)
     complex(8),dimension(:),intent(inout)         :: vin
     complex(8),dimension(size(vin)),intent(inout) :: vout
     complex(8),dimension(size(vin))               :: dummy,tmp
@@ -111,7 +123,7 @@ contains
     ns_=size(vin)
     if(iter==1)then
        norm=sqrt(dot_product(vin,vin))
-       if(norm==0.d0)stop "plain_lanczos_iteration: norm =0!!"
+       if(norm==0.d0)stop "lanczos_plain_iteration: norm =0!!"
        vin=vin/norm
        b=0.d0
     end if
@@ -122,11 +134,16 @@ contains
     b = sqrt(dot_product(dummy,dummy))
     vout = vin
     vin = dummy/b
-  end subroutine plain_lanczos_iteration_c
+  end subroutine lanczos_plain_iteration_c
 
 
 
-  subroutine plain_lanczos_tridiag_d(vin,alanc,blanc,nitermax,iverbose,threshold)
+
+  !---------------------------------------------------------------------
+  !Purpose: use simple Lanczos to tri-diagonalize a matrix H (defined 
+  ! in the H*v function).
+  !---------------------------------------------------------------------
+  subroutine lanczos_plain_tridiag_d(vin,alanc,blanc,nitermax,iverbose,threshold)
     real(8),dimension(:),intent(inout)        :: vin
     real(8),dimension(size(vin))              :: vout
     real(8),dimension(nitermax),intent(inout) :: alanc
@@ -142,15 +159,15 @@ contains
     b_=0.d0
     vout=0.d0
     do iter=1,nitermax
-       call plain_lanczos_iteration_d(iter,vin,vout,a_,b_)
+       call lanczos_plain_iteration_d(iter,vin,vout,a_,b_)
        if(verb)print*,iter,a_,b_
        if(abs(b_)<threshold_)exit
        alanc(iter)=a_
        if(iter<nitermax)blanc(iter+1)=b_
     enddo
-  end subroutine plain_lanczos_tridiag_d
+  end subroutine lanczos_plain_tridiag_d
   !
-  subroutine plain_lanczos_tridiag_c(vin,alanc,blanc,nitermax,iverbose,threshold)
+  subroutine lanczos_plain_tridiag_c(vin,alanc,blanc,nitermax,iverbose,threshold)
     complex(8),dimension(:),intent(inout)     :: vin
     complex(8),dimension(size(vin))           :: vout
     real(8),dimension(nitermax),intent(inout) :: alanc
@@ -164,21 +181,24 @@ contains
     if(present(threshold))threshold_=threshold
     a_=0.d0
     b_=0.d0
-    vout=cmplx(0.d0,0.d0,8)
+    vout=zero
     do iter=1,nitermax
-       call plain_lanczos_iteration_c(iter,vin,vout,a_,b_)
+       call lanczos_plain_iteration_c(iter,vin,vout,a_,b_)
        if(verb)print*,iter,a_,b_
        if(abs(b_)<threshold_)exit
        alanc(iter)=a_
        if(iter<nitermax)blanc(iter+1)=b_
     enddo
-  end subroutine plain_lanczos_tridiag_c
+    if(iter==nitermax)print*,"LANCZOS_SIMPLE: reach Nitermax"
+  end subroutine lanczos_plain_tridiag_c
 
 
 
 
-
-  subroutine plain_lanczos_get_groundstate(ns,nitermax,egs,vect,Nlanc,iverbose,threshold,ncheck)
+  !---------------------------------------------------------------------
+  !Purpose: use plain lanczos to get the groundstate energy
+  !---------------------------------------------------------------------
+  subroutine lanczos_plain_d(ns,nitermax,egs,vect,Nlanc,iverbose,threshold,ncheck)
     integer                              :: ns,nitermax
     real(8),dimension(nitermax)          :: egs
     real(8),dimension(ns)                :: vect
@@ -196,17 +216,18 @@ contains
     if(present(threshold))threshold_=threshold
     if(present(ncheck))ncheck_=ncheck
     if(.not.associated(dp_hprod))then
-       print*,"PLAIN_LANCZOS: dp_hprod is not set. call plain_lanczos_set_htimesv"
+       print*,"LANCZOS_PLAIN: dp_hprod is not set. call lanczos_plain_set_htimesv"
        stop
     endif
     norm=dot_product(vect,vect)
     if(norm==0.d0)then
        call random_number(vect)
        vect=vect/sqrt(dot_product(vect,vect))
-       if(verb)write(*,*)"PLAIN_LANCZOS: random initial vector generated:"
+       if(verb)write(*,*)"LANCZOS_PLAIN: random initial vector generated:"
     endif
     !
-    !============= LANCZOS ITERATION =====================
+    !============= LANCZOS LOOP =====================
+    !
     vin = vect
     vout= 0.d0
     alanc=0.d0
@@ -217,7 +238,104 @@ contains
           print*,""
           write(*,*)"Lanczos iteration:",iter
        endif
-       call plain_lanczos_iteration(iter,vin,vout,a_,b_)
+       call lanczos_plain_iteration_d(iter,vin,vout,a_,b_)
+       if(abs(b_)<threshold_)exit lanc_loop
+       if(verb)print*,"alanc,blanc=",a_,b_
+       nlanc=nlanc+1
+       alanc(iter) = a_ ; blanc(iter+1) = b_
+       diag = 0.d0 ; subdiag = 0.d0 ; Z = 0.d0
+       forall(i=1:Nlanc)Z(i,i)=1.d0
+       diag(1:Nlanc)    = alanc(1:Nlanc)
+       subdiag(2:Nlanc) = blanc(2:Nlanc)
+       call tql2(Nlanc,diag,subdiag,Z,ierr)
+       if(verb)then
+          print *,'---> lowest eigenvalue  <---'
+          write(*,*)"E_lowest    = ",diag(1)
+          open(10,file="lanc_eigenvals.dat")
+          do i=1,Nlanc
+             write(10,*)i,diag(i)
+          enddo
+          close(10)
+       endif
+       if(nlanc >= ncheck_)then
+          esave(nlanc-(Ncheck_-1))=diag(1)
+          if(nlanc >= (Ncheck_+1))then
+             diff=esave(Nlanc-(Ncheck_-1))-esave(Nlanc-(Ncheck_-1)-1)
+             if(verb)write(*,*)'test deltaE = ',diff
+             if(abs(diff).le.threshold_)exit lanc_loop
+          endif
+       endif
+    enddo lanc_loop
+    if(.not.verb)write(*,*)'test deltaE lanczos = ',diff
+    if(nlanc==nitermax)print*,"LANCZOS_SIMPLE: reach Nitermax"
+    !
+    !============== END LANCZOS LOOP ======================
+    !
+    diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
+    forall(i=1:Nlanc)Z(i,i)=1.d0
+    diag(1:Nlanc)    = alanc(1:Nlanc)
+    subdiag(2:Nlanc) = blanc(2:Nlanc)
+    call tql2(Nlanc,diag,subdiag,Z,ierr)
+    !
+    !Get the Eigenvalues:
+    egs(1:Nlanc)=diag(1:Nlanc)
+    !
+    !Get the Eigenvector:
+    vin =vect
+    vout=0.d0
+    vect=0.d0
+    do iter=1,nlanc
+       call lanczos_plain_iteration_d(iter,vin,vout,alanc(iter),blanc(iter))
+       vect = vect + vin*Z(iter,1)
+    end do
+    norm=sqrt(dot_product(vect,vect))
+    vect=vect/norm
+  end subroutine lanczos_plain_d
+
+  subroutine lanczos_plain_c(ns,nitermax,egs,vect,Nlanc,iverbose,threshold,ncheck)
+    integer                              :: ns,nitermax
+    real(8),dimension(nitermax)          :: egs
+    complex(8),dimension(ns)             :: vect
+    complex(8),dimension(ns)             :: vin,vout
+    integer                              :: iter,nlanc
+    real(8),dimension(nitermax+1)        :: alanc,blanc
+    real(8),dimension(Nitermax,Nitermax) :: Z
+    real(8),dimension(Nitermax)          :: diag,subdiag,esave
+    real(8)                              :: a_,b_,norm,diff,ran(2)
+    integer                              :: i,j,ierr
+    real(8),optional                     :: threshold
+    integer,optional                     :: ncheck
+    logical,optional                     :: iverbose
+    if(present(iverbose))verb=iverbose
+    if(present(threshold))threshold_=threshold
+    if(present(ncheck))ncheck_=ncheck
+    if(.not.associated(cp_hprod))then
+       print*,"LANCZOS_PLAIN: cp_hprod is not set. call lanczos_plain_set_htimesv"
+       stop
+    endif
+    norm=dot_product(vect,vect)
+    if(norm==0.d0)then
+       do i=1,ns
+          call random_number(ran)
+          vect(i)=cmplx(ran(1),ran(2),8)
+       enddo
+       vect=vect/sqrt(dot_product(vect,vect))
+       if(verb)write(*,*)"LANCZOS_PLAIN: random initial vector generated:"
+    endif
+    !
+    !============= LANCZOS LOOP =====================
+    !
+    vin = vect
+    vout= zero
+    alanc=0.d0
+    blanc=0.d0
+    nlanc=0
+    lanc_loop: do iter=1,Nitermax
+       if(verb)then
+          print*,""
+          write(*,*)"Lanczos iteration:",iter
+       endif
+       call lanczos_plain_iteration_c(iter,vin,vout,a_,b_)
        if(abs(b_)<threshold_)exit lanc_loop
        if(verb)print*,"alanc,blanc=",a_,b_
        nlanc=nlanc+1
@@ -265,12 +383,12 @@ contains
     vout=0.d0
     vect=0.d0
     do iter=1,nlanc
-       call plain_lanczos_iteration(iter,vin,vout,alanc(iter),blanc(iter))
+       call lanczos_plain_iteration_c(iter,vin,vout,alanc(iter),blanc(iter))
        vect = vect + vin*Z(iter,1)
     end do
     norm=sqrt(dot_product(vect,vect))
     vect=vect/norm
-  end subroutine plain_lanczos_get_groundstate
+  end subroutine lanczos_plain_c
 
 
 
@@ -278,49 +396,52 @@ contains
 
 
 
-
+  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  !++++++++++++++++++COMPUTATIONAL ROUTINE: TQL2++++++++++++++++++++++++ 
+  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  !---------------------------------------------------------------------
+  ! PURPOSE computes all eigenvalues/vectors, real symmetric tridiagonal matrix.
+  !    This subroutine finds the eigenvalues and eigenvectors of a symmetric
+  !    tridiagonal matrix by the QL method.  The eigenvectors of a full
+  !    symmetric matrix can also be found if TRED2 has been used to reduce this
+  !    full matrix to tridiagonal form.
+  !  Parameters:
+  !    Input, integer ( kind = 4 ) N, the order of the matrix.
+  !
+  !    Input/output, real ( kind = 8 ) D(N).  On input, the diagonal elements of
+  !    the matrix.  On output, the eigenvalues in ascending order.  If an error
+  !    exit is made, the eigenvalues are correct but unordered for indices
+  !    1,2,...,IERR-1.
+  !
+  !    Input/output, real ( kind = 8 ) E(N).  On input, E(2:N) contains the
+  !    subdiagonal elements of the input matrix, and E(1) is arbitrary.
+  !    On output, E has been destroyed.
+  !
+  !    Input, real ( kind = 8 ) Z(N,N).  On input, the transformation matrix
+  !    produced in the reduction by TRED2, if performed.  If the eigenvectors of
+  !    the tridiagonal matrix are desired, Z must contain the identity matrix.
+  !    On output, Z contains the orthonormal eigenvectors of the symmetric
+  !    tridiagonal (or full) matrix.  If an error exit is made, Z contains
+  !    the eigenvectors associated with the stored eigenvalues.
+  !
+  !    Output, integer ( kind = 4 ) IERR, error flag.
+  !    0, normal return,
+  !    J, if the J-th eigenvalue has not been determined after
+  !    30 iterations.
+  !
+  !---------------------------------------------------------------------
   subroutine tql2 ( n, d, e, z, ierr )
-    !! TQL2 computes all eigenvalues/vectors, real symmetric tridiagonal matrix.
-    !    This subroutine finds the eigenvalues and eigenvectors of a symmetric
-    !    tridiagonal matrix by the QL method.  The eigenvectors of a full
-    !    symmetric matrix can also be found if TRED2 has been used to reduce this
-    !    full matrix to tridiagonal form.
-    !  Parameters:
-    !    Input, integer ( kind = 4 ) N, the order of the matrix.
-    !
-    !    Input/output, real ( kind = 8 ) D(N).  On input, the diagonal elements of
-    !    the matrix.  On output, the eigenvalues in ascending order.  If an error
-    !    exit is made, the eigenvalues are correct but unordered for indices
-    !    1,2,...,IERR-1.
-    !
-    !    Input/output, real ( kind = 8 ) E(N).  On input, E(2:N) contains the
-    !    subdiagonal elements of the input matrix, and E(1) is arbitrary.
-    !    On output, E has been destroyed.
-    !
-    !    Input, real ( kind = 8 ) Z(N,N).  On input, the transformation matrix
-    !    produced in the reduction by TRED2, if performed.  If the eigenvectors of
-    !    the tridiagonal matrix are desired, Z must contain the identity matrix.
-    !    On output, Z contains the orthonormal eigenvectors of the symmetric
-    !    tridiagonal (or full) matrix.  If an error exit is made, Z contains
-    !    the eigenvectors associated with the stored eigenvalues.
-    !
-    !    Output, integer ( kind = 4 ) IERR, error flag.
-    !    0, normal return,
-    !    J, if the J-th eigenvalue has not been determined after
-    !    30 iterations.
-    !
-    implicit none
-    integer ( kind = 4 ) n
-    real ( kind = 8 ) c
-    real ( kind = 8 ) c2
-    real ( kind = 8 ) c3
-    real ( kind = 8 ) d(n)
-    real ( kind = 8 ) dl1
-    real ( kind = 8 ) e(n)
-    real ( kind = 8 ) el1
-    real ( kind = 8 ) f
-    real ( kind = 8 ) g
-    real ( kind = 8 ) h
+    integer :: n
+    real(8) :: c
+    real(8) :: c2
+    real(8) :: c3
+    real(8) :: d(n)
+    real(8) :: dl1
+    real(8) :: e(n)
+    real(8) :: el1
+    real(8) :: f
+    real(8) :: g
+    real(8) :: h
     integer ( kind = 4 ) i
     integer ( kind = 4 ) ierr
     integer ( kind = 4 ) ii
@@ -331,13 +452,13 @@ contains
     integer ( kind = 4 ) l2
     integer ( kind = 4 ) m
     integer ( kind = 4 ) mml
-    real ( kind = 8 ) p
-    real ( kind = 8 ) r
-    real ( kind = 8 ) s
-    real ( kind = 8 ) s2
-    real ( kind = 8 ) tst1
-    real ( kind = 8 ) tst2
-    real ( kind = 8 ) z(n,n)
+    real(8) :: p
+    real(8) :: r
+    real(8) :: s
+    real(8) :: s2
+    real(8) :: tst1
+    real(8) :: tst2
+    real(8) :: z(n,n)
     ierr = 0
     if ( n == 1 ) then
        return
@@ -432,7 +553,6 @@ contains
        i = ii - 1
        k = i
        p = d(i)
-
        do j = ii, n
           if ( d(j) < p ) then
              k = j
@@ -450,25 +570,28 @@ contains
     return
   end subroutine tql2
 
+
+  !---------------------------------------------------------------------
+  ! PURPOSE: computes SQRT ( A * A + B * B ) carefully.
+  !    The formula
+  !    PYTHAG = sqrt ( A * A + B * B )
+  !    is reasonably accurate, but can fail if, for example, A**2 is larger
+  !    than the machine overflow.  The formula can lose most of its accuracy
+  !    if the sum of the squares is very large or very small.
+  !  Parameters:
+  !    Input, real(8) :: A, B, the two legs of a right triangle.
+  !    Output, real(8) :: PYTHAG, the length of the hypotenuse.
+  !---------------------------------------------------------------------
   function pythag ( a, b )
-    !! PYTHAG computes SQRT ( A * A + B * B ) carefully.
-    !    The formula
-    !      PYTHAG = sqrt ( A * A + B * B )
-    !    is reasonably accurate, but can fail if, for example, A**2 is larger
-    !    than the machine overflow.  The formula can lose most of its accuracy
-    !    if the sum of the squares is very large or very small.
-    !  Parameters:
-    !    Input, real ( kind = 8 ) A, B, the two legs of a right triangle.
-    !    Output, real ( kind = 8 ) PYTHAG, the length of the hypotenuse.
     implicit none
-    real ( kind = 8 ) a
-    real ( kind = 8 ) b
-    real ( kind = 8 ) p
-    real ( kind = 8 ) pythag
-    real ( kind = 8 ) r
-    real ( kind = 8 ) s
-    real ( kind = 8 ) t
-    real ( kind = 8 ) u
+    real(8) :: a
+    real(8) :: b
+    real(8) :: p
+    real(8) :: pythag
+    real(8) :: r
+    real(8) :: s
+    real(8) :: t
+    real(8) :: u
     p = max ( abs ( a ), abs ( b ) )
     if ( p /= 0.0D+00 ) then
        r = ( min ( abs ( a ), abs ( b ) ) / p )**2
@@ -487,15 +610,16 @@ contains
     return
   end function pythag
 
+  !---------------------------------------------------------------------
+  ! PURPOSE: swaps two R8's.
+  !  Parameters:
+  !    Input/output, real(8) :: X, Y.  On output, the values of X and
+  !    Y have been interchanged.
+  !---------------------------------------------------------------------
   subroutine r8_swap ( x, y )
-    !! R8_SWAP swaps two R8's.
-    !  Parameters:
-    !    Input/output, real ( kind = 8 ) X, Y.  On output, the values of X and
-    !    Y have been interchanged.
-    implicit none
-    real ( kind = 8 ) x
-    real ( kind = 8 ) y
-    real ( kind = 8 ) z
+    real(8) :: x
+    real(8) :: y
+    real(8) :: z
     z = x
     x = y
     y = z
