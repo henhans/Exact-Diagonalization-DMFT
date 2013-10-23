@@ -32,6 +32,7 @@ program fulled_lda
   real(8),allocatable    :: fg0(:,:,:)
   real(8),allocatable    :: dos_wt(:)
   logical                :: fbethe
+  real(8)                :: wbath
 
   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   call parse_cmd_variable(rerun,"RERUN",default=.false.)
@@ -56,9 +57,7 @@ program fulled_lda
      Nb=get_bath_size()
      allocate(bath(Nb))
      call init_full_ed_solver(bath)
-     !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
      call full_ed_solver(bath) 
-     !Get the Weiss field/Delta function to be fitted (user defined)
      allocate(delta(NL))
      call get_delta
      stop
@@ -72,6 +71,7 @@ program fulled_lda
   call parse_cmd_variable(file,"FILE",default="hkfile.in")
   call parse_cmd_variable(ntype,"NTYPE",default=0)
   call parse_cmd_variable(fbethe,"FBETHE",default=.false.)
+  call parse_cmd_variable(wbath,"WBATH",default=1.d0)
 
   !Allocate:
   allocate(wm(NL),wr(Nw),tau(0:Ltau))
@@ -130,13 +130,12 @@ contains
           read(50,"(10(2F10.7,1x))")(Hk(iorb,jorb,ik),jorb=1,Nopd)
        enddo
     enddo
-    dos_wt=1.d0/dfloat(Lk)
+    dos_wt=2.d0*Wbath/dfloat(Lk)
     if(fbethe)then
        de=2.d0/dfloat(Lk)
        do ik=1,Lk
-          e = -1.d0 + dfloat(ik-1)*de
-          dos_wt(ik)=dens_bethe(e,1.d0)*de
-          write(10,*)e,dos_wt(ik)
+          e = -wbath + dfloat(ik-1)*de
+          dos_wt(ik)=dens_bethe(e,wbath)*de
        enddo
     endif
   end subroutine read_hk
@@ -178,7 +177,7 @@ contains
     !
 
     npimp=get_density_fromFFT(gp,beta)
-    ntotal=nimp+npimp
+    ntotal=nimp(1)+npimp
     write(*,*)"np  =",npimp
     write(*,*)"ntot=",ntotal
 
@@ -213,7 +212,7 @@ contains
     call splot("np.ntot.ed",npimp,ntotal)
 
     if(ntype==1)then
-       nobj=nimp
+       nobj=nimp(1)
     elseif(ntype==2)then
        nobj=npimp
     else

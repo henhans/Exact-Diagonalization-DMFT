@@ -6,13 +6,106 @@ MODULE ED_AUX_FUNX
   USE ED_VARS_GLOBAL
   implicit none
   private
+
+  public :: init_ed_structure
+  public :: setup_pointers
   public :: build_sector
   public :: bdecomp
   public :: c,cdg
-  public :: setup_pointers
   public :: search_mu
 
 contains
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : Init calculation
+  !+------------------------------------------------------------------+
+  subroutine init_ed_structure
+    integer          :: i,NP,nup,ndw
+    !!<MPI
+    ! if(mpiID==0)then
+    !!>MPI
+    !Norb=# of impurity orbitals
+    !Nbath=# of bath sites per orbital
+    !Ns=total number of sites
+    !Nbo=total number of bath sites (all sites - impurity sites)
+    Ns=(Nbath+1)*Norb
+    Nbo   = Ns-Norb
+    Ntot  = 2*Ns
+    NN    = 2**Ntot
+    Nsect = (Ns+1)*(Ns+1)
+    !
+    nup=Ns/2
+    ndw=Ns-nup
+    NP=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
+    NP=NP*(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
+    write(*,*)"Summary:"
+    write(*,*)"--------------------------------------------"
+    write(*,*)'Number of impurities         = ',Norb
+    write(*,*)'Number of bath/impurity      = ',Nbath
+    write(*,*)'Total # of Bath sites/spin   = ',Nbo
+    write(*,*)'Total # of sites/spin        = ',Ns
+    write(*,*)'Maximum dimension            = ',NP
+    write(*,*)'Total size, Hilber space dim.= ',Ntot,NN
+    write(*,*)'Number of sectors            = ',Nsect
+    write(*,*)"--------------------------------------------"
+    print*,''
+    !!<MPI
+    ! endif
+    !!>MPI
+
+
+    allocate(impIndex(Norb,2))
+    allocate(Hmap(Nsect),invHmap(Nsect,NN))
+    allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect))
+    allocate(getsector(0:Ns,0:Ns))
+    allocate(getCsector(2,Nsect))
+    allocate(getCDGsector(2,Nsect))
+    allocate(neigen_sector(Nsect))
+
+    !check finiteT
+    !finiteT=.false.
+    !if(lanc_neigen>1)finiteT=.true.
+    finiteT=.true.              !assume doing finite T per default
+    if(lanc_nstates==1)then     !is you only want to keep 1 state
+       lanc_neigen=1            !set the required eigen per sector to 1 see later for neigen_sector
+       finiteT=.false.          !set to do zero temperature calculations
+       write(*,*)"--------------------------------------------"
+       write(LOGfile,"(A)")"Required Lanc_Nstates=1 => set T=0 calculation"
+       write(*,*)"--------------------------------------------"
+       write(*,*)""
+    endif
+
+    !check whether lanc_neigen and lanc_states are even (we do want to keep doublet among states)
+    if(finiteT)then
+       if(mod(lanc_neigen,2)/=0)then
+          lanc_neigen=lanc_neigen+1
+          write(*,*)"--------------------------------------------"
+          write(LOGfile,*)"Increased Lanc_Neigen:",lanc_neigen
+          write(*,*)"--------------------------------------------"
+          write(*,*)""
+       endif
+       if(mod(lanc_nstates,2)/=0)then
+          lanc_nstates=lanc_nstates+1
+          write(*,*)"--------------------------------------------"
+          write(LOGfile,*)"Increased Lanc_Nstates:",lanc_nstates
+          write(*,*)"--------------------------------------------"
+          write(*,*)""
+       endif
+    endif
+
+    !Some check:
+    if(Nfit>NL)Nfit=NL
+    if(Norb>3)stop "Norb > 3 ERROR. I guess you need to open the code at this point..." 
+    if(nerr > eps_error) nerr=eps_error    
+
+    !allocate functions
+    allocate(impGmats(Nspin,Norb,NL),impSmats(Nspin,Norb,NL))
+    allocate(impGreal(Nspin,Norb,Nw),impSreal(Nspin,Norb,Nw))
+
+    !allocate observables
+    allocate(nimp(Norb),dimp(Norb),nupimp(Norb),ndwimp(Norb),magimp(Norb))
+    allocate(m2imp(Norb,Norb))
+  end subroutine init_ed_structure
 
 
 
@@ -25,7 +118,7 @@ contains
     integer                          :: nup,ndw,jup,jdw
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
-    call msg("Setting up pointers:")
+    write(LOGfile,"(A)")"Setting up pointers:"
     call start_timer
     isector=0
     do nup=0,Ns
@@ -38,6 +131,7 @@ contains
           dimdw=(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
           dim=dimup*dimdw
           getdim(isector)=dim
+          neigen_sector(isector) = min(dim,lanc_neigen)   !init every sector to required eigenstates
           allocate(Hmap(isector)%map(dim))
           call build_sector(nup,ndw,dim,&
                Hmap(isector)%map(:),invHmap(isector,:))
@@ -79,8 +173,6 @@ contains
        jsector=getsector(jup,jdw)
        getCDGsector(2,isector)=jsector
     enddo
-
-    startloop=1;lastloop=Nsect
   end subroutine setup_pointers
 
 
@@ -252,6 +344,22 @@ contains
     write(10,*)ndelta,nindex
     close(10)
   end subroutine search_mu
+
+
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : calculate the Heaviside  function
+  !+------------------------------------------------------------------+
+  recursive function factorial(n) result(f)
+    integer            :: f
+    integer,intent(in) :: n
+    if(n<=0)then
+       f=1
+    else
+       f=n*factorial(n-1)
+    end if
+  end function factorial
 
 
 
