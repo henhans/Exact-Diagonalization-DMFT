@@ -175,12 +175,20 @@ contains
     integer             :: Nitermax
     logical,optional    :: iverbose
     logical             :: iverbose_
+    integer,allocatable,dimension(:)     :: HImap,HJmap    !map of the Sector S to Hilbert space H
+    !integer,allocatable,dimension(:)     :: invHJmap !inverse map of dim(S) sector in H to S
+
     iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
     Nitermax=lanc_nGFiter
     allocate(alfa_(Nitermax),beta_(Nitermax))
     !Get site index of the iorb-impurity:
     isite=impIndex(iorb,ispin)
     idim0  = getdim(isect0)
+
+    !allocate map from isect0 to HS
+    allocate(HImap(idim0))
+    call build_sector(isect0,HImap)
+
     !ADD ONE PARTICLE:
     jsect0 = getCDGsector(ispin,isect0)
     if(jsect0/=0)then 
@@ -196,18 +204,20 @@ contains
        !endif
        !!>MPI
        call ed_geth(jsect0)
+       allocate(HJmap(jdim0))!,invHJmap(NN))
+       call build_sector(jsect0,HJmap)!,invHJmap)
        ! !##DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
        allocate(vvinit(jdim0))
        !
        vvinit=0.d0
        do m=1,idim0                     !loop over |gs> components m
-          i=Hmap(isect0)%map(m)         !map m to Hilbert space state i
+          i=HImap(m)        !map m to Hilbert space state i
           call bdecomp(i,ib)            !i into binary representation
           if(ib(isite)==0)then          !if impurity is empty: proceed
              call cdg(isite,i,r)
              sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
-             j=invHmap(jsect0,r)        !map r back to  jsect0
+             j=binary_search(HJmap,r)!invHJmap(r)              !map r back to  jsect0
              vvinit(j) = sgn*state_vec(m)   !build the cdg_up|gs> state
           endif
        enddo
@@ -216,7 +226,7 @@ contains
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
        call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
        call add_to_lanczos_gf(norm0,state_e,nitermax,alfa_,beta_,1,iorb,ispin)
-       deallocate(vvinit)
+       deallocate(vvinit,HJmap)!,invHJmap)
        call sp_delete_matrix(spH0)
     endif
     !
@@ -236,18 +246,20 @@ contains
        !endif
        !!>MPI
        call ed_geth(jsect0)
+       allocate(HJmap(jdim0))!,invHJmap(NN))
+       call build_sector(jsect0,HJmap)!,invHJmap)
        ! !##ELSE DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
        allocate(vvinit(jdim0)) 
        !
        vvinit=0.d0
        do m=1,idim0
-          i=Hmap(isect0)%map(m)
+          i=HImap(m)
           call bdecomp(i,ib)
           if(ib(isite)==1)then
              call c(isite,i,r)
              sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
-             j=invHmap(jsect0,r)
+             j=binary_search(HJmap,r)!invHJmap(r)
              vvinit(j) = sgn*state_vec(m)
           endif
        enddo
@@ -256,7 +268,7 @@ contains
        alfa_=0.d0 ; beta_=0.d0
        call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
        call add_to_lanczos_gf(norm0,state_e,nitermax,alfa_,beta_,-1,iorb,ispin)
-       deallocate(vvinit)
+       deallocate(vvinit,HJmap)!,invHJmap)
        call sp_delete_matrix(spH0)
     endif
     deallocate(alfa_,beta_)
@@ -278,20 +290,27 @@ contains
     integer             :: Nitermax
     logical,optional    :: iverbose
     logical             :: iverbose_
+    integer,allocatable,dimension(:)   :: HImap    !map of the Sector S to Hilbert space H
+
     iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
     Nitermax=lanc_nGFiter
     allocate(alfa_(Nitermax),beta_(Nitermax))
     idim0  = getdim(isect0)
+
     if(isect0/=0)then 
        iup0   = getnup(isect0)
        idw0   = getndw(isect0)
        call ed_geth(isect0)
+       !allocate map from isect0 to HS
+       allocate(HImap(idim0))
+       call build_sector(isect0,HImap)
+
        ! !##DIRECT H*V PRODUCT:
        ! call set_Hsector(isect0)
        allocate(vvinit(idim0))
        vvinit=0.d0
        do m=1,idim0                     !loop over |gs> components m
-          i=Hmap(isect0)%map(m)
+          i=HImap(m)
           call bdecomp(i,ib)
           sgn = real(ib(iorb),8)-real(ib(iorb+Ns),8)
           vvinit(m) = sgn*state_vec(m)   !build the cdg_up|gs> state
@@ -301,7 +320,7 @@ contains
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
        call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
        call add_to_lanczos_chi(norm0,state_e,nitermax,alfa_,beta_,iorb)
-       deallocate(vvinit)
+       deallocate(vvinit,HImap)
        call sp_delete_matrix(spH0)
     endif
     deallocate(alfa_,beta_)
@@ -445,6 +464,10 @@ contains
     real(8)                 :: Ei,Ej,matcdg
     real(8)                 :: expterm,peso,de,w0,it,chij1
     complex(8)              :: iw
+    integer,allocatable,dimension(:)     :: HJmap,HImap    !map of the Sector S to Hilbert space H
+    !integer,allocatable,dimension(:)     :: invHImap !inverse map of dim(S) sector in H to S
+
+
     nsite=1
     isite=impIndex(iorb,ispin)
     write(LOGfile,"(A)")"Evaluating G_imp_Orb"//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin))
@@ -454,6 +477,10 @@ contains
        call progress(isector,Nsect)
        idim=getdim(isector)     !i-th sector dimension
        jdim=getdim(jsector)     !j-th sector dimension
+       allocate(HImap(idim))!,invHImap(NN))
+       allocate(HJmap(jdim))
+       call build_sector(isector,HImap)!,invHImap)
+       call build_sector(jsector,HJmap)
        do i=1,idim          !loop over the states in the i-th sect.
           do j=1,jdim       !loop over the states in the j-th sect.
              cdgmat=0.d0
@@ -461,11 +488,13 @@ contains
              if(expterm < cutoff)cycle
              !
              do ll=1,jdim              !loop over the component of |j> (IN state!)
-                m=Hmap(jsector)%map(ll)!map from IN state (j) to full Hilbert space
+                !m=Hmap(jsector)%map(ll)!map from IN state (j) to full Hilbert space
+                m = HJmap(ll)
                 call bdecomp(m,ib)
                 if(ib(isite) == 0)then
                    call cdg(isite,m,k);cc=dble(k)/dble(abs(k));k=abs(k)
-                   r=invHmap(isector,k)
+                   !r=invHmap(isector,k)
+                   r = binary_search(HImap,k)!invHImap(k)
                    cdgmat=cdgmat+espace(isector)%M(r,i)*cc*espace(jsector)%M(ll,j)
                 endif
              enddo
@@ -486,6 +515,7 @@ contains
              enddo
           enddo
        enddo
+       deallocate(HImap,HJmap)!,invHImap)
     enddo
     call stop_progress
   end subroutine full_ed_buildgf
@@ -502,6 +532,7 @@ contains
     real(8)                               :: Ei,Ej,cc,peso(Norb),pesotot
     real(8)                               :: expterm,de,w0,it
     complex(8)                            :: iw
+    integer,allocatable,dimension(:)      :: HImap    !map of the Sector S to Hilbert space H
     ! real(8),allocatable,dimension(:,:)    :: Chitau
     ! real(8),allocatable,dimension(:)      :: Chitautot
     ! complex(8),allocatable,dimension(:,:) :: Chiw,Chiiw
@@ -522,13 +553,15 @@ contains
     do isector=1,Nsect !loop over <i| total particle number
        call progress(isector,Nsect)
        idim=getdim(isector)
+       allocate(HImap(idim))
+       call build_sector(isector,HImap)
        do i=1,idim 
           do j=1,idim
              chij=0.d0;chitot=0.d0
              expterm=exp(-beta*espace(isector)%e(j))
              if(expterm<cutoff)cycle
              do ll=1,idim 
-                ia=Hmap(isector)%map(ll)
+                ia=HImap(ll)
                 call bdecomp(ia,ib)
                 spintot=0.d0
                 do iorb=1,Norb

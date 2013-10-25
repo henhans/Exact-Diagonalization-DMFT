@@ -67,11 +67,8 @@ MODULE ED_VARS_GLOBAL
 
   !Some maps between sectors and full Hilbert space (pointers)
   !=========================================================
-  type HSmap
-     integer,dimension(:),pointer      :: map
-  end type HSmap
-  type(HSmap),dimension(:),allocatable :: Hmap
-  integer,allocatable,dimension(:,:)   :: invHmap
+  ! integer,allocatable,dimension(:)     :: Hmap    !map of the Sector S to Hilbert space H
+  ! integer,allocatable,dimension(:)     :: invHmap !inverse map of dim(S) sector in H to S
   integer,allocatable,dimension(:,:)   :: getsector
   integer,allocatable,dimension(:,:)   :: getCsector
   integer,allocatable,dimension(:,:)   :: getCDGsector

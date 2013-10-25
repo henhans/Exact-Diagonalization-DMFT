@@ -30,6 +30,7 @@ contains
     real(8)                      :: Ei,Egs,norm0,sgn,nup(Norb),ndw(Norb),peso
     real(8)                      :: factor
     real(8),dimension(:),pointer :: gsvec
+    integer,allocatable,dimension(:)     :: Hmap
 
     !!<MPI
     !if(mpiID==0)then
@@ -50,6 +51,8 @@ contains
           isect0 = es_return_sector(state_list,izero)
           Ei     = es_return_energy(state_list,izero)
           dim0   = getdim(isect0)
+          allocate(Hmap(dim0))
+          call build_sector(isect0,Hmap)
           iup0   = getnup(isect0)
           idw0   = getndw(isect0)
           gsvec  => es_return_vector(state_list,izero)
@@ -62,7 +65,7 @@ contains
           endif
           !
           do i=1,dim0
-             m=Hmap(isect0)%map(i)
+             m=Hmap(i)
              call bdecomp(m,ib)
              gs=gsvec(i)
              do iorb=1,Norb
@@ -79,6 +82,7 @@ contains
              enddo
           enddo
           nullify(gsvec)
+          deallocate(Hmap)
        enddo
        nimp  = nimp/zeta_function
        nupimp = nupimp/zeta_function
@@ -90,12 +94,14 @@ contains
     case ('full')
        do isector=1,Nsect
           dim=getdim(isector)
+          allocate(Hmap(dim))
+          call build_sector(isect0,Hmap)
           do i=1,dim
              Ei=espace(isector)%e(i)
              peso=exp(-beta*Ei)/zeta_function
              if(peso < cutoff)cycle
              do j=1,dim
-                ia=Hmap(isector)%map(j)
+                ia=Hmap(j)
                 gs=espace(isector)%M(j,i)
                 call bdecomp(ia,ib)
                 do iorb=1,Norb
@@ -112,6 +118,7 @@ contains
                 enddo
              enddo
           enddo
+          deallocate(Hmap)
        enddo
     end select
 
