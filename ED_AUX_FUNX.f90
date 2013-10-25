@@ -138,58 +138,6 @@ contains
     enddo
     call stop_timer
 
-
-
-    !!>DEBUG
-    ! !check that invHmap is always filled with zeros, what a weist!!
-    ! do isector=1,Nsect
-    !    print*,isector
-    !    do i=1,NN
-    !       print*,invHmap(isector,i)
-    !    enddo
-    !    print*,""
-    ! end do
-    ! nup=Ns/2;ndw=nup
-    ! isector=getsector(nup,ndw) !half-filling
-    ! dim    =getdim(isector)     !Nstates(nup,ndw)
-    ! allocate(Nstock(dim))
-    ! allocate(Ninv(NN))
-    ! call build_sector(isector,Nstock,Ninv)
-    ! ! Ninv=0
-    ! ! do i=1,dim
-    ! !    Ninv(Hmap(isector)%map(i))=i
-    ! ! enddo
-    ! print*,size(Ninv)!,size(invHmap(isector,:))
-    ! do i=1,NN
-    !    print*,i,Ninv(i)!,invHmap(isector,i)
-    ! enddo
-    ! ! for Nbath=3, state 90 in HS is related to state 10 in Sector(2,2)
-    ! print*,binary_search(Nstock,90)
-    ! !THIS WAS TO TEST THE F77 build_basis code.
-    ! allocate(Nstock(dim))
-    ! kcp=0
-    ! do i=1,NN
-    !    call bdecomp(i,ivec) !|0.1.1.1.0.0>
-    !    jup = sum(ivec(1:Ns))    !conta quanti up in questa configurazione
-    !    jdw = sum(ivec(Ns+1:2*Ns)) !conta quanti dw " " " 
-    !    if(jup==nup.AND.jdw==ndw)then
-    !       kcp=kcp+1           !count the states in the sector (n_up,n_dw)//kcp
-    !       do is=1,Ntot
-    !          if(ivec(is)==1)Nstock(kcp)=ibset(Nstock(kcp),is-1)
-    !       enddo
-    !    endif
-    ! enddo
-    ! print*,""
-    ! do i=1,dim
-    !    print*,Nstock(i),Hmap(isector)%map(i)
-    ! enddo
-    ! stop
-    !call build_sector(isector)
-    !stop 
-    ! !!<DEBUG
-
-
-
     do in=1,Norb
        impIndex(in,1)=in
        impIndex(in,2)=in+Ns
@@ -228,28 +176,19 @@ contains
 
 
 
-
-
-
   !+------------------------------------------------------------------+
   !PURPOSE  : constructs the pointers for the different sectors and
   !the vectors isrt and jsrt with the corresponding
   !ordering definition of the sub-basis within each sector
   !+------------------------------------------------------------------+
   !|ImpUP,BathUP;,ImpDW,BathDW >
-  subroutine build_sector(isector,map)!,invmap)
-    integer :: i,j,isector,iup,idw,count,dim
-    integer :: nup,ndw
-    integer :: ivec(Ntot)
-    integer,dimension(:)  :: map
-    !integer,dimension(NN),optional :: invmap
+  subroutine build_sector(isector,map)
+    integer              :: i,j,isector,iup,idw,count
+    integer              :: nup,ndw
+    integer              :: ivec(Ntot)
+    integer,dimension(:) :: map
     nup = getnup(isector)
     ndw = getndw(isector)
-    dim = getdim(isector)
-    ! if(allocated(Hmap))deallocate(Hmap)
-    ! if(allocated(invHmap))deallocate(invHmap)
-    ! allocate(Hmap(dim),invHmap(NN))
-    !if(present(invmap))invmap=0
     count=0
     do i=1,NN
        call bdecomp(i,ivec)
@@ -258,11 +197,9 @@ contains
        if(iup==nup.AND.idw==ndw)then
           count             = count+1 !count the states in the sector (n_up,n_dw)
           map(count)        = i       !build the map to full space states
-          !if(present(invmap))invmap(i)         = count
        endif
     enddo
   end subroutine build_sector
-  !
 
 
   !+------------------------------------------------------------------+

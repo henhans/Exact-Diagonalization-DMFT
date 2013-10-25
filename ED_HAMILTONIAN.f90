@@ -37,12 +37,11 @@ contains
     real(8),dimension(Norb)          :: nup,ndw
     logical                          :: Jcondition,flanc
     integer,allocatable,dimension(:) :: Hmap    !map of the Sector S to Hilbert space H
-    !integer,allocatable,dimension(:) :: invHmap !inverse map of dim(S) sector in H to S
 
 
     dim=getdim(isector)
-    allocate(Hmap(dim))!,invHmap(NN))
-    call build_sector(isector,Hmap)!,invHmap)
+    allocate(Hmap(dim))
+    call build_sector(isector,Hmap)
 
     flanc=.true. ; if(present(h))flanc=.false.
 
@@ -135,7 +134,7 @@ contains
                    ! call cdg(jorb+Ns,k1,k2);sg2=dfloat(k2)/dfloat(abs(k2));k2=abs(k2)
                    ! call c(iorb+Ns,k2,k3)  ;sg3=dfloat(k3)/dfloat(abs(k3));k3=abs(k3)
                    ! call cdg(iorb,k3,k4)   ;sg4=dfloat(k4)/dfloat(abs(k4));k4=abs(k4)
-                   j=binary_search(Hmap,k4)!invHmap(k4)
+                   j=binary_search(Hmap,k4)
                    htmp = Jh*sg1*sg2*sg3*sg4
                    if(flanc)then
                       call sp_insert_element(spH0,htmp,i,j)
@@ -164,7 +163,7 @@ contains
                    call c(jorb+Ns,k1,k2)  ;sg2=dfloat(k2)/dfloat(abs(k2));k2=abs(k2)
                    call cdg(iorb+Ns,k2,k3);sg3=dfloat(k3)/dfloat(abs(k3));k3=abs(k3)
                    call cdg(iorb,k3,k4)   ;sg4=dfloat(k4)/dfloat(abs(k4));k4=abs(k4)
-                   j=binary_search(Hmap,k4)!invHmap(k4)
+                   j=binary_search(Hmap,k4)
                    htmp = Jh*sg1*sg2*sg3*sg4
                    if(flanc)then
                       call sp_insert_element(spH0,htmp,i,j)
@@ -187,7 +186,7 @@ contains
              if(ib(iorb) == 1 .AND. ib(ms) == 0)then
                 call c(iorb,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
                 call cdg(ms,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)
-                j=binary_search(Hmap,r)!invHmap(r)
+                j=binary_search(Hmap,r)
                 tef=vup(iorb,kp)
                 htmp = tef*sg1*sg2
                 if(flanc)then
@@ -202,7 +201,7 @@ contains
              if(ib(iorb+Ns) == 1 .AND. ib(ms+Ns) == 0)then
                 call c(iorb+Ns,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
                 call cdg(ms+Ns,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)           
-                j=binary_search(Hmap,r)!invHmap(r)
+                j=binary_search(Hmap,r)
                 tef=vdw(iorb,kp)
                 htmp=tef*sg1*sg2
                 if(flanc)then
@@ -216,7 +215,7 @@ contains
           enddo
        enddo
     enddo
-    deallocate(Hmap)!,invHmap)
+    deallocate(Hmap)
   end subroutine ed_geth
 
 

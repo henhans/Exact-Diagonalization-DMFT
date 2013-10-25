@@ -176,7 +176,6 @@ contains
     logical,optional    :: iverbose
     logical             :: iverbose_
     integer,allocatable,dimension(:)     :: HImap,HJmap    !map of the Sector S to Hilbert space H
-    !integer,allocatable,dimension(:)     :: invHJmap !inverse map of dim(S) sector in H to S
 
     iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
     Nitermax=lanc_nGFiter
@@ -204,8 +203,8 @@ contains
        !endif
        !!>MPI
        call ed_geth(jsect0)
-       allocate(HJmap(jdim0))!,invHJmap(NN))
-       call build_sector(jsect0,HJmap)!,invHJmap)
+       allocate(HJmap(jdim0))
+       call build_sector(jsect0,HJmap)
        ! !##DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
        allocate(vvinit(jdim0))
@@ -217,7 +216,7 @@ contains
           if(ib(isite)==0)then          !if impurity is empty: proceed
              call cdg(isite,i,r)
              sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
-             j=binary_search(HJmap,r)!invHJmap(r)              !map r back to  jsect0
+             j=binary_search(HJmap,r)     !map r back to  jsect0
              vvinit(j) = sgn*state_vec(m)   !build the cdg_up|gs> state
           endif
        enddo
@@ -226,7 +225,7 @@ contains
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
        call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
        call add_to_lanczos_gf(norm0,state_e,nitermax,alfa_,beta_,1,iorb,ispin)
-       deallocate(vvinit,HJmap)!,invHJmap)
+       deallocate(vvinit,HJmap)
        call sp_delete_matrix(spH0)
     endif
     !
@@ -246,8 +245,8 @@ contains
        !endif
        !!>MPI
        call ed_geth(jsect0)
-       allocate(HJmap(jdim0))!,invHJmap(NN))
-       call build_sector(jsect0,HJmap)!,invHJmap)
+       allocate(HJmap(jdim0))
+       call build_sector(jsect0,HJmap)
        ! !##ELSE DIRECT H*V PRODUCT:
        ! call set_Hsector(jsect0)
        allocate(vvinit(jdim0)) 
@@ -259,7 +258,7 @@ contains
           if(ib(isite)==1)then
              call c(isite,i,r)
              sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
-             j=binary_search(HJmap,r)!invHJmap(r)
+             j=binary_search(HJmap,r)
              vvinit(j) = sgn*state_vec(m)
           endif
        enddo
@@ -268,7 +267,7 @@ contains
        alfa_=0.d0 ; beta_=0.d0
        call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
        call add_to_lanczos_gf(norm0,state_e,nitermax,alfa_,beta_,-1,iorb,ispin)
-       deallocate(vvinit,HJmap)!,invHJmap)
+       deallocate(vvinit,HJmap)
        call sp_delete_matrix(spH0)
     endif
     deallocate(alfa_,beta_)
@@ -465,7 +464,6 @@ contains
     real(8)                 :: expterm,peso,de,w0,it,chij1
     complex(8)              :: iw
     integer,allocatable,dimension(:)     :: HJmap,HImap    !map of the Sector S to Hilbert space H
-    !integer,allocatable,dimension(:)     :: invHImap !inverse map of dim(S) sector in H to S
 
 
     nsite=1
@@ -477,9 +475,9 @@ contains
        call progress(isector,Nsect)
        idim=getdim(isector)     !i-th sector dimension
        jdim=getdim(jsector)     !j-th sector dimension
-       allocate(HImap(idim))!,invHImap(NN))
+       allocate(HImap(idim))
        allocate(HJmap(jdim))
-       call build_sector(isector,HImap)!,invHImap)
+       call build_sector(isector,HImap)
        call build_sector(jsector,HJmap)
        do i=1,idim          !loop over the states in the i-th sect.
           do j=1,jdim       !loop over the states in the j-th sect.
@@ -493,8 +491,7 @@ contains
                 call bdecomp(m,ib)
                 if(ib(isite) == 0)then
                    call cdg(isite,m,k);cc=dble(k)/dble(abs(k));k=abs(k)
-                   !r=invHmap(isector,k)
-                   r = binary_search(HImap,k)!invHImap(k)
+                   r = binary_search(HImap,k)
                    cdgmat=cdgmat+espace(isector)%M(r,i)*cc*espace(jsector)%M(ll,j)
                 endif
              enddo
@@ -515,7 +512,7 @@ contains
              enddo
           enddo
        enddo
-       deallocate(HImap,HJmap)!,invHImap)
+       deallocate(HImap,HJmap)
     enddo
     call stop_progress
   end subroutine full_ed_buildgf
