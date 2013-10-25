@@ -24,19 +24,25 @@ contains
   !PURPOSE  : 
   !+------------------------------------------------------------------+
   subroutine ed_geth(isector,h)
-    real(8),optional              :: h(:,:)
-    integer                       :: isector
-    integer                       :: ib(Ntot)
-    integer                       :: dim,iup,idw
-    integer                       :: i,j,k,r,m,ms,iorb,jorb,ispin
-    integer                       :: kp,k1,k2,k3,k4
-    real(8)                       :: sg1,sg2,sg3,sg4
-    real(8),dimension(Norb,Nbath) :: eup,edw
-    real(8),dimension(Norb,Nbath) :: vup,vdw
-    real(8)                       :: nup(Norb),ndw(Norb),tef,htmp
-    logical                       :: Jcondition,flanc
+    real(8),optional,dimension(:,:)  :: h
+    integer                          :: isector
+    integer,dimension(Ntot)          :: ib
+    integer                          :: dim,iup,idw
+    integer                          :: i,j,k,r,m,ms,iorb,jorb,ispin
+    integer                          :: kp,k1,k2,k3,k4
+    real(8)                          :: sg1,sg2,sg3,sg4
+    real(8)                          :: tef,htmp
+    real(8),dimension(Norb,Nbath)    :: eup,edw
+    real(8),dimension(Norb,Nbath)    :: vup,vdw
+    real(8),dimension(Norb)          :: nup,ndw
+    logical                          :: Jcondition,flanc
+    integer,allocatable,dimension(:) :: Hmap    !map of the Sector S to Hilbert space H
+
 
     dim=getdim(isector)
+    allocate(Hmap(dim))
+    call build_sector(isector,Hmap)
+
     flanc=.true. ; if(present(h))flanc=.false.
 
     if(flanc)then
@@ -55,7 +61,7 @@ contains
     vup=vbath(1,:,:)   ; vdw=vbath(Nspin,:,:)
 
     do i=1,dim
-       m=Hmap(isector)%map(i)
+       m=Hmap(i)
        call bdecomp(m,ib)
 
        htmp=0.d0
@@ -128,7 +134,7 @@ contains
                    ! call cdg(jorb+Ns,k1,k2);sg2=dfloat(k2)/dfloat(abs(k2));k2=abs(k2)
                    ! call c(iorb+Ns,k2,k3)  ;sg3=dfloat(k3)/dfloat(abs(k3));k3=abs(k3)
                    ! call cdg(iorb,k3,k4)   ;sg4=dfloat(k4)/dfloat(abs(k4));k4=abs(k4)
-                   j=invHmap(isector,k4)
+                   j=binary_search(Hmap,k4)
                    htmp = Jh*sg1*sg2*sg3*sg4
                    if(flanc)then
                       call sp_insert_element(spH0,htmp,i,j)
@@ -157,7 +163,7 @@ contains
                    call c(jorb+Ns,k1,k2)  ;sg2=dfloat(k2)/dfloat(abs(k2));k2=abs(k2)
                    call cdg(iorb+Ns,k2,k3);sg3=dfloat(k3)/dfloat(abs(k3));k3=abs(k3)
                    call cdg(iorb,k3,k4)   ;sg4=dfloat(k4)/dfloat(abs(k4));k4=abs(k4)
-                   j=invHmap(isector,k4)
+                   j=binary_search(Hmap,k4)
                    htmp = Jh*sg1*sg2*sg3*sg4
                    if(flanc)then
                       call sp_insert_element(spH0,htmp,i,j)
@@ -180,7 +186,7 @@ contains
              if(ib(iorb) == 1 .AND. ib(ms) == 0)then
                 call c(iorb,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
                 call cdg(ms,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)
-                j=invHmap(isector,r)
+                j=binary_search(Hmap,r)
                 tef=vup(iorb,kp)
                 htmp = tef*sg1*sg2
                 if(flanc)then
@@ -195,7 +201,7 @@ contains
              if(ib(iorb+Ns) == 1 .AND. ib(ms+Ns) == 0)then
                 call c(iorb+Ns,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
                 call cdg(ms+Ns,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)           
-                j=invHmap(isector,r)
+                j=binary_search(Hmap,r)
                 tef=vdw(iorb,kp)
                 htmp=tef*sg1*sg2
                 if(flanc)then
@@ -209,6 +215,7 @@ contains
           enddo
        enddo
     enddo
+    deallocate(Hmap)
   end subroutine ed_geth
 
 
@@ -302,7 +309,7 @@ contains
   !   if(Nv/=dim)call error("HtimesV error in dimensions")
   !   Hv=0.d0
   !   do i=1,dim
-  !      m=Hmap(isector)%map(i)
+  !      m=Hmap(i)
   !      call bdecomp(m,ib)
   !      nup=real(ib(1),8)
   !      ndw=real(ib(1+Ns),8)
@@ -327,7 +334,7 @@ contains
   !         if(ib(1)==1 .AND. ib(ms)==0)then
   !            call c(1,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
   !            call cdg(ms,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)
-  !            j=invHmap(isector,r)
+  !            j=invHmap(r)
   !            tef=vup(ms-1)
   !            htmp = tef*sg1*sg2
   !            Hv(i) = Hv(i) + htmp*v(j)
@@ -336,7 +343,7 @@ contains
   !         if(ib(1+Ns)==1 .AND. ib(ms+Ns)==0)then
   !            call c(1+Ns,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
   !            call cdg(ms+Ns,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)           
-  !            j=invHmap(isector,r)
+  !            j=invHmap(r)
   !            tef=vdw(ms-1)   
   !            htmp=tef*sg1*sg2
   !            Hv(i) = Hv(i) + htmp*v(j)
@@ -373,7 +380,7 @@ contains
   !   eup=ebath(1,:,:)   ; edw=ebath(Nspin,:,:)
   !   vup=vbath(1,:,:)   ; vdw=vbath(Nspin,:,:)
   !   do i=1,dim
-  !      m=Hmap(isector)%map(i)
+  !      m=Hmap(i)
   !      call bdecomp(m,ib)
   !      htmp=0.d0
   !      do iorb=1,Norb
@@ -436,7 +443,7 @@ contains
   !                  ! call cdg(jorb+Ns,k1,k2);sg2=dfloat(k2)/dfloat(abs(k2));k2=abs(k2)
   !                  ! call c(iorb+Ns,k2,k3)  ;sg3=dfloat(k3)/dfloat(abs(k3));k3=abs(k3)
   !                  ! call cdg(iorb,k3,k4)   ;sg4=dfloat(k4)/dfloat(abs(k4));k4=abs(k4)
-  !                  j=invHmap(isector,k4)
+  !                  j=invHmap(k4)
   !                  htmp = Jh*sg1*sg2*sg3*sg4
   !                  call sp_insert_element(spH0,htmp,i,j)
   !                  call sp_insert_element(spH0,htmp,j,i)
@@ -460,7 +467,7 @@ contains
   !                  call c(jorb+Ns,k1,k2)  ;sg2=dfloat(k2)/dfloat(abs(k2));k2=abs(k2)
   !                  call cdg(iorb+Ns,k2,k3);sg3=dfloat(k3)/dfloat(abs(k3));k3=abs(k3)
   !                  call cdg(iorb,k3,k4)   ;sg4=dfloat(k4)/dfloat(abs(k4));k4=abs(k4)
-  !                  j=invHmap(isector,k4)
+  !                  j=invHmap(k4)
   !                  htmp = Jh*sg1*sg2*sg3*sg4
   !                  call sp_insert_element(spH0,htmp,i,j)
   !                  call sp_insert_element(spH0,htmp,j,i)
@@ -476,7 +483,7 @@ contains
   !            if(ib(iorb) == 1 .AND. ib(ms) == 0)then
   !               call c(iorb,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
   !               call cdg(ms,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)
-  !               j=invHmap(isector,r)
+  !               j=invHmap(r)
   !               tef=vup(iorb,kp)!ms-Norb)
   !               h(i,j)=tef*sg1*sg2
   !               h(j,i)=h(i,j)
@@ -485,7 +492,7 @@ contains
   !            if(ib(iorb+Ns) == 1 .AND. ib(ms+Ns) == 0)then
   !               call c(iorb+Ns,m,k);sg1=dfloat(k)/dfloat(abs(k));k=abs(k)
   !               call cdg(ms+Ns,k,r);sg2=dfloat(r)/dfloat(abs(r));r=abs(r)           
-  !               j=invHmap(isector,r)
+  !               j=invHmap(r)
   !               tef=vdw(iorb,kp)!ms-Norb)
   !               h(i,j)=tef*sg1*sg2
   !               h(j,i)=h(i,j)

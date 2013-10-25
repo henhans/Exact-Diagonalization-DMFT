@@ -13,8 +13,10 @@ MODULE ED_AUX_FUNX
   public :: bdecomp
   public :: c,cdg
   public :: search_mu
+  public :: binary_search
 
 contains
+
 
   !+------------------------------------------------------------------+
   !PURPOSE  : Init calculation
@@ -53,9 +55,8 @@ contains
     ! endif
     !!>MPI
 
-
     allocate(impIndex(Norb,2))
-    allocate(Hmap(Nsect),invHmap(Nsect,NN))
+    !allocate(Hmap(Nsect),invHmap(Nsect,NN))
     allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect))
     allocate(getsector(0:Ns,0:Ns))
     allocate(getCsector(2,Nsect))
@@ -63,8 +64,6 @@ contains
     allocate(neigen_sector(Nsect))
 
     !check finiteT
-    !finiteT=.false.
-    !if(lanc_neigen>1)finiteT=.true.
     finiteT=.true.              !assume doing finite T per default
     if(lanc_nstates==1)then     !is you only want to keep 1 state
        lanc_neigen=1            !set the required eigen per sector to 1 see later for neigen_sector
@@ -108,16 +107,19 @@ contains
   end subroutine init_ed_structure
 
 
-
-
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
   subroutine setup_pointers
-    integer                          :: in,dim,isector,jsector,dimup,dimdw
+    integer                          :: i,in,dim,isector,jsector,dimup,dimdw
     integer                          :: nup,ndw,jup,jdw
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
+    ! !<DEBUG
+    integer,dimension(:),allocatable :: Ninv,Nstock
+    ! integer :: ivec(Ntot),kcp,is
+    ! !>DEBUG
+
     write(LOGfile,"(A)")"Setting up pointers:"
     call start_timer
     isector=0
@@ -132,9 +134,6 @@ contains
           dim=dimup*dimdw
           getdim(isector)=dim
           neigen_sector(isector) = min(dim,lanc_neigen)   !init every sector to required eigenstates
-          allocate(Hmap(isector)%map(dim))
-          call build_sector(nup,ndw,dim,&
-               Hmap(isector)%map(:),invHmap(isector,:))
        enddo
     enddo
     call stop_timer
@@ -177,39 +176,30 @@ contains
 
 
 
-
-
-
   !+------------------------------------------------------------------+
   !PURPOSE  : constructs the pointers for the different sectors and
   !the vectors isrt and jsrt with the corresponding
   !ordering definition of the sub-basis within each sector
   !+------------------------------------------------------------------+
   !|ImpUP,BathUP;,ImpDW,BathDW >
-  subroutine build_sector(iup,idw,dim,imap,invmap)
-    integer :: i,j,iup,idw,dim
-    integer :: nup,ndw
-    integer :: imap(:),invmap(:)
-    integer :: ivec(Ntot)
-    dim=0
-    imap=0
-    invmap=0
-    if(size(invmap)/=NN)stop "ERROR1 in imp_sectorns" 
+  subroutine build_sector(isector,map)
+    integer              :: i,j,isector,iup,idw,count
+    integer              :: nup,ndw
+    integer              :: ivec(Ntot)
+    integer,dimension(:) :: map
+    nup = getnup(isector)
+    ndw = getndw(isector)
+    count=0
     do i=1,NN
        call bdecomp(i,ivec)
-       nup = sum(ivec(1:Ns))
-       ndw = sum(ivec(Ns+1:2*Ns))
-       if(nup==iup.AND.ndw==idw)then
-          dim=dim+1           !count the states in the sector (n_up,n_dw)
-          imap(dim)=i         !build the map to full space states
-          invmap(i)=dim       !and the inverse map
+       iup = sum(ivec(1:Ns))
+       idw = sum(ivec(Ns+1:2*Ns))
+       if(iup==nup.AND.idw==ndw)then
+          count             = count+1 !count the states in the sector (n_up,n_dw)
+          map(count)        = i       !build the map to full space states
        endif
     enddo
-    if(size(imap)/=dim)stop "ERROR2 in imp_sectorns" 
   end subroutine build_sector
-
-
-
 
 
   !+------------------------------------------------------------------+
@@ -239,23 +229,27 @@ contains
   !the sign of j has the phase convention
   !m labels the sites
   !+-------------------------------------------------------------------+
-  subroutine c(m,i,j)
+  subroutine c(m,i,j)!,sgn)
     integer :: ib(Ntot)
     integer :: i,j,m,km,k
     integer :: isg
+    real(8) :: sgn
     call bdecomp(i,ib)
-    if (ib(m).eq.0)then
+    if (ib(m)==0)then
        j=0
     else
-       if(m.eq.1)then
+       if(m==1)then
           j=i-1
        else
           km=0
           do k=1,m-1
              km=km+ib(k)
           enddo
+          !km=sum(ib(1:m-1))
           isg=(-1)**km
           j=(i-2**(m-1))*isg
+          ! sgn=(-1.d0)**km
+          ! j=(i-2**(m-1))!*isg
        endif
     endif
     return
@@ -268,23 +262,27 @@ contains
   !the sign of j has the phase convention
   !m labels the sites
   !+-------------------------------------------------------------------+
-  subroutine cdg(m,i,j)
+  subroutine cdg(m,i,j)!,sgn)
     integer :: ib(Ntot)
     integer :: i,j,m,km,k
     integer :: isg
+    real(8) :: sgn
     call bdecomp(i,ib)
     if (ib(m)==1)then
        j=0
     else
-       if(m.eq.1)then
+       if(m==1)then
           j=i+1
        else
           km=0
           do k=1,m-1
              km=km+ib(k)
           enddo
+          !km=sum(ib(1:m-1))
           isg=(-1)**km
           j=(i+2**(m-1))*isg
+          ! sgn=(-1.d0)**km
+          ! j=(i+2**(m-1))!*isg
        endif
     endif
     return
@@ -363,7 +361,23 @@ contains
 
 
 
-
+  recursive function binary_search(a,value) result(bsresult)
+    integer,intent(in) :: a(:), value
+    integer            :: bsresult, mid
+    mid = size(a)/2 + 1
+    if (size(a) == 0) then
+       bsresult = 0        ! not found
+    else if (a(mid) > value) then
+       bsresult= binary_search(a(:mid-1), value)
+    else if (a(mid) < value) then
+       bsresult = binary_search(a(mid+1:), value)
+       if (bsresult /= 0) then
+          bsresult = mid + bsresult
+       end if
+    else
+       bsresult = mid      ! SUCCESS!!
+    end if
+  end function binary_search
 
 
 END MODULE ED_AUX_FUNX
