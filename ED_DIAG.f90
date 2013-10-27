@@ -56,8 +56,9 @@ contains
        lanc_solve  = .true. ; if(Neigen==dim)lanc_solve=.false.
        !
        if(lanc_solve)then
-          call ed_geth(isector)
-          call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_d,.false.)
+          call setup_Hv_sector(isector)
+          call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,HtimesV,.false.)
+          call delete_Hv_sector()
        else
           call ed_geth(isector,eig_basis)
           call matrix_diagonalize(eig_basis,eig_values,'V','U')
@@ -86,7 +87,8 @@ contains
           endif
        endif
        !
-       deallocate(eig_values,eig_basis)
+       if(allocated(eig_values))deallocate(eig_values)
+       if(allocated(eig_basis))deallocate(eig_basis)
        if(spH0%status)call sp_delete_matrix(spH0)
        !
     enddo sector
