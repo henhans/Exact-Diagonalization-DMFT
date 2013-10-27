@@ -40,7 +40,7 @@ contains
 
 
   !####################################################################
-  !                    LANCZOS DIAGONALIZATION 
+  !                    lanczos DIAGONALIZATION 
   !####################################################################
   !+------------------------------------------------------------------+
   !PURPOSE  : Evaluate Green's functions using Lanczos algorithm
@@ -55,6 +55,7 @@ contains
     write(LOGfile,"(A)")"Evaluating Green's functions"
     numstates=numgs
     if(finiteT)numstates=state_list%size
+    call lanczos_plain_set_htimesv_d(HtimesV)
     do ispin=1,Nspin
        do iorb=1,Norb
           write(LOGfile,"(A)")"Evaluating G_imp_Orb"//&
@@ -73,14 +74,13 @@ contains
                      "is not normalized:"//reg(txtfy(norm0))
                 stop
              endif
-             call lanczos_plain_set_htimesv_d(spHtimesV_d)
              call lanc_ed_buildgf(isect0,iorb,ispin)
+             nullify(state_vec)
           enddo
-          call lanczos_plain_delete_htimesv_d
-          nullify(state_vec)
           call stop_progress
        enddo
     enddo
+    call lanczos_plain_delete_htimesv_d
     impGmats=impGmats/zeta_function
     impGreal=impGreal/zeta_function
     !Print impurity functions:
@@ -121,6 +121,7 @@ contains
     write(LOGfile,"(A)")"Evaluating Susceptibility:"
     numstates=numgs
     if(finiteT)numstates=state_list%size
+    call lanczos_plain_set_htimesv_d(HtimesV)
     do iorb=1,Norb
        write(LOGfile,"(A)")"Evaluating Chi_Orb"//reg(txtfy(iorb))
        call start_progress
@@ -137,13 +138,12 @@ contains
                   "is not normalized:"//reg(txtfy(norm0))
              stop
           endif
-          call lanczos_plain_set_htimesv_d(spHtimesV_d)
           call lanc_ed_buildchi(isect0,iorb)
+          nullify(state_vec)
        enddo
-       call lanczos_plain_delete_htimesv_d
-       nullify(state_vec)
        call stop_progress
     enddo
+    call lanczos_plain_delete_htimesv_d
     Chitau=Chitau/zeta_function
     Chiw=Chiw/zeta_function
     Chiiw=Chiiw/zeta_function
@@ -176,18 +176,18 @@ contains
     logical,optional    :: iverbose
     logical             :: iverbose_
     integer,allocatable,dimension(:)     :: HImap,HJmap    !map of the Sector S to Hilbert space H
-
+    !
     iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
+    !
     Nitermax=lanc_nGFiter
     allocate(alfa_(Nitermax),beta_(Nitermax))
     !Get site index of the iorb-impurity:
     isite=impIndex(iorb,ispin)
     idim0  = getdim(isect0)
-
     !allocate map from isect0 to HS
     allocate(HImap(idim0))
     call build_sector(isect0,HImap)
-
+    !
     !ADD ONE PARTICLE:
     jsect0 = getCDGsector(ispin,isect0)
     if(jsect0/=0)then 
@@ -202,31 +202,31 @@ contains
        !!<MPI
        !endif
        !!>MPI
-       call ed_geth(jsect0)
        allocate(HJmap(jdim0))
        call build_sector(jsect0,HJmap)
-       ! !##DIRECT H*V PRODUCT:
-       ! call set_Hsector(jsect0)
-       allocate(vvinit(jdim0))
        !
+       allocate(vvinit(jdim0))
        vvinit=0.d0
        do m=1,idim0                     !loop over |gs> components m
-          i=HImap(m)        !map m to Hilbert space state i
+          i=HImap(m)                    !map m to Hilbert space state i
           call bdecomp(i,ib)            !i into binary representation
           if(ib(isite)==0)then          !if impurity is empty: proceed
              call cdg(isite,i,r)
              sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
-             j=binary_search(HJmap,r)     !map r back to  jsect0
-             vvinit(j) = sgn*state_vec(m)   !build the cdg_up|gs> state
+             j=binary_search(HJmap,r)      !map r back to  jsect0
+             vvinit(j) = sgn*state_vec(m)  !build the cdg_up|gs> state
           endif
        enddo
+       deallocate(HJmap)
        norm0=sqrt(dot_product(vvinit,vvinit))
        vvinit=vvinit/norm0
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
+       call setup_Hv_sector(jsect0)
        call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
+       call delete_Hv_sector()
        call add_to_lanczos_gf(norm0,state_e,nitermax,alfa_,beta_,1,iorb,ispin)
-       deallocate(vvinit,HJmap)
-       call sp_delete_matrix(spH0)
+       deallocate(vvinit)
+       if(spH0%status)call sp_delete_matrix(spH0)
     endif
     !
     !
@@ -244,13 +244,10 @@ contains
        !!<MPI
        !endif
        !!>MPI
-       call ed_geth(jsect0)
        allocate(HJmap(jdim0))
        call build_sector(jsect0,HJmap)
-       ! !##ELSE DIRECT H*V PRODUCT:
-       ! call set_Hsector(jsect0)
-       allocate(vvinit(jdim0)) 
        !
+       allocate(vvinit(jdim0)) 
        vvinit=0.d0
        do m=1,idim0
           i=HImap(m)
@@ -262,15 +259,18 @@ contains
              vvinit(j) = sgn*state_vec(m)
           endif
        enddo
+       deallocate(HJmap)
        norm0=sqrt(dot_product(vvinit,vvinit))
        vvinit=vvinit/norm0
        alfa_=0.d0 ; beta_=0.d0
+       call setup_Hv_sector(jsect0)
        call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
+       call delete_Hv_sector()
        call add_to_lanczos_gf(norm0,state_e,nitermax,alfa_,beta_,-1,iorb,ispin)
-       deallocate(vvinit,HJmap)
-       call sp_delete_matrix(spH0)
+       deallocate(vvinit)
+       if(spH0%status)call sp_delete_matrix(spH0)
     endif
-    deallocate(alfa_,beta_)
+    deallocate(alfa_,beta_,HImap)
   end subroutine lanc_ed_buildgf
 
 
@@ -290,22 +290,17 @@ contains
     logical,optional    :: iverbose
     logical             :: iverbose_
     integer,allocatable,dimension(:)   :: HImap    !map of the Sector S to Hilbert space H
-
     iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
     Nitermax=lanc_nGFiter
     allocate(alfa_(Nitermax),beta_(Nitermax))
     idim0  = getdim(isect0)
-
     if(isect0/=0)then 
        iup0   = getnup(isect0)
        idw0   = getndw(isect0)
-       call ed_geth(isect0)
+       !call ed_geth(isect0)
        !allocate map from isect0 to HS
        allocate(HImap(idim0))
        call build_sector(isect0,HImap)
-
-       ! !##DIRECT H*V PRODUCT:
-       ! call set_Hsector(isect0)
        allocate(vvinit(idim0))
        vvinit=0.d0
        do m=1,idim0                     !loop over |gs> components m
@@ -314,13 +309,16 @@ contains
           sgn = real(ib(iorb),8)-real(ib(iorb+Ns),8)
           vvinit(m) = sgn*state_vec(m)   !build the cdg_up|gs> state
        enddo
+       deallocate(HImap)
        norm0=sqrt(dot_product(vvinit,vvinit))
        vvinit=vvinit/norm0
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
+       call setup_Hv_sector(isect0)
        call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
+       call delete_Hv_sector()
        call add_to_lanczos_chi(norm0,state_e,nitermax,alfa_,beta_,iorb)
-       deallocate(vvinit,HImap)
-       call sp_delete_matrix(spH0)
+       deallocate(vvinit)
+       if(spH0%status)call sp_delete_matrix(spH0)
     endif
     deallocate(alfa_,beta_)
   end subroutine lanc_ed_buildchi
