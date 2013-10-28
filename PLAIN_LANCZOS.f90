@@ -12,12 +12,6 @@ MODULE PLAIN_LANCZOS_HTIMESV_INTERFACE
        complex(8) :: vin(n)
        complex(8) :: vout(n)
      end subroutine lanc_htimesv_c
-     !<MPI
-     ! subroutine lanc_htimesv_mpi(Q,R,nloc,n,vin,vout)
-     !   integer                 :: Q,R,nloc,n
-     !   real(8),dimension(nloc) :: vin,vout
-     ! end subroutine lanc_htimesv_mpi
-     !>MPI
   end interface
 END MODULE PLAIN_LANCZOS_HTIMESV_INTERFACE
 
@@ -33,10 +27,6 @@ MODULE PLAIN_LANCZOS
   real(8)                           :: ncheck_=10
   complex(8),parameter              :: zero=(0.d0,0.d0),one=(1.d0,0.d0),xi=(0.d0,1.d0)
 
-  !<DEBUG
-  !yet I have to decide if interfaces are useful here, for the time being
-  !I keep direct call.
-  !>DEBUG
   public :: lanczos_plain_set_htimesv_d
   public :: lanczos_plain_set_htimesv_c
   public :: lanczos_plain_delete_htimesv_d

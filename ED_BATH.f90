@@ -83,11 +83,12 @@ contains
     integer :: i,iorb,ispin,unit
     logical :: IOfile
     real(8) :: ran(Nbath)
-    !!<MPI
-    !if(mpiID==0)then
-!!!>MPI
+
     if(bath_status)call deallocate_bath
     call allocate_bath
+    ! #ifdef _MPI
+    !     if(mpiID==0)then
+    ! #endif
     inquire(file=trim(Hfile),exist=IOfile)
     if(IOfile)then
        write(LOGfile,"(A)")'Reading bath from file'
@@ -109,11 +110,11 @@ contains
           enddo
        enddo
     endif
-    !!<MPI
-    ! endif
-    ! call MPI_BCAST(ebath(1:Nspin,1:Nbath),Nspin*Nbath,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
-    ! call MPI_BCAST(vbath(1:Nspin,1:Nbath),Nspin*Nbath,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
-    !!>MPI
+    ! #ifdef _MPI
+    !     endif
+    !     call MPI_BCAST(ebath,size(ebath),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
+    !     call MPI_BCAST(vbath,size(vbath),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
+    ! #endif
   end subroutine init_bath_ed
 
 
@@ -126,19 +127,19 @@ contains
   !+-------------------------------------------------------------------+
   subroutine write_bath(unit)
     integer :: i,unit,ispin,iorb
-    !!<MPI
-    ! if(mpiID==0)then
-    !!>MPI
-    if(.not.bath_status)stop "WRITE_BATH: bath not allocated"
-    write(unit,"(90(A22,1X))")&
-         (("# Ek_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),&
-         "Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
-    do i=1,Nbath
-       write(unit,"(90(F22.15,1X))")((ebath(ispin,iorb,i),vbath(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
-    enddo
-    !!<MPI
-    !endif
-    !!>MPI
+#ifdef _MPI
+    if(mpiID==0)then
+#endif
+       if(.not.bath_status)stop "WRITE_BATH: bath not allocated"
+       write(unit,"(90(A22,1X))")&
+            (("# Ek_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),&
+            "Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
+       do i=1,Nbath
+          write(unit,"(90(F22.15,1X))")((ebath(ispin,iorb,i),vbath(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
+       enddo
+#ifdef _MPI
+    endif
+#endif
   end subroutine write_bath
 
 

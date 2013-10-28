@@ -5,17 +5,15 @@ MODULE ED_VARS_GLOBAL
   USE PARSE_CMD
   USE IOTOOLS
   USE MATRIX, only: matrix_diagonalize
-  USE OPTIMIZE
   USE TOOLS, only: arange,linspace
   !LOCAL
   USE MATRIX_SPARSE
   USE EIGEN_SPACE
   USE PLAIN_LANCZOS
   USE ARPACK_LANCZOS
-  !PARALLEL:
-  !!<MPI
-  !USE MPI
-  !!>MPI
+#ifdef _MPI
+  USE MPI
+#endif
   implicit none
 
   !GIT VERSION
@@ -143,13 +141,14 @@ contains
     character(len=*) :: INPUTunit
     logical          :: control
 
-    !!<MPI
-    ! if(mpiID==0)then
-    !!>MPI
-    call version(revision)
-    !!<MPI
-    ! endif
-    !!>MPI
+#ifdef _MPI
+    if(mpiID==0)then
+#endif
+       call version(revision)
+#ifdef _MPI
+    endif
+#endif
+
 
     !DEFAULT VALUES OF THE PARAMETERS:
     !ModelConf
@@ -202,11 +201,17 @@ contains
        read(50,nml=EDvars)
        close(50)
     else
-       print*,"Can not find INPUT file"
-       print*,"Printing a default version in default."//INPUTunit
-       open(50,file="default."//INPUTunit)
-       write(50,nml=EDvars)
-       write(50,*)""
+#ifdef _MPI
+       if(mpiID==0)then
+#endif
+          print*,"Can not find INPUT file"
+          print*,"Printing a default version in default."//INPUTunit
+          open(50,file="default."//INPUTunit)
+          write(50,nml=EDvars)
+          write(50,*)""
+#ifdef _MPI
+       endif
+#endif
        stop
     endif
 
@@ -249,18 +254,17 @@ contains
     call parse_cmd_variable(CHIfile,"CHIFILE")
     call parse_cmd_variable(LOGfile,"LOGFILE")
 
-    !!<MPI
-    ! if(mpiID==0)then
-    !!>MPI
-    open(50,file="used."//INPUTunit)
-    write(50,nml=EDvars)
-    close(50)
-    write(*,*)"CONTROL PARAMETERS"
-    write(*,nml=EDvars)
-    !!<MPI
-    ! endif
-    !!>MPI
-
+#ifdef _MPI
+    if(mpiID==0)then
+#endif
+       open(50,file="used."//INPUTunit)
+       write(50,nml=EDvars)
+       close(50)
+       write(*,*)"CONTROL PARAMETERS"
+       write(*,nml=EDvars)
+#ifdef _MPI
+    endif
+#endif
   end subroutine read_input
 
 END MODULE ED_VARS_GLOBAL

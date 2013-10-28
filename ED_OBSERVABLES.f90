@@ -32,120 +32,117 @@ contains
     real(8),dimension(:),pointer :: gsvec
     integer,allocatable,dimension(:)     :: Hmap
 
-    !!<MPI
-    !if(mpiID==0)then
-    !!>MPI
-    write(LOGfile,"(A)")"Evaluating Observables:"
-    Egs = state_list%emin       !es_return_energy(state_list,1)
-    nimp  = 0.d0
-    nupimp = 0.d0
-    ndwimp = 0.d0
-    dimp   = 0.d0
-    magimp = 0.d0
-    m2imp  = 0.d0
-    select case(ed_type)
-    case default
-       numstates=numgs
-       if(finiteT)numstates=state_list%size
-       do izero=1,numstates
-          isect0 = es_return_sector(state_list,izero)
-          Ei     = es_return_energy(state_list,izero)
-          dim0   = getdim(isect0)
-          allocate(Hmap(dim0))
-          call build_sector(isect0,Hmap)
-          iup0   = getnup(isect0)
-          idw0   = getndw(isect0)
-          gsvec  => es_return_vector(state_list,izero)
-          peso   = 1.d0
-          if(finiteT)peso=exp(-beta*(Ei-Egs))
-          norm0=sqrt(dot_product(gsvec,gsvec))
-          if(abs(norm0-1.d0)>1.d-9)then
-             write(LOGfile,*) "GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0)
-             stop
-          endif
-          !
-          do i=1,dim0
-             m=Hmap(i)
-             call bdecomp(m,ib)
-             gs=gsvec(i)
-             do iorb=1,Norb
-                nup(iorb)=real(ib(iorb),8)
-                ndw(iorb)=real(ib(iorb+Ns),8)
-                nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*gs**2*peso
-                nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*gs**2*peso
-                ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*gs**2*peso
-                dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*gs**2*peso
-                magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*gs**2*peso
-                do jorb=1,Norb
-                   m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs**2*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*peso
-                enddo
-             enddo
-          enddo
-          nullify(gsvec)
-          deallocate(Hmap)
-       enddo
-       nimp  = nimp/zeta_function
-       nupimp = nupimp/zeta_function
-       ndwimp = ndwimp/zeta_function
-       dimp   = dimp/zeta_function
-       magimp = magimp/zeta_function
-       m2imp  = m2imp/zeta_function
-
-    case ('full')
-       do isector=1,Nsect
-          dim=getdim(isector)
-          allocate(Hmap(dim))
-          call build_sector(isect0,Hmap)
-          do i=1,dim
-             Ei=espace(isector)%e(i)
-             peso=exp(-beta*Ei)/zeta_function
-             if(peso < cutoff)cycle
-             do j=1,dim
-                ia=Hmap(j)
-                gs=espace(isector)%M(j,i)
-                call bdecomp(ia,ib)
+#ifdef _MPI
+    if(mpiID==0)then
+#endif
+       write(LOGfile,"(A)")"Evaluating Observables:"
+       Egs = state_list%emin       !es_return_energy(state_list,1)
+       nimp  = 0.d0
+       nupimp = 0.d0
+       ndwimp = 0.d0
+       dimp   = 0.d0
+       magimp = 0.d0
+       m2imp  = 0.d0
+       select case(ed_type)
+       case default
+          numstates=numgs
+          if(finiteT)numstates=state_list%size
+          do izero=1,numstates
+             isect0 = es_return_sector(state_list,izero)
+             Ei     = es_return_energy(state_list,izero)
+             dim0   = getdim(isect0)
+             allocate(Hmap(dim0))
+             call build_sector(isect0,Hmap)
+             iup0   = getnup(isect0)
+             idw0   = getndw(isect0)
+             gsvec  => es_return_vector(state_list,izero)
+             peso   = 1.d0
+             if(finiteT)peso=exp(-beta*(Ei-Egs))
+             norm0=sqrt(dot_product(gsvec,gsvec))
+             if(abs(norm0-1.d0)>1.d-9)then
+                write(LOGfile,*) "GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0)
+                stop
+             endif
+             !
+             do i=1,dim0
+                m=Hmap(i)
+                call bdecomp(m,ib)
+                gs=gsvec(i)
                 do iorb=1,Norb
                    nup(iorb)=real(ib(iorb),8)
                    ndw(iorb)=real(ib(iorb+Ns),8)
-                   nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*peso*gs**2
-                   nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*peso*gs**2
-                   ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*peso*gs**2
-                   dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*peso*gs**2
-                   magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*peso*gs**2
+                   nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*gs**2*peso
+                   nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*gs**2*peso
+                   ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*gs**2*peso
+                   dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*gs**2*peso
+                   magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*gs**2*peso
                    do jorb=1,Norb
-                      m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs**2*peso*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))
+                      m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs**2*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*peso
                    enddo
                 enddo
              enddo
+             nullify(gsvec)
+             deallocate(Hmap)
           enddo
-          deallocate(Hmap)
-       enddo
-    end select
+          nimp  = nimp/zeta_function
+          nupimp = nupimp/zeta_function
+          ndwimp = ndwimp/zeta_function
+          dimp   = dimp/zeta_function
+          magimp = magimp/zeta_function
+          m2imp  = m2imp/zeta_function
 
-    allocate(simp(Norb,Nspin),zimp(Norb,Nspin),rimp(Norb,Nspin))
-    call get_szr
+       case ('full')
+          do isector=1,Nsect
+             dim=getdim(isector)
+             allocate(Hmap(dim))
+             call build_sector(isector,Hmap)
+             do i=1,dim
+                Ei=espace(isector)%e(i)
+                peso=exp(-beta*Ei)/zeta_function
+                if(peso < cutoff)cycle
+                do j=1,dim
+                   ia=Hmap(j)
+                   gs=espace(isector)%M(j,i)
+                   call bdecomp(ia,ib)
+                   do iorb=1,Norb
+                      nup(iorb)=real(ib(iorb),8)
+                      ndw(iorb)=real(ib(iorb+Ns),8)
+                      nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*peso*gs**2
+                      nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*peso*gs**2
+                      ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*peso*gs**2
+                      dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*peso*gs**2
+                      magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*peso*gs**2
+                      do jorb=1,Norb
+                         m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs**2*peso*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))
+                      enddo
+                   enddo
+                enddo
+             enddo
+             deallocate(Hmap)
+          enddo
+       end select
 
-    if(iolegend)call write_legend
+       allocate(simp(Norb,Nspin),zimp(Norb,Nspin),rimp(Norb,Nspin))
+       call get_szr
 
-    loop=loop+1
-    call write_to_unit_column()
-    write(LOGfile,"(A,10f18.12)")"nimp=  ",(nimp(iorb),iorb=1,Norb)
-    write(LOGfile,"(A,10f18.12)")"docc=  ",(dimp(iorb),iorb=1,Norb)
-    write(LOGfile,"(A,10f18.12)")"mom2=  ",(m2imp(iorb,iorb),iorb=1,Norb)
-    if(Nspin==2)then
-       write(LOGfile,"(A,10f18.12)")"mag=   ",(magimp(iorb),iorb=1,Norb)
+       if(iolegend)call write_legend
+
+       loop=loop+1
+       call write_to_unit_column()
+       write(LOGfile,"(A,10f18.12)")"nimp=  ",(nimp(iorb),iorb=1,Norb)
+       write(LOGfile,"(A,10f18.12)")"docc=  ",(dimp(iorb),iorb=1,Norb)
+       write(LOGfile,"(A,10f18.12)")"mom2=  ",(m2imp(iorb,iorb),iorb=1,Norb)
+       if(Nspin==2)then
+          write(LOGfile,"(A,10f18.12)")"mag=   ",(magimp(iorb),iorb=1,Norb)
+       endif
+       write(LOGfile,*)""
+       deallocate(simp,zimp,rimp)
+
+#ifdef _MPI
     endif
-    write(LOGfile,*)""
-    deallocate(simp,zimp,rimp)
-    !!<MPI
-    ! endif
-    ! call MPI_BCAST(nimp,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-    !!>MPI
+    call MPI_BCAST(nimp,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
+#endif
   end subroutine ed_getobs
-
-
-
-
 
 
 

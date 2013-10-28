@@ -2,8 +2,8 @@
 !PURPOSE  : Perform the \Chi^2 fit procedure on the Delta function
 !########################################################################
 MODULE ED_CHI2FIT
-  USE ED_VARS_GLOBAL, only: zero,xi,pi,beta,cg_type,LOGfile,cg_niter,cg_ftol,Nbath,Norb,&
-       txtfy,reg,arange,fmin_cg,splot,error
+  USE OPTIMIZE
+  USE ED_VARS_GLOBAL
   USE ED_BATH
   USE ED_AUX_FUNX
   implicit none
@@ -26,54 +26,50 @@ contains
     real(8),dimension(2*Nbath)         :: a
     integer                            :: iter,stride_spin,stride_orb,ifirst,ilast,i,j,iorb
     real(8)                            :: chi
-    !!<MPI
-    !if(mpiID==0)then
-    !!>MPI
-    write(LOGfile,"(A)")"FIT Delta function:"
-    if(size(fg,1)/=Norb)stop"CHI2_FITGF: wrong dimension 1 in Delta_input"
-    call check_bath_dimension(bath)
+#ifdef _MPI
+    if(mpiID==0)then
+#endif
+       write(LOGfile,"(A)")"FIT Delta function:"
+       if(size(fg,1)/=Norb)stop"CHI2_FITGF: wrong dimension 1 in Delta_input"
+       call check_bath_dimension(bath)
 
-    Ldelta = size(fg,2)
-    allocate(Fdelta(Ldelta))
-    allocate(Xdelta(Ldelta))
-    allocate(Wdelta(Ldelta))
-    Xdelta = pi/beta*real(2*arange(1,Ldelta)-1,8)
-    select case(CG_type)
-    case(0)
-       Wdelta=(/(1.d0,i=1,Ldelta)/)
-    case(1)
-       Wdelta=(/(real(i,8),i=1,Ldelta)/)
-    case(2)
-       Wdelta=Xdelta
-    end select
+       Ldelta = size(fg,2)
+       allocate(Fdelta(Ldelta))
+       allocate(Xdelta(Ldelta))
+       allocate(Wdelta(Ldelta))
+       Xdelta = pi/beta*real(2*arange(1,Ldelta)-1,8)
+       select case(CG_type)
+       case(0)
+          Wdelta=(/(1.d0,i=1,Ldelta)/)
+       case(1)
+          Wdelta=(/(real(i,8),i=1,Ldelta)/)
+       case(2)
+          Wdelta=Xdelta
+       end select
 
-    do iorb=1,Norb
-       Fdelta(:) = fg(iorb,:)
+       do iorb=1,Norb
+          Fdelta(:) = fg(iorb,:)
 
-       stride_spin=(ispin-1)*Norb*Nbath
-       stride_orb=(iorb-1)*2*Nbath
+          stride_spin=(ispin-1)*Norb*Nbath
+          stride_orb=(iorb-1)*2*Nbath
 
-       ifirst=stride_spin + stride_orb + 1
-       ilast =stride_spin + stride_orb + Nbath + Nbath
-       a(:) = bath(ifirst:ilast)
-       call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
-       bath(ifirst:ilast) = a(:)
-       call dump_fit_result(a,ispin,iorb)
-       write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
-    enddo
-    !
-    print*," "
-    deallocate(Fdelta,Xdelta,Wdelta)
-    !!<MPI
-    ! endif
-    ! call MPI_BCAST(bath,size(bath),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-    !!>MPI
+          ifirst=stride_spin + stride_orb + 1
+          ilast =stride_spin + stride_orb + Nbath + Nbath
+          a(:) = bath(ifirst:ilast)
+          call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
+          bath(ifirst:ilast) = a(:)
+          call dump_fit_result(a,ispin,iorb)
+          write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
+       enddo
+       !
+       print*," "
+       deallocate(Fdelta,Xdelta,Wdelta)
+#ifdef _MPI
+    endif
+    call MPI_BCAST(bath,size(bath),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
+#endif
   end subroutine chi2_fitgf
 
-
-  !********************************************************************
-  !********************************************************************
-  !********************************************************************
 
 
 
@@ -152,19 +148,22 @@ contains
     integer                      :: i,j,iorb,ispin,Nb
     real(8)                      :: w
     character(len=20)            :: suffix
+    integer :: unit
     suffix="_orb"//reg(txtfy(iorb))//"_"//reg(txtfy(ispin))//".ed"
     Nb=size(bath)/2
     eps=bath(1:Nb)
     vps=bath(Nb+1:2*Nb)
     fgand=zero
+    unit=free_unit()
+    open(unit,file="fit_delta"//reg(suffix))
     do i=1,Ldelta
        w=Xdelta(i)
        do j=1,Nb
           fgand(i)=fgand(i)+vps(j)**2/(xi*w-eps(j))
        enddo
+       write(unit,"(5F24.15)")Xdelta(i),dimag(Fdelta(i)),dimag(fgand(i)),dreal(Fdelta(i)),dreal(fgand(i))
     enddo
-    call splot("fit_delta"//reg(suffix),Xdelta,dimag(Fdelta(:)),dimag(fgand),&
-         dreal(Fdelta(:)),dreal(fgand))
+    close(unit)
   end subroutine dump_fit_result
 
 end MODULE ED_CHI2FIT
