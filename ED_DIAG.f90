@@ -4,6 +4,9 @@
 !########################################################################
 module ED_DIAG
   USE STATISTICS
+  USE MATRIX, only: matrix_diagonalize
+  USE TIMER
+  USE ARPACK_LANCZOS
   USE ED_VARS_GLOBAL
   USE ED_BATH
   USE ED_AUX_FUNX
@@ -42,53 +45,40 @@ contains
     call es_free_espace(state_list)
     oldzero=1000.d0
     numgs=0
-#ifdef _MPI
-    if(mpiID==0)then
-#endif
-       write(LOGfile,"(A)")"Get Hamiltonian:"
-       call start_progress(LOGfile)
-#ifdef _MPI
-    endif
-#endif
+    if(mpiID==0)write(LOGfile,"(A)")"Get Hamiltonian:"
+    if(mpiID==0)call start_progress(LOGfile)
+
     sector: do isector=1,Nsect
-#ifdef _MPI
-       if(mpiID==0)then
-#endif
-          call progress(isector,Nsect)
-#ifdef _MPI
-       endif
-#endif
+       if(mpiID==0)call progress(isector,Nsect)
        dim     = getdim(isector)
        Neigen  = min(dim,neigen_sector(isector))
        Nitermax= min(dim,lanc_niter)
        Nblock  = min(dim,5*Neigen+10)
        !
        lanc_solve  = .true. ; if(Neigen==dim)lanc_solve=.false.
-       if(dim<=64)lanc_solve=.false.
+       if(dim<=128)lanc_solve=.false.
        !
        if(lanc_solve)then
           allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
-          eig_values=0.d0 ; eig_basis=0.d0 
+          eig_values=0.d0 ; eig_basis=0.d0
           call setup_Hv_sector(isector)
+          call ed_geth(isector)
 #ifdef _MPI
-          call lanczos_parpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,HtimesV_mpi,.false.)
+          call lanczos_parpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_d,.false.)
 #else
-          call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,HtimesV,.false.)
+          call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_d,.false.)
 #endif
           call delete_Hv_sector()
        else
           allocate(eig_values(Dim),eig_basis(Dim,dim))
           eig_values=0.d0 ; eig_basis=0.d0 
+          call setup_Hv_sector(isector)
           call ed_geth(isector,eig_basis)
+          call delete_Hv_sector()
           call matrix_diagonalize(eig_basis,eig_values,'V','U')
           if(dim==1)eig_basis(dim,dim)=1.d0
        endif
-
-       !print*,mpiID,isector,eig_values(1)
        !
-       !if(finiteT) try to add each obtained state to the state_list if (Ei < E_list_max)
-       !add_state is pop last state & insert new one
-       !if(!finiteT) keep the ground states only 
        if(finiteT)then
           do i=1,Neigen
              call es_add_state(state_list,eig_values(i),eig_basis(1:dim,i),isector,size=lanc_nstates)
@@ -113,13 +103,7 @@ contains
        if(spH0%status)call sp_delete_matrix(spH0)
        !
     enddo sector
-#ifdef _MPI
-    if(mpiID==0)then
-#endif
-       call stop_progress
-#ifdef _MPI
-    endif
-#endif
+    if(mpiID==0)call stop_progress
 
     !POST PROCESSING:
 #ifdef _MPI
@@ -154,13 +138,7 @@ contains
        zeta_function=real(numgs,8)
     end if
     !
-#ifdef _MPI
-    if(mpiID==0)then
-#endif
-       write(LOGfile,"(A)")"Groundstate sector(s):"
-#ifdef _MPI
-    endif
-#endif
+    if(mpiID==0)write(LOGfile,"(A)")"Groundstate sector(s):"
     if(finiteT)then
        numgs=es_return_groundstates(state_list)
        if(numgs>Nsect)stop "ed_diag: too many gs"
@@ -171,25 +149,16 @@ contains
        nup0  = getnup(isect0)
        ndw0  = getndw(isect0)
        dim0  = getdim(isect0)
-#ifdef _MPI
-       if(mpiID==0)then
-#endif
-          write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
-#ifdef _MPI
-       endif
-#endif
+       if(mpiID==0)write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
     enddo
-#ifdef _MPI
     if(mpiID==0)then
-#endif
        write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function
        write(LOGfile,*)""
        open(3,file='egs.ed',access='append')
        write(3,*)egs
        close(3)
-#ifdef _MPI
     endif
-#endif
+
 
     !Get histogram distribution of the sector contributing to the evaluated spectrum:
     !Go thru states list and update the neigen_sector(isector) sector-by-sector
@@ -247,13 +216,7 @@ contains
        Ec  = state_list%emax
        if(exp(-beta*(Ec-Egs)) > cutoff)then
           lanc_nstates=lanc_nstates + 2!*lanc_nincrement
-#ifdef _MPI
-          if(mpiID==0)then
-#endif
-             write(*,"(A,I4)")"Increasing lanc_nstates+2:",lanc_nstates
-#ifdef _MPI
-          endif
-#endif
+          if(mpiID==0)write(*,"(A,I4)")"Increasing lanc_nstates+2:",lanc_nstates
        endif
     endif
 
@@ -283,16 +246,13 @@ contains
 #endif
 
     do isector=1,Nsect
-#ifdef _MPI
-       if(mpiID==0)then
-#endif
-          call progress(isector,Nsect)
-#ifdef _MPI
-       endif
-#endif
+       if(mpiID==0)call progress(isector,Nsect)
        dim=getdim(isector)
+       call setup_Hv_sector(isector)
        call ed_geth(isector,espace(isector)%M(:,:))
+       call delete_Hv_sector()
        call matrix_diagonalize(espace(isector)%M,espace(isector)%e,'V','U')
+
        e0(isector)=minval(espace(isector)%e)
     enddo
     call stop_progress

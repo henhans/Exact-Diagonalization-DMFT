@@ -5,7 +5,6 @@ MODULE ED_CHI2FIT
   USE OPTIMIZE
   USE ED_VARS_GLOBAL
   USE ED_BATH
-  USE ED_AUX_FUNX
   implicit none
   private
 
@@ -37,7 +36,7 @@ contains
        allocate(Fdelta(Ldelta))
        allocate(Xdelta(Ldelta))
        allocate(Wdelta(Ldelta))
-       Xdelta = pi/beta*real(2*arange(1,Ldelta)-1,8)
+       forall(i=1:Ldelta)Xdelta(i)=pi/beta*real(2*i-1,8)
        select case(CG_type)
        case(0)
           Wdelta=(/(1.d0,i=1,Ldelta)/)
@@ -50,11 +49,11 @@ contains
        do iorb=1,Norb
           Fdelta(:) = fg(iorb,:)
 
-          stride_spin=(ispin-1)*Norb*Nbath
-          stride_orb=(iorb-1)*2*Nbath
+          stride_spin = (ispin-1)*Norb*Nbath
+          stride_orb  = (iorb-1)*2*Nbath
 
-          ifirst=stride_spin + stride_orb + 1
-          ilast =stride_spin + stride_orb + Nbath + Nbath
+          ifirst = stride_spin + stride_orb + 1
+          ilast  = stride_spin + stride_orb + Nbath + Nbath
           a(:) = bath(ifirst:ilast)
           call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
           bath(ifirst:ilast) = a(:)
@@ -106,11 +105,11 @@ contains
   end function dchi2
 
   function gand(w,a) result(gg)
-    real(8)                :: w
-    real(8),dimension(:)   :: a
+    real(8)                      :: w
+    real(8),dimension(:)         :: a
     real(8),dimension(size(a)/2) :: eps,vps
-    complex(8)             :: gg
-    integer                :: i,Nb
+    complex(8)                   :: gg
+    integer                      :: i,Nb
     Nb=size(a)/2
     eps=a(1:Nb)
     vps=a(Nb+1:2*Nb)

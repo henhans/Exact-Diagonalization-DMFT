@@ -9,7 +9,6 @@ program lancED
   implicit none
   integer :: iloop,Nb
   logical :: converged
-  real(8),allocatable    :: wm(:),wr(:)
   real(8)                :: wband,ts
   !Bath:
   real(8),allocatable    :: Bath(:)
@@ -27,10 +26,6 @@ program lancED
   call read_input("inputED.in")
   call parse_cmd_variable(wband,"wband",default=1.d0)
 
-  allocate(wm(NL),wr(Nw))
-  wm = pi/beta*real(2*arange(1,NL)-1,8)
-  wr = linspace(wini,wfin,Nw)
-
   !Allocate Weiss Field:
   allocate(delta(Norb,NL))
 
@@ -41,7 +36,7 @@ program lancED
 
   !DMFT loop
   iloop=0;converged=.false.
-  do while(.not.converged)
+  do while(.not.converged.OR.iloop>nloop)
      iloop=iloop+1
      call start_loop(iloop,nloop,"DMFT-loop")
 
@@ -60,7 +55,6 @@ program lancED
 #endif
         converged = check_convergence(delta(1,:),eps_error,nsuccess,nloop)
         if(nread/=0.d0)call search_mu(nimp(1),converged)
-        if(iloop>nloop)converged=.true.
 #ifdef _MPI
      endif
      call MPI_BCAST(converged,1,MPI_LOGICAL,0,MPI_COMM_WORLD,mpiERR)
@@ -69,7 +63,6 @@ program lancED
   enddo
 
 #ifdef _MPI
-  call MPI_BARRIER(MPI_COMM_WORLD,mpiERR)
   call MPI_FINALIZE(mpiERR)
 #endif
 
@@ -83,6 +76,10 @@ contains
     complex(8)                :: iw,zita,g0and,g0loc
     complex(8),dimension(NL)  :: self,gloc
     complex(8),dimension(Nw)  :: selfr,grloc
+    real(8)                   :: wm(NL),wr(Nw)
+
+    wm = pi/beta*real(2*arange(1,NL)-1,8)
+    wr = linspace(wini,wfin,Nw)
 
     do iorb=1,Norb
        do i=1,NL

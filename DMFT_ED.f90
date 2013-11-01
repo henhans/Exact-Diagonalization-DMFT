@@ -17,20 +17,15 @@ contains
   !+------------------------------------------------------------------+
   subroutine init_ed_solver(bath)
     real(8),dimension(:),intent(inout) :: bath
-#ifdef _MPI
-    if(mpiID==0)then
-#endif
-       write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
-#ifdef _MPI
-    endif
-#endif
+    if(mpiID==0)write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
     call init_ed_structure
     call check_bath_dimension(bath)
+    call allocate_bath
     call init_bath_ed
+    bath = copy_bath()
     call write_bath(LOGfile)
     call setup_pointers
     if(ed_type=='full')call setup_eigenspace
-    bath = copy_bath()
     call deallocate_bath
   end subroutine init_ed_solver
 
@@ -41,13 +36,7 @@ contains
   subroutine ed_solver(bath)
     real(8),dimension(:),intent(in) :: bath
     integer                         :: unit
-#ifdef _MPI
-    if(mpiID==0)then
-#endif
-       write(LOGfile,"(A)")"ED SOLUTION"
-#ifdef _MPI
-    endif
-#endif
+    if(mpiID==0)write(LOGfile,"(A)")"ED SOLUTION"
     call check_bath_dimension(bath)
     call allocate_bath
     call set_bath(bath)

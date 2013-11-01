@@ -84,37 +84,40 @@ contains
     logical :: IOfile
     real(8) :: ran(Nbath)
 
-    if(bath_status)call deallocate_bath
-    call allocate_bath
-    ! #ifdef _MPI
-    !     if(mpiID==0)then
-    ! #endif
-    inquire(file=trim(Hfile),exist=IOfile)
-    if(IOfile)then
-       write(LOGfile,"(A)")'Reading bath from file'
-       write(LOGfile,"(A)")'- - - - - - - - - - - -'
-       unit = free_unit()
-       open(unit,file=trim(Hfile))
-       read(unit,*)
-       do i=1,Nbath
-          read(unit,"(90(F22.15,1X))")((ebath(ispin,iorb,i),vbath(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
-       enddo
-       close(unit)
-    else
-       write(LOGfile,"(A)")bg_red('Generating bath from scratch')
-       call random_number(ran(:)) !default Fortran RNG: based on KISS
-       do ispin=1,Nspin
+    if(.not.bath_status)stop "init_bath: bath not allocated"
+
+#ifdef _MPI
+    if(mpiID==0)then
+#endif
+       inquire(file=trim(Hfile),exist=IOfile)
+       if(IOfile)then
+          write(LOGfile,"(A)")'Reading bath from file'
+          write(LOGfile,"(A)")'- - - - - - - - - - - -'
+          unit = free_unit()
+          open(unit,file=trim(Hfile))
+          read(unit,*)
           do i=1,Nbath
-             ebath(ispin,1:Norb,i)=(2.d0*ran(i)-1.d0)*real(Nbath,8)/2.d0
-             vbath(ispin,1:Norb,i)=1.d0/sqrt(real(Nbath,8))
+             read(unit,"(90(F22.15,1X))")((ebath(ispin,iorb,i),vbath(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
           enddo
-       enddo
+          close(unit)
+       else
+          write(LOGfile,"(A)")"Generating bath from scratch"
+          write(LOGfile,"(A)")'- - - - - - - - - - - - - - -'
+          call random_number(ran(:))
+          do ispin=1,Nspin
+             do iorb=1,Norb
+                do i=1,Nbath
+                   ebath(ispin,iorb,i)=(2.d0*ran(i)-1.d0)*real(Nbath,8)/2.d0
+                   vbath(ispin,iorb,i)=1.d0/sqrt(real(Nbath,8))
+                enddo
+             enddo
+          enddo
+       endif
+#ifdef _MPI
     endif
-    ! #ifdef _MPI
-    !     endif
-    !     call MPI_BCAST(ebath,size(ebath),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
-    !     call MPI_BCAST(vbath,size(vbath),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
-    ! #endif
+    call MPI_BCAST(ebath,size(ebath),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
+    call MPI_BCAST(vbath,size(vbath),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
+#endif
   end subroutine init_bath_ed
 
 
