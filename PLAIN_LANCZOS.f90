@@ -1,14 +1,14 @@
 MODULE PLAIN_LANCZOS_HTIMESV_INTERFACE
   implicit none
   abstract interface 
-     subroutine lanc_htimesv_d(n,vin,vout)
-       integer :: n
+     subroutine lanc_htimesv_d(nloc,n,vin,vout)
+       integer :: n,nloc
        real(8) :: vin(n)
        real(8) :: vout(n)
      end subroutine lanc_htimesv_d
      !
-     subroutine lanc_htimesv_c(n,vin,vout)
-       integer    :: n
+     subroutine lanc_htimesv_c(nloc,n,vin,vout)
+       integer    :: n,nloc
        complex(8) :: vin(n)
        complex(8) :: vout(n)
      end subroutine lanc_htimesv_c
@@ -18,19 +18,18 @@ END MODULE PLAIN_LANCZOS_HTIMESV_INTERFACE
 
 MODULE PLAIN_LANCZOS
   USE PLAIN_LANCZOS_HTIMESV_INTERFACE
+  USE ED_VARS_GLOBAL
   implicit none
   private
-  procedure(lanc_htimesv_d),pointer :: dp_hprod
-  procedure(lanc_htimesv_c),pointer :: cp_hprod
-  logical                           :: verb=.false.
-  real(8)                           :: threshold_=1.d-12
-  real(8)                           :: ncheck_=10
-  complex(8),parameter              :: zero=(0.d0,0.d0),one=(1.d0,0.d0),xi=(0.d0,1.d0)
+  procedure(lanc_htimesv_d),pointer     :: dp_hprod
+  procedure(lanc_htimesv_c),pointer     :: cp_hprod
+  logical                               :: verb=.false.
+  real(8)                               :: threshold_=1.d-12
+  real(8)                               :: ncheck_=10
 
   public :: lanczos_plain_set_htimesv_d
   public :: lanczos_plain_set_htimesv_c
-  public :: lanczos_plain_delete_htimesv_d
-  public :: lanczos_plain_delete_htimesv_c
+  public :: lanczos_plain_delete_htimesv
   public :: lanczos_plain_iteration_d
   public :: lanczos_plain_iteration_c
   public :: lanczos_plain_tridiag_d
@@ -62,13 +61,11 @@ contains
   !---------------------------------------------------------------------
   !Purpose: delete the H*v function operator (use abstract interface)
   !---------------------------------------------------------------------
-  subroutine lanczos_plain_delete_htimesv_d()
+  subroutine lanczos_plain_delete_htimesv()
     if(associated(dp_hprod))nullify(dp_hprod)
-  end subroutine lanczos_plain_delete_htimesv_d
-  !
-  subroutine lanczos_plain_delete_htimesv_c()
     if(associated(cp_hprod))nullify(cp_hprod)
-  end subroutine lanczos_plain_delete_htimesv_c
+  end subroutine lanczos_plain_delete_htimesv
+
 
 
   !---------------------------------------------------------------------
@@ -85,8 +82,9 @@ contains
     real(8),dimension(size(vin)),intent(inout) :: vout
     real(8),dimension(size(vin))               :: dummy,tmp
     real(8),intent(inout)                      :: a,b
-    integer                                    :: i,iter,ns_
+    integer                                    :: i,iter,ns_,nloc
     real(8)                                    :: norm
+    integer                                    :: mpiQ,mpiR
     ns_=size(vin)
     if(iter==1)then
        norm=sqrt(dot_product(vin,vin))
@@ -94,7 +92,14 @@ contains
        vin=vin/norm
        b=0.d0
     end if
-    call dp_Hprod(ns_,vin,tmp)
+    nloc=1
+#ifdef _MPI
+    mpiQ = ns_/mpiSIZE
+    mpiR = 0
+    if(mpiID==(mpiSIZE-1))mpiR=mod(ns_,mpiSIZE)
+    nloc=mpiQ+mpiR
+#endif
+    call dp_Hprod(nloc,ns_,vin,tmp)
     tmp=tmp-b*vout
     a = dot_product(vin,tmp)
     dummy=tmp-a*vin
@@ -108,8 +113,9 @@ contains
     complex(8),dimension(size(vin)),intent(inout) :: vout
     complex(8),dimension(size(vin))               :: dummy,tmp
     real(8),intent(inout)                         :: a,b
-    integer                                       :: i,iter,ns_
+    integer                                       :: i,iter,ns_,nloc
     real(8)                                       :: norm
+    integer                                       :: mpiQ,mpiR
     ns_=size(vin)
     if(iter==1)then
        norm=sqrt(dot_product(vin,vin))
@@ -117,7 +123,14 @@ contains
        vin=vin/norm
        b=0.d0
     end if
-    call cp_Hprod(ns_,vin,tmp)
+    nloc = 1 
+#ifdef _MPI
+    mpiQ = ns_/mpiSIZE
+    mpiR = 0
+    if(mpiID == mpiSIZE-1)mpiR=mod(Ns_,mpiSIZE)
+    nloc=mpiQ+mpiR
+#endif
+    call cp_Hprod(nloc,ns_,vin,tmp)
     tmp=tmp-b*vout
     a = dot_product(vin,tmp)
     dummy=tmp-a*vin

@@ -1,16 +1,11 @@
 MODULE ED_VARS_GLOBAL
   USE SCIFOR_VERSION
   USE COMMON_VARS
-  USE TIMER
   USE PARSE_CMD
-  USE IOTOOLS
-  USE MATRIX, only: matrix_diagonalize
-  USE TOOLS, only: arange,linspace
+  USE IOTOOLS, only:free_unit,reg,splot
   !LOCAL
   USE MATRIX_SPARSE
   USE EIGEN_SPACE
-  USE PLAIN_LANCZOS
-  USE ARPACK_LANCZOS
 #ifdef _MPI
   USE MPI
 #endif
@@ -60,7 +55,6 @@ MODULE ED_VARS_GLOBAL
   !Dimension of the functions:
   !=========================================================
   integer :: NL,Ltau,Nw,Nfit
-
 
 
   !Some maps between sectors and full Hilbert space (pointers)
@@ -141,14 +135,7 @@ contains
     character(len=*) :: INPUTunit
     logical          :: control
 
-#ifdef _MPI
-    if(mpiID==0)then
-#endif
-       call version(revision)
-#ifdef _MPI
-    endif
-#endif
-
+    if(mpiID==0)call version(revision)
 
     !DEFAULT VALUES OF THE PARAMETERS:
     !ModelConf
@@ -265,6 +252,7 @@ contains
 #ifdef _MPI
     endif
 #endif
+
   end subroutine read_input
 
 END MODULE ED_VARS_GLOBAL

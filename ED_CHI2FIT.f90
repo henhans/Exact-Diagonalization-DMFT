@@ -3,6 +3,7 @@
 !########################################################################
 MODULE ED_CHI2FIT
   USE OPTIMIZE
+  USE TOOLS, only: arange,linspace
   USE ED_VARS_GLOBAL
   USE ED_BATH
   USE ED_AUX_FUNX

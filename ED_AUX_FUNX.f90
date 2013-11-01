@@ -3,6 +3,7 @@
 !AUTHORS  : Adriano Amaricci
 !########################################################################
 MODULE ED_AUX_FUNX
+  USE TIMER
   USE ED_VARS_GLOBAL
   implicit none
   private
@@ -112,7 +113,7 @@ contains
 
     !Some check:
     if(Nfit>NL)Nfit=NL
-    if(Norb>3)stop "Norb > 3 ERROR. I guess you need to open the code at this point..." 
+    if(Norb>5)stop "Norb > 5 ERROR. I guess you need to open the code at this point..." 
     if(nerr > eps_error) nerr=eps_error    
 
     !allocate functions
@@ -134,13 +135,7 @@ contains
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
 
-#ifdef _MPI
-    if(mpiID==0)then
-#endif
-       write(LOGfile,"(A)")"Setting up pointers:"
-#ifdef _MPI
-    endif
-#endif
+    if(mpiID==0)write(LOGfile,"(A)")"Setting up pointers:"
     call start_timer
     isector=0
     do nup=0,Ns

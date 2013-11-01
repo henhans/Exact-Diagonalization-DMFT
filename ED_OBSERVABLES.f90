@@ -24,7 +24,7 @@ contains
     integer                      :: k,r
     integer                      :: ia,isector
     integer                      :: izero,isect0,jsect0,m
-    integer                      :: dim,dim0,iup,iup0,idw,idw0
+    integer                      :: dim,dim0,iup,idw
     integer                      :: iorb,jorb,ispin,numstates
     real(8)                      :: gs
     real(8)                      :: Ei,Egs,norm0,sgn,nup(Norb),ndw(Norb),peso
@@ -51,10 +51,6 @@ contains
              isect0 = es_return_sector(state_list,izero)
              Ei     = es_return_energy(state_list,izero)
              dim0   = getdim(isect0)
-             allocate(Hmap(dim0))
-             call build_sector(isect0,Hmap)
-             iup0   = getnup(isect0)
-             idw0   = getndw(isect0)
              gsvec  => es_return_vector(state_list,izero)
              peso   = 1.d0
              if(finiteT)peso=exp(-beta*(Ei-Egs))
@@ -63,6 +59,9 @@ contains
                 write(LOGfile,*) "GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0)
                 stop
              endif
+             !
+             allocate(Hmap(dim0))
+             call build_sector(isect0,Hmap)
              !
              do i=1,dim0
                 m=Hmap(i)
