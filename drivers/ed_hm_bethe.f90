@@ -16,6 +16,13 @@ program lancED
   !The local hybridization function:
   complex(8),allocatable :: Delta(:,:)
 
+#ifdef _MPI
+  call MPI_INIT(mpiERR)
+  call MPI_COMM_RANK(MPI_COMM_WORLD,mpiID,mpiERR)
+  call MPI_COMM_SIZE(MPI_COMM_WORLD,mpiSIZE,mpiERR)
+  write(*,"(A,I4,A,I4,A)")'Processor ',mpiID,' of ',mpiSIZE,' is alive'
+  call MPI_BARRIER(MPI_COMM_WORLD,mpiERR)
+#endif
 
   call read_input("inputED.in")
   call parse_cmd_variable(wband,"wband",default=1.d0)
@@ -48,11 +55,23 @@ program lancED
      call chi2_fitgf(delta,bath,ispin=1)
 
      !Check convergence (if required change chemical potential)
-     converged = check_convergence(delta(1,:),eps_error,nsuccess,nloop)
-     if(nread/=0.d0)call search_mu(nimp(1),converged)
-     if(iloop>nloop)converged=.true.
+#ifdef _MPI
+     if(mpiID==0)then
+#endif
+        converged = check_convergence(delta(1,:),eps_error,nsuccess,nloop)
+        if(nread/=0.d0)call search_mu(nimp(1),converged)
+        if(iloop>nloop)converged=.true.
+#ifdef _MPI
+     endif
+     call MPI_BCAST(converged,1,MPI_LOGICAL,0,MPI_COMM_WORLD,mpiERR)
+#endif
      call end_loop
   enddo
+
+#ifdef _MPI
+  call MPI_BARRIER(MPI_COMM_WORLD,mpiERR)
+  call MPI_FINALIZE(mpiERR)
+#endif
 
 
 contains
@@ -93,6 +112,7 @@ contains
   end subroutine get_delta_bethe
   !+----------------------------------------+
 
+  include 'search_mu.f90'
 end program lancED
 
 

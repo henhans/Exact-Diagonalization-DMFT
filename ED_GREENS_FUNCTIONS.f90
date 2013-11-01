@@ -7,6 +7,10 @@
 !AUTHORS  : Adriano Amaricci
 !###################################################################
 MODULE ED_GREENS_FUNCTIONS
+  USE TIMER
+  USE IOTOOLS, only:free_unit,reg
+  USE TOOLS, only: arange,linspace
+  USE PLAIN_LANCZOS
   USE ED_VARS_GLOBAL
   USE ED_BATH
   USE ED_AUX_FUNX
@@ -39,59 +43,52 @@ MODULE ED_GREENS_FUNCTIONS
 contains
 
 
+
   !####################################################################
-  !                    lanczos DIAGONALIZATION 
+  !                    LANCZOS DIAGONALIZATION 
   !####################################################################
   !+------------------------------------------------------------------+
   !PURPOSE  : Evaluate Green's functions using Lanczos algorithm
   !+------------------------------------------------------------------+
   subroutine lanc_ed_getgf()
     integer :: izero,iorb,jorb,ispin,i
-    integer :: isect0,nup0,ndw0,numstates
+    integer :: isect0,numstates
     real(8) :: norm0
     call allocate_grids
     impGmats=zero
     impGreal=zero
-    write(LOGfile,"(A)")"Evaluating Green's functions"
+    if(mpiID==0)write(LOGfile,"(A)")"Evaluating Green's functions"
+
     numstates=numgs
     if(finiteT)numstates=state_list%size
-    call lanczos_plain_set_htimesv_d(HtimesV)
+    call lanczos_plain_set_htimesv_d(lanc_spHtimesV_d)
     do ispin=1,Nspin
        do iorb=1,Norb
-          write(LOGfile,"(A)")"Evaluating G_imp_Orb"//&
+          if(mpiID==0)write(LOGfile,"(A)")"Evaluating G_imp_Orb"//&
                reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin))
-          call start_progress
+          if(mpiID==0)call start_progress
+
           do izero=1,numstates
-             call progress(izero,numstates)
-             isect0 =  es_return_sector(state_list,izero)
+             if(mpiID==0)call progress(izero,numstates)
+             isect0     =  es_return_sector(state_list,izero)
              state_e    =  es_return_energy(state_list,izero)
              state_vec  => es_return_vector(state_list,izero)
-             nup0  = getnup(isect0)
-             ndw0  = getndw(isect0)
              norm0=sqrt(dot_product(state_vec,state_vec))
              if(abs(norm0-1.d0)>1.d-9)then
-                write(LOGfile,*) "GS"//reg(txtfy(izero))//&
-                     "is not normalized:"//reg(txtfy(norm0))
+                write(LOGfile,*) "GS"//reg(txtfy(izero))//"is not normalized:"//reg(txtfy(norm0))
                 stop
              endif
              call lanc_ed_buildgf(isect0,iorb,ispin)
              nullify(state_vec)
           enddo
-          call stop_progress
+          if(mpiID==0)call stop_progress
        enddo
     enddo
-    call lanczos_plain_delete_htimesv_d
+    call lanczos_plain_delete_htimesv
     impGmats=impGmats/zeta_function
     impGreal=impGreal/zeta_function
     !Print impurity functions:
-    !!<MPI
-    !if(mpiID==0)then
-    !!>MPI
-    call print_imp_gf
-    !!<MPI
-    !endif
-    !!>MPI
-    !call stop_timer
+    if(mpiID==0)call print_imp_gf
     deallocate(wm,wr,tau,vm)
   end subroutine lanc_ed_getgf
 
@@ -102,11 +99,11 @@ contains
   !+------------------------------------------------------------------+
   subroutine lanc_ed_getchi()
     integer :: izero,iorb,jorb,ispin,i
-    integer :: isect0,nup0,ndw0,numstates
+    integer :: isect0,numstates
     real(8) :: norm0
     allocate(wm(NL))
     wm     = pi/beta*real(2*arange(1,NL)-1,8)
-    allocate(vm(0:NL))          !bosonic frequencies
+    allocate(vm(0:NL))
     do i=0,NL
        vm(i) = pi/beta*2.d0*real(i,8)
     enddo
@@ -118,42 +115,34 @@ contains
     Chitau=0.d0
     Chiw=zero
     Chiiw=zero
-    write(LOGfile,"(A)")"Evaluating Susceptibility:"
+    if(mpiID==0)write(LOGfile,"(A)")"Evaluating Susceptibility:"
+
     numstates=numgs
     if(finiteT)numstates=state_list%size
-    call lanczos_plain_set_htimesv_d(HtimesV)
+    call lanczos_plain_set_htimesv_d(lanc_spHtimesV_d)
     do iorb=1,Norb
-       write(LOGfile,"(A)")"Evaluating Chi_Orb"//reg(txtfy(iorb))
-       call start_progress
+       if(mpiID==0)write(LOGfile,"(A)")"Evaluating Chi_Orb"//reg(txtfy(iorb))
+       if(mpiID==0)call start_progress
        do izero=1,numstates
           call progress(izero,numstates)
           isect0 =  es_return_sector(state_list,izero)
           state_e    =  es_return_energy(state_list,izero)
           state_vec  => es_return_vector(state_list,izero)
-          nup0  = getnup(isect0)
-          ndw0  = getndw(isect0)
           norm0=sqrt(dot_product(state_vec,state_vec))
           if(abs(norm0-1.d0)>1.d-9)then
-             write(LOGfile,*) "GS"//reg(txtfy(izero))//&
-                  "is not normalized:"//reg(txtfy(norm0))
+             write(LOGfile,*) "GS"//reg(txtfy(izero))//"is not normalized:"//reg(txtfy(norm0))
              stop
           endif
           call lanc_ed_buildchi(isect0,iorb)
           nullify(state_vec)
        enddo
-       call stop_progress
+       if(mpiID==0)call stop_progress
     enddo
-    call lanczos_plain_delete_htimesv_d
-    Chitau=Chitau/zeta_function
-    Chiw=Chiw/zeta_function
-    Chiiw=Chiiw/zeta_function
-    !!<MPI
-    !if(mpiID==0)then
-    !!>MPI
-    call print_imp_chi()
-    !!<MPI
-    !endif
-    !!>MPI
+    call lanczos_plain_delete_htimesv
+    Chitau = Chitau/zeta_function
+    Chiw   = Chiw/zeta_function
+    Chiiw  = Chiiw/zeta_function
+    if(mpiID==0)call print_imp_chi()
     deallocate(Chitau,Chiw,Chiiw)
     deallocate(wm,wr,tau,vm)
   end subroutine lanc_ed_getchi
@@ -194,25 +183,17 @@ contains
        jdim0  = getdim(jsect0)
        jup0   = getnup(jsect0)
        jdw0   = getndw(jsect0)
-       !!<MPI
-       !if(mpiID==0)then
-       !!>MPI
-       if(iverbose_)write(LOGfile,"(A,2I3,I15)")'add particle:',&
-            jup0,jdw0,jdim0
-       !!<MPI
-       !endif
-       !!>MPI
-       allocate(HJmap(jdim0))
-       call build_sector(jsect0,HJmap)
-       !
-       allocate(vvinit(jdim0))
+       if(mpiID==0.AND.iverbose_)write(LOGfile,"(A,2I3,I15)")'add particle:',jup0,jdw0,jdim0
+
+       allocate(HJmap(jdim0),vvinit(jdim0))
+       call build_sector(jsect0,HJmap) !note that here you are doing twice the map building...
        vvinit=0.d0
        do m=1,idim0                     !loop over |gs> components m
           i=HImap(m)                    !map m to Hilbert space state i
           call bdecomp(i,ib)            !i into binary representation
           if(ib(isite)==0)then          !if impurity is empty: proceed
-             call cdg(isite,i,r)
-             sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
+             call cdg(isite,i,r,sgn)
+             !sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
              j=binary_search(HJmap,r)      !map r back to  jsect0
              vvinit(j) = sgn*state_vec(m)  !build the cdg_up|gs> state
           endif
@@ -222,6 +203,7 @@ contains
        vvinit=vvinit/norm0
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
        call setup_Hv_sector(jsect0)
+       call ed_geth(jsect0)
        call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
        call delete_Hv_sector()
        call add_to_lanczos_gf(norm0,state_e,nitermax,alfa_,beta_,1,iorb,ispin)
@@ -236,25 +218,16 @@ contains
        jdim0  = getdim(jsect0)
        jup0    = getnup(jsect0)
        jdw0    = getndw(jsect0)
-       !!<MPI
-       !if(mpiID==0)then
-       !!>MPI
-       if(iverbose_)write(LOGfile,"(A,2I3,I15)")'del particle:',&
+       if(mpiID==0.AND.iverbose_)write(LOGfile,"(A,2I3,I15)")'del particle:',&
             jup0,jdw0,jdim0
-       !!<MPI
-       !endif
-       !!>MPI
-       allocate(HJmap(jdim0))
+       allocate(HJmap(jdim0),vvinit(jdim0))
        call build_sector(jsect0,HJmap)
-       !
-       allocate(vvinit(jdim0)) 
        vvinit=0.d0
        do m=1,idim0
           i=HImap(m)
           call bdecomp(i,ib)
           if(ib(isite)==1)then
-             call c(isite,i,r)
-             sgn=dfloat(r)/dfloat(abs(r));r=abs(r)
+             call c(isite,i,r,sgn)
              j=binary_search(HJmap,r)
              vvinit(j) = sgn*state_vec(m)
           endif
@@ -264,6 +237,7 @@ contains
        vvinit=vvinit/norm0
        alfa_=0.d0 ; beta_=0.d0
        call setup_Hv_sector(jsect0)
+       call ed_geth(jsect0)
        call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
        call delete_Hv_sector()
        call add_to_lanczos_gf(norm0,state_e,nitermax,alfa_,beta_,-1,iorb,ispin)
@@ -297,11 +271,9 @@ contains
     if(isect0/=0)then 
        iup0   = getnup(isect0)
        idw0   = getndw(isect0)
-       !call ed_geth(isect0)
        !allocate map from isect0 to HS
-       allocate(HImap(idim0))
+       allocate(HImap(idim0),vvinit(idim0))
        call build_sector(isect0,HImap)
-       allocate(vvinit(idim0))
        vvinit=0.d0
        do m=1,idim0                     !loop over |gs> components m
           i=HImap(m)
@@ -314,6 +286,7 @@ contains
        vvinit=vvinit/norm0
        alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
        call setup_Hv_sector(isect0)
+       call ed_geth(isect0)
        call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
        call delete_Hv_sector()
        call add_to_lanczos_chi(norm0,state_e,nitermax,alfa_,beta_,iorb)
@@ -322,8 +295,6 @@ contains
     endif
     deallocate(alfa_,beta_)
   end subroutine lanc_ed_buildchi
-
-
 
 
 
@@ -429,20 +400,14 @@ contains
     call allocate_grids
     impGmats   =zero
     impGreal   =zero
-    call start_timer
+    if(mpiID==0)call start_timer
     do ispin=1,Nspin
        do iorb=1,Norb
           call full_ed_buildgf(iorb,ispin)
        enddo
     enddo
-    !!<MPI
-    !if(mpiID==0)then
-    !!>MPI
-    call print_imp_gf
-    !!<MPI
-    !endif
-    !!>MPI    
-    call stop_timer
+    if(mpiID==0)call print_imp_gf
+    if(mpiID==0)call stop_timer
     deallocate(wm,tau,wr,vm)
   end subroutine full_ed_getgf
 
@@ -466,11 +431,12 @@ contains
 
     nsite=1
     isite=impIndex(iorb,ispin)
-    write(LOGfile,"(A)")"Evaluating G_imp_Orb"//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin))
-    call start_progress(LOGfile)
+    if(mpiID==0)write(LOGfile,"(A)")"Evaluating G_imp_Orb"//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin))
+    if(mpiID==0)call start_progress(LOGfile)
+
     do isector=1,Nsect
        jsector=getCsector(1,isector);if(jsector==0)cycle
-       call progress(isector,Nsect)
+       if(mpiID==0)call progress(isector,Nsect)
        idim=getdim(isector)     !i-th sector dimension
        jdim=getdim(jsector)     !j-th sector dimension
        allocate(HImap(idim))
@@ -488,7 +454,7 @@ contains
                 m = HJmap(ll)
                 call bdecomp(m,ib)
                 if(ib(isite) == 0)then
-                   call cdg(isite,m,k);cc=dble(k)/dble(abs(k));k=abs(k)
+                   call cdg(isite,m,k,cc)!;cc=dble(k)/dble(abs(k));k=abs(k)
                    r = binary_search(HImap,k)
                    cdgmat=cdgmat+espace(isector)%M(r,i)*cc*espace(jsector)%M(ll,j)
                 endif
@@ -512,7 +478,7 @@ contains
        enddo
        deallocate(HImap,HJmap)
     enddo
-    call stop_progress
+    if(mpiID==0)call stop_progress
   end subroutine full_ed_buildgf
 
 
@@ -528,11 +494,7 @@ contains
     real(8)                               :: expterm,de,w0,it
     complex(8)                            :: iw
     integer,allocatable,dimension(:)      :: HImap    !map of the Sector S to Hilbert space H
-    ! real(8),allocatable,dimension(:,:)    :: Chitau
-    ! real(8),allocatable,dimension(:)      :: Chitautot
-    ! complex(8),allocatable,dimension(:,:) :: Chiw,Chiiw
-    ! complex(8),allocatable,dimension(:)   :: Chiwtot,Chiiwtot
-    write(LOGfile,"(A)")"Evaluating Suceptibility:"
+    if(mpiID==0)write(LOGfile,"(A)")"Evaluating Suceptibility:"
     call allocate_grids
     allocate(Chitau(Norb,0:Ltau),Chiw(Norb,Nw),Chiiw(Norb,0:NL))
     allocate(Chitautot(0:Ltau),Chiwtot(Nw),Chiiwtot(0:NL))
@@ -543,10 +505,11 @@ contains
     Chiwtot=zero
     Chiiwtot=zero
     !Spin susceptibility \X(tau). |<i|S_z|j>|^2
-    write(LOGfile,"(A)")"Evaluating Chi_Sz"
-    call start_progress(LOGfile)
+    if(mpiID==0)write(LOGfile,"(A)")"Evaluating Chi_Sz"
+    if(mpiID==0)call start_progress(LOGfile)
+
     do isector=1,Nsect !loop over <i| total particle number
-       call progress(isector,Nsect)
+       if(mpiID==0)call progress(isector,Nsect)
        idim=getdim(isector)
        allocate(HImap(idim))
        call build_sector(isector,HImap)
@@ -618,14 +581,8 @@ contains
           enddo
        enddo
     enddo
-    call stop_progress
-    !!<MPI
-    !if(mpiID==0)then
-    !!>MPI
-    call print_imp_chi()
-    !!<MPI
-    !endif
-    !!>MPI
+    if(mpiID==0)call stop_progress
+    if(mpiID==0)call print_imp_chi()
     deallocate(Chitau,Chiw,Chiiw,Chitautot,Chiwtot,Chiiwtot)
     deallocate(wm,tau,wr,vm)
   end subroutine full_ed_getchi
@@ -687,19 +644,19 @@ contains
     enddo
     !Print the impurity functions:
     do iorb=1,Norb
-       prefix=reg(GFfile)//"_orb"//reg(txtfy(iorb))
+       prefix="_orb"//reg(txtfy(iorb))
        unit(1)=free_unit()
-       open(unit(1),file=reg(prefix)//"_iw.ed")
+       open(unit(1),file=reg(GFfile)//reg(prefix)//"_iw.ed")
        unit(2)=free_unit()
-       open(unit(2),file=reg(prefix)//"_realw.ed")
+       open(unit(2),file=reg(GFfile)//reg(prefix)//"_realw.ed")
        unit(3)=free_unit()
-       open(unit(3),file="impSigma_iw.ed")
+       open(unit(3),file="impSigma"//reg(prefix)//"_iw.ed")
        unit(4)=free_unit()
-       open(unit(4),file="impSigma_realw.ed")
+       open(unit(4),file="impSigma"//reg(prefix)//"_realw.ed")
        unit(5)=free_unit()
-       open(unit(5),file="impDelta_iw.ed")
+       open(unit(5),file="impDelta"//reg(prefix)//"_iw.ed")
        unit(6)=free_unit()
-       open(unit(6),file="impDelta_realw.ed")
+       open(unit(6),file="impDelta"//reg(prefix)//"_realw.ed")
        do i=1,NL
           write(unit(1),"(F26.15,6(F26.15))")wm(i),&
                (dimag(impGmats(ispin,iorb,i)),dreal(impGmats(ispin,iorb,i)),ispin=1,Nspin)

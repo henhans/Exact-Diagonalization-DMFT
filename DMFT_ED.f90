@@ -17,7 +17,13 @@ contains
   !+------------------------------------------------------------------+
   subroutine init_ed_solver(bath)
     real(8),dimension(:),intent(inout) :: bath
-    write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
+#ifdef _MPI
+    if(mpiID==0)then
+#endif
+       write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
+#ifdef _MPI
+    endif
+#endif
     call init_ed_structure
     call check_bath_dimension(bath)
     call init_bath_ed
@@ -35,7 +41,13 @@ contains
   subroutine ed_solver(bath)
     real(8),dimension(:),intent(in) :: bath
     integer                         :: unit
-    write(LOGfile,"(A)")"ED SOLUTION"
+#ifdef _MPI
+    if(mpiID==0)then
+#endif
+       write(LOGfile,"(A)")"ED SOLUTION"
+#ifdef _MPI
+    endif
+#endif
     call check_bath_dimension(bath)
     call allocate_bath
     call set_bath(bath)
@@ -51,10 +63,16 @@ contains
        if(chiflag)call full_ed_getchi
     end select
     call ed_getobs
-    unit=free_unit()
-    open(unit,file=trim(Hfile))
-    call write_bath(unit)
-    close(unit)
+#ifdef _MPI
+    if(mpiID==0)then
+#endif
+       unit=free_unit()
+       open(unit,file=trim(Hfile))
+       call write_bath(unit)
+       close(unit)
+#ifdef _MPI
+    endif
+#endif
     call deallocate_bath
   end subroutine ed_solver
 

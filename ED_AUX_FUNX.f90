@@ -3,6 +3,7 @@
 !AUTHORS  : Adriano Amaricci
 !########################################################################
 MODULE ED_AUX_FUNX
+  USE TIMER
   USE ED_VARS_GLOBAL
   implicit none
   private
@@ -12,7 +13,6 @@ MODULE ED_AUX_FUNX
   public :: build_sector
   public :: bdecomp
   public :: c,cdg
-  public :: search_mu
   public :: binary_search
 
 contains
@@ -23,9 +23,6 @@ contains
   !+------------------------------------------------------------------+
   subroutine init_ed_structure
     integer          :: i,NP,nup,ndw
-    !!<MPI
-    ! if(mpiID==0)then
-    !!>MPI
     !Norb=# of impurity orbitals
     !Nbath=# of bath sites per orbital
     !Ns=total number of sites
@@ -40,20 +37,23 @@ contains
     ndw=Ns-nup
     NP=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
     NP=NP*(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
-    write(*,*)"Summary:"
-    write(*,*)"--------------------------------------------"
-    write(*,*)'Number of impurities         = ',Norb
-    write(*,*)'Number of bath/impurity      = ',Nbath
-    write(*,*)'Total # of Bath sites/spin   = ',Nbo
-    write(*,*)'Total # of sites/spin        = ',Ns
-    write(*,*)'Maximum dimension            = ',NP
-    write(*,*)'Total size, Hilber space dim.= ',Ntot,NN
-    write(*,*)'Number of sectors            = ',Nsect
-    write(*,*)"--------------------------------------------"
-    print*,''
-    !!<MPI
-    ! endif
-    !!>MPI
+#ifdef _MPI
+    if(mpiID==0)then
+#endif
+       write(*,*)"Summary:"
+       write(*,*)"--------------------------------------------"
+       write(*,*)'Number of impurities         = ',Norb
+       write(*,*)'Number of bath/impurity      = ',Nbath
+       write(*,*)'Total # of Bath sites/spin   = ',Nbo
+       write(*,*)'Total # of sites/spin        = ',Ns
+       write(*,*)'Maximum dimension            = ',NP
+       write(*,*)'Total size, Hilber space dim.= ',Ntot,NN
+       write(*,*)'Number of sectors            = ',Nsect
+       write(*,*)"--------------------------------------------"
+       print*,''
+#ifdef _MPI
+    endif
+#endif
 
     allocate(impIndex(Norb,2))
     !allocate(Hmap(Nsect),invHmap(Nsect,NN))
@@ -68,33 +68,52 @@ contains
     if(lanc_nstates==1)then     !is you only want to keep 1 state
        lanc_neigen=1            !set the required eigen per sector to 1 see later for neigen_sector
        finiteT=.false.          !set to do zero temperature calculations
-       write(*,*)"--------------------------------------------"
-       write(LOGfile,"(A)")"Required Lanc_Nstates=1 => set T=0 calculation"
-       write(*,*)"--------------------------------------------"
-       write(*,*)""
+#ifdef _MPI
+       if(mpiID==0)then
+#endif
+          write(*,*)"--------------------------------------------"
+          write(LOGfile,"(A)")"Required Lanc_Nstates=1 => set T=0 calculation"
+          write(*,*)"--------------------------------------------"
+          write(*,*)""
+#ifdef _MPI
+       endif
+#endif
     endif
+
 
     !check whether lanc_neigen and lanc_states are even (we do want to keep doublet among states)
     if(finiteT)then
        if(mod(lanc_neigen,2)/=0)then
           lanc_neigen=lanc_neigen+1
-          write(*,*)"--------------------------------------------"
-          write(LOGfile,*)"Increased Lanc_Neigen:",lanc_neigen
-          write(*,*)"--------------------------------------------"
-          write(*,*)""
+#ifdef _MPI
+          if(mpiID==0)then
+#endif
+             write(*,*)"--------------------------------------------"
+             write(LOGfile,*)"Increased Lanc_Neigen:",lanc_neigen
+             write(*,*)"--------------------------------------------"
+             write(*,*)""
+#ifdef _MPI
+          endif
+#endif
        endif
        if(mod(lanc_nstates,2)/=0)then
           lanc_nstates=lanc_nstates+1
-          write(*,*)"--------------------------------------------"
-          write(LOGfile,*)"Increased Lanc_Nstates:",lanc_nstates
-          write(*,*)"--------------------------------------------"
-          write(*,*)""
+#ifdef _MPI
+          if(mpiID==0)then
+#endif
+             write(*,*)"--------------------------------------------"
+             write(LOGfile,*)"Increased Lanc_Nstates:",lanc_nstates
+             write(*,*)"--------------------------------------------"
+             write(*,*)""
+#ifdef _MPI
+          endif
+#endif
        endif
     endif
 
     !Some check:
     if(Nfit>NL)Nfit=NL
-    if(Norb>3)stop "Norb > 3 ERROR. I guess you need to open the code at this point..." 
+    if(Norb>5)stop "Norb > 5 ERROR. I guess you need to open the code at this point..." 
     if(nerr > eps_error) nerr=eps_error    
 
     !allocate functions
@@ -115,12 +134,8 @@ contains
     integer                          :: nup,ndw,jup,jdw
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
-    ! !<DEBUG
-    integer,dimension(:),allocatable :: Ninv,Nstock
-    ! integer :: ivec(Ntot),kcp,is
-    ! !>DEBUG
 
-    write(LOGfile,"(A)")"Setting up pointers:"
+    if(mpiID==0)write(LOGfile,"(A)")"Setting up pointers:"
     call start_timer
     isector=0
     do nup=0,Ns
@@ -177,11 +192,10 @@ contains
 
 
   !+------------------------------------------------------------------+
-  !PURPOSE  : constructs the pointers for the different sectors and
-  !the vectors isrt and jsrt with the corresponding
-  !ordering definition of the sub-basis within each sector
+  !PURPOSE  : constructs the sectors by storing the map from the 
+  !states i\in Hilbert_space to the states count in H_sector.
   !+------------------------------------------------------------------+
-  !|ImpUP,BathUP;,ImpDW,BathDW >
+  !|ImpUP,BathUP>|ImpDW,BathDW >
   subroutine build_sector(isector,map)
     integer              :: i,j,isector,iup,idw,count
     integer              :: nup,ndw
@@ -218,7 +232,6 @@ contains
        ivec(l+1)=0
        if(busy)ivec(l+1)=1
     enddo
-    return 
   end subroutine bdecomp
 
 
@@ -229,7 +242,7 @@ contains
   !the sign of j has the phase convention
   !m labels the sites
   !+-------------------------------------------------------------------+
-  subroutine c(m,i,j)!,sgn)
+  subroutine c(m,i,j,sgn)
     integer :: ib(Ntot)
     integer :: i,j,m,km,k
     integer :: isg
@@ -248,11 +261,10 @@ contains
           !km=sum(ib(1:m-1))
           isg=(-1)**km
           j=(i-2**(m-1))*isg
-          ! sgn=(-1.d0)**km
-          ! j=(i-2**(m-1))!*isg
        endif
     endif
-    return
+    sgn=dfloat(j)/dfloat(abs(j))
+    j=abs(j)
   end subroutine c
 
 
@@ -262,7 +274,7 @@ contains
   !the sign of j has the phase convention
   !m labels the sites
   !+-------------------------------------------------------------------+
-  subroutine cdg(m,i,j)!,sgn)
+  subroutine cdg(m,i,j,sgn)
     integer :: ib(Ntot)
     integer :: i,j,m,km,k
     integer :: isg
@@ -281,73 +293,16 @@ contains
           !km=sum(ib(1:m-1))
           isg=(-1)**km
           j=(i+2**(m-1))*isg
-          ! sgn=(-1.d0)**km
-          ! j=(i+2**(m-1))!*isg
        endif
     endif
-    return
+    sgn=dfloat(j)/dfloat(abs(j))
+    j=abs(j)
   end subroutine cdg
 
 
 
-
-
   !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine search_mu(ntmp,convergence)
-    logical,intent(inout) :: convergence
-    real(8)               :: ntmp
-    logical               :: check
-    integer,save          :: count=0
-    integer,save          :: nindex=0
-    real(8)               :: ndelta1,nindex1
-    if(count==0)then
-       inquire(file="searchmu_file.restart",exist=check)
-       if(check)then
-          open(10,file="searchmu_file.restart")
-          read(10,*)ndelta,nindex          
-          close(10)
-       endif
-    endif
-    count=count+1
-    nindex1=nindex
-    ndelta1=ndelta
-    if((ntmp >= nread+nerr))then
-       nindex=-1
-    elseif(ntmp <= nread-nerr)then
-       nindex=1
-    else
-       nindex=0
-    endif
-    if(nindex1+nindex==0.AND.nindex/=0)then !avoid loop forth and back
-       ndelta=ndelta1/2.d0 !decreasing the step       
-    else
-       ndelta=ndelta1
-    endif
-    xmu=xmu+real(nindex,8)*ndelta
-    write(*,"(A,f15.12,A,f15.12,A,f15.12,A,f15.12)")" n=",ntmp," /",nread,&
-         "| shift=",nindex*ndelta,"| xmu=",xmu
-    write(*,"(A,f15.12)")"dn=",abs(ntmp-nread)
-    print*,""
-    if(abs(ntmp-nread)>nerr)then
-       convergence=.false.
-       ! else
-       !    convergence=.true.
-    endif
-    print*,""
-    print*,"Convergence:",convergence
-    print*,""
-    open(10,file="searchmu_file.restart.new")
-    write(10,*)ndelta,nindex
-    close(10)
-  end subroutine search_mu
-
-
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : calculate the Heaviside  function
+  !PURPOSE  : calculate the factorial of an integer N!=1.2.3...(N-1).N
   !+------------------------------------------------------------------+
   recursive function factorial(n) result(f)
     integer            :: f
@@ -360,7 +315,9 @@ contains
   end function factorial
 
 
-
+  !+------------------------------------------------------------------+
+  !PURPOSE : binary search of a value in an array
+  !+------------------------------------------------------------------+
   recursive function binary_search(a,value) result(bsresult)
     integer,intent(in) :: a(:), value
     integer            :: bsresult, mid
