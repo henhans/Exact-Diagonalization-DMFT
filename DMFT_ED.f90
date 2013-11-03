@@ -25,7 +25,7 @@ contains
     bath = copy_bath()
     call write_bath(LOGfile)
     call setup_pointers
-    if(ed_type=='full')call setup_eigenspace
+    if(ed_method=='full')call setup_eigenspace
     call deallocate_bath
   end subroutine init_ed_solver
 
@@ -40,7 +40,7 @@ contains
     call check_bath_dimension(bath)
     call allocate_bath
     call set_bath(bath)
-    select case(ed_type)
+    select case(ed_method)
     case default
        call lanc_ed_diag
        call lanc_ed_getgf
