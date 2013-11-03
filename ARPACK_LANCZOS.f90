@@ -42,7 +42,7 @@ contains
   ! complex-hermitian (_c.f90) cmatrix
   !+-------------------------------------------------------------------+ 
   include "lanczos_parpack_d.f90"
-  !include "lanczos_parpack_c.f90" << missing 
+  include "lanczos_parpack_c.f90" !<< missing 
 #endif
 
 end module ARPACK_LANCZOS

@@ -117,8 +117,10 @@ contains
     if(nerr > eps_error) nerr=eps_error    
 
     !allocate functions
-    allocate(impGmats(Nspin,Norb,NL),impSmats(Nspin,Norb,NL))
-    allocate(impGreal(Nspin,Norb,Nw),impSreal(Nspin,Norb,Nw))
+    !allocate(impGmats(Nspin,Norb,NL))
+    !allocate(impGreal(Nspin,Norb,Nw))
+    allocate(impSmats(Nspin,Norb,NL))
+    allocate(impSreal(Nspin,Norb,Nw))
 
     !allocate observables
     allocate(nimp(Norb),dimp(Norb),nupimp(Norb),ndwimp(Norb),magimp(Norb))

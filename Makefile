@@ -3,7 +3,8 @@ include sfmake.inc
 FC=$(SFMPI)/mpif90
 #FPP=MPI
 #=========================================================================
-EXE=ed_hm_bethe
+#EXE=ed_hm_bethe
+EXE=ed_hm_2dsquare
 #EXE=ed_lda1b
 #EXE=ed_pam_test
 #EXE=ed_2x2bhz

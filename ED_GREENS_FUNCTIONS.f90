@@ -28,6 +28,12 @@ MODULE ED_GREENS_FUNCTIONS
   real(8),dimension(:),pointer :: state_vec
   real(8)                      :: state_e
 
+  !Impurity GF
+  !=========================================================
+  complex(8),allocatable,dimension(:,:,:) :: impGmats
+  complex(8),allocatable,dimension(:,:,:) :: impGreal
+
+
   !Spin Susceptibilities
   !=========================================================
   real(8),allocatable,dimension(:,:)    :: Chitau
@@ -55,6 +61,8 @@ contains
     integer :: isect0,numstates
     real(8) :: norm0
     call allocate_grids
+    if(.not.allocated(impGmats))allocate(impGmats(Nspin,Norb,NL))
+    if(.not.allocated(impGreal))allocate(impGreal(Nspin,Norb,Nw))
     impGmats=zero
     impGreal=zero
     if(mpiID==0)write(LOGfile,"(A)")"Evaluating Green's functions"
@@ -90,6 +98,7 @@ contains
     !Print impurity functions:
     if(mpiID==0)call print_imp_gf
     deallocate(wm,wr,tau,vm)
+    deallocate(impGmats,impGreal)
   end subroutine lanc_ed_getgf
 
 
@@ -101,16 +110,10 @@ contains
     integer :: izero,iorb,jorb,ispin,i
     integer :: isect0,numstates
     real(8) :: norm0
-    allocate(wm(NL))
-    wm     = pi/beta*real(2*arange(1,NL)-1,8)
-    allocate(vm(0:NL))
-    do i=0,NL
-       vm(i) = pi/beta*2.d0*real(i,8)
-    enddo
-    allocate(wr(Nw))
-    wr     = linspace(wini,wfin,Nw)
-    allocate(tau(0:Ltau))
-    tau(0:)= linspace(0.d0,beta,Ltau+1)
+    call allocate_grids
+    if(allocated(chitau))deallocate(chitau)
+    if(allocated(chiw))deallocate(chiw)
+    if(allocated(chiiw))deallocate(chiiw)
     allocate(Chitau(Norb,0:Ltau),Chiw(Norb,Nw),Chiiw(Norb,0:NL))
     Chitau=0.d0
     Chiw=zero
@@ -398,6 +401,8 @@ contains
     integer :: iorb,jorb,ispin
     write(LOGfile,"(A)")"Evaluating Green's functions"
     call allocate_grids
+    if(.not.allocated(impGmats))allocate(impGmats(Nspin,Norb,NL))
+    if(.not.allocated(impGreal))allocate(impGreal(Nspin,Norb,Nw))
     impGmats   =zero
     impGreal   =zero
     if(mpiID==0)call start_timer
@@ -409,6 +414,7 @@ contains
     if(mpiID==0)call print_imp_gf
     if(mpiID==0)call stop_timer
     deallocate(wm,tau,wr,vm)
+    deallocate(impGmats,impGreal)
   end subroutine full_ed_getgf
 
 
@@ -427,8 +433,6 @@ contains
     real(8)                 :: expterm,peso,de,w0,it,chij1
     complex(8)              :: iw
     integer,allocatable,dimension(:)     :: HJmap,HImap    !map of the Sector S to Hilbert space H
-
-
     nsite=1
     isite=impIndex(iorb,ispin)
     if(mpiID==0)write(LOGfile,"(A)")"Evaluating G_imp_Orb"//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin))
@@ -496,14 +500,17 @@ contains
     integer,allocatable,dimension(:)      :: HImap    !map of the Sector S to Hilbert space H
     if(mpiID==0)write(LOGfile,"(A)")"Evaluating Suceptibility:"
     call allocate_grids
+    if(allocated(chitau))deallocate(chitau)
+    if(allocated(chiw))deallocate(chiw)
+    if(allocated(chiiw))deallocate(chiiw)
     allocate(Chitau(Norb,0:Ltau),Chiw(Norb,Nw),Chiiw(Norb,0:NL))
-    allocate(Chitautot(0:Ltau),Chiwtot(Nw),Chiiwtot(0:NL))
+    ! allocate(Chitautot(0:Ltau),Chiwtot(Nw),Chiiwtot(0:NL))
     Chitau=0.d0
     Chiw=zero
     Chiiw=zero
-    Chitautot=0.d0
-    Chiwtot=zero
-    Chiiwtot=zero
+    ! Chitautot=0.d0
+    ! Chiwtot=zero
+    ! Chiiwtot=zero
     !Spin susceptibility \X(tau). |<i|S_z|j>|^2
     if(mpiID==0)write(LOGfile,"(A)")"Evaluating Chi_Sz"
     if(mpiID==0)call start_progress(LOGfile)
@@ -583,7 +590,7 @@ contains
     enddo
     if(mpiID==0)call stop_progress
     if(mpiID==0)call print_imp_chi()
-    deallocate(Chitau,Chiw,Chiiw,Chitautot,Chiwtot,Chiiwtot)
+    deallocate(Chitau,Chiw,Chiiw)!,Chitautot,Chiwtot,Chiiwtot)
     deallocate(wm,tau,wr,vm)
   end subroutine full_ed_getchi
 
@@ -636,7 +643,7 @@ contains
           enddo
           do i=1,Nw
              iw=cmplx(wr(i),eps)
-             G0wr(ispin,iorb,i)= (iw+xmu)-delta_bath(ispin,iorb,iw)
+             G0wr(ispin,iorb,i)= wr(i)+xmu-delta_bath(ispin,iorb,iw)
              impSreal(ispin,iorb,i) = G0wr(ispin,iorb,i) - one/impGreal(ispin,iorb,i)
              G0wr(ispin,iorb,i)= delta_bath(ispin,iorb,iw)
           enddo
@@ -678,6 +685,7 @@ contains
        enddo
     enddo
   end subroutine print_imp_gf
+
 
 
 

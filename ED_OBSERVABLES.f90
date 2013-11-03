@@ -43,7 +43,7 @@ contains
        dimp   = 0.d0
        magimp = 0.d0
        m2imp  = 0.d0
-       select case(ed_type)
+       select case(ed_method)
        case default
           numstates=numgs
           if(finiteT)numstates=state_list%size
@@ -121,7 +121,7 @@ contains
           enddo
        end select
 
-       allocate(simp(Norb,Nspin),zimp(Norb,Nspin),rimp(Norb,Nspin))
+       allocate(simp(Norb,Nspin),zimp(Norb,Nspin))!,rimp(Norb,Nspin))
        call get_szr
 
        if(iolegend)call write_legend
@@ -135,7 +135,7 @@ contains
           write(LOGfile,"(A,10f18.12)")"mag=   ",(magimp(iorb),iorb=1,Norb)
        endif
        write(LOGfile,*)""
-       deallocate(simp,zimp,rimp)
+       deallocate(simp,zimp)!,rimp)
 
 #ifdef _MPI
     endif
@@ -160,8 +160,8 @@ contains
           simp(iorb,ispin) = dimag(impSmats(ispin,iorb,1)) - &
                wm1*(dimag(impSmats(ispin,iorb,2))-dimag(impSmats(ispin,iorb,1)))/(wm2-wm1)
           zimp(iorb,ispin)   = 1.d0/( 1.d0 + abs( dimag(impSmats(ispin,iorb,1))/wm1 ))
-          rimp(iorb,ispin)   = dimag(impGmats(ispin,iorb,1)) - &
-               wm1*(dimag(impGmats(ispin,iorb,2))-dimag(impGmats(ispin,iorb,1)))/(wm2-wm1)
+          ! rimp(iorb,ispin)   = dimag(impGmats(ispin,iorb,1)) - &
+          !      wm1*(dimag(impGmats(ispin,iorb,2))-dimag(impGmats(ispin,iorb,1)))/(wm2-wm1)
        enddo
     enddo
   end subroutine get_szr
@@ -174,8 +174,8 @@ contains
   subroutine write_legend()
     integer :: unit,iorb,jorb,ispin
     unit = free_unit()
-    open(unit,file="columns_all.ed")
-    write(unit,"(A1,2A18,1A7,90A18)")"#","xmu","beta","loop",&
+    open(unit,file="columns_info.ed")
+    write(unit,"(A1,1A7,90A18)")"#","loop",&
          ("nimp_"//reg(txtfy(iorb)),iorb=1,Norb),&
          ("docc_"//reg(txtfy(iorb)),iorb=1,Norb),&
          ("nup_"//reg(txtfy(iorb)),iorb=1,Norb),&
@@ -183,43 +183,33 @@ contains
          ("mag_"//reg(txtfy(iorb)),iorb=1,Norb),&
          (("mom2_"//reg(txtfy(iorb))//reg(txtfy(jorb)),jorb=1,Norb),iorb=1,Norb),&
          (("z_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin),&
-         (("rho_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin),&
+                                ! (("rho_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin),&
          (("sig_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
     close(unit)
     !
-    unit = free_unit()
-    open(unit,file="columns_dens_docc.ed")
-    write(unit,"(A1,2A18,1A7,90A18)")"#","xmu","beta","loop",&
-         ("nimp_"//reg(txtfy(iorb)),iorb=1,Norb),&
-         ("docc_"//reg(txtfy(iorb)),iorb=1,Norb)
-    close(unit)
-    !
-    unit = free_unit()
-    open(unit,file="columns_nspin_mag.ed")
-    write(unit,"(A1,2A18,1A7,90A18)")"#","xmu","beta","loop",&
-         ("nup_"//reg(txtfy(iorb)),iorb=1,Norb),&
-         ("ndw_"//reg(txtfy(iorb)),iorb=1,Norb),&
-         ("mag_"//reg(txtfy(iorb)),iorb=1,Norb)
-    close(unit)
-    !
-    unit = free_unit()
-    open(unit,file="columns_mom.ed")
-    write(unit,"(A1,2A18,1A7,90A18)")"#","xmu","beta","loop",&
-         (("mom2_"//reg(txtfy(iorb))//reg(txtfy(jorb)),jorb=1,Norb),iorb=1,Norb)
-    close(unit)
-    !
-    unit = free_unit()
-    open(unit,file="columns_z.ed")
-    write(unit,"(A1,2A18,1A7,90A18)")"#","xmu","beta","loop",&
-         (("z_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
-    close(unit)
-    !
-    unit = free_unit()
-    open(unit,file="columns_rho_sig.ed")
-    write(unit,"(A1,2A18,1A7,90A18)")"#","xmu","beta","loop",&
-         (("rho_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin),&
-         (("sig_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
-    close(unit)
+    ! unit = free_unit()
+    ! open(unit,file="columns_dens.ed")
+    ! write(unit,"(A1,2A18,1A7,90A18)")"#","xmu","beta","loop",&
+    !      ("nimp_"//reg(txtfy(iorb)),iorb=1,Norb),&
+    !      ("nup_"//reg(txtfy(iorb)),iorb=1,Norb),&
+    !      ("ndw_"//reg(txtfy(iorb)),iorb=1,Norb),&
+    !      ("mag_"//reg(txtfy(iorb)),iorb=1,Norb)
+    ! close(unit)
+    ! !
+    ! unit = free_unit()
+    ! open(unit,file="columns_docc_mom_z.ed")
+    ! write(unit,"(A1,2A18,1A7,90A18)")"#","xmu","beta","loop",&
+    !      ("docc_"//reg(txtfy(iorb)),iorb=1,Norb),&
+    !      (("mom2_"//reg(txtfy(iorb))//reg(txtfy(jorb)),jorb=1,Norb),iorb=1,Norb),&
+    !      (("z_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
+    ! close(unit)
+    ! !
+    ! unit = free_unit()
+    ! open(unit,file="columns_rho_sig.ed")
+    ! write(unit,"(A1,2A18,1A7,90A18)")"#","xmu","beta","loop",&
+    !      (("rho_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin),&
+    !      (("sig_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
+    ! close(unit)
     iolegend=.false.
   end subroutine write_legend
 
@@ -233,7 +223,7 @@ contains
     integer :: iorb,jorb,ispin
     unit = free_unit()
     open(unit,file=reg(Ofile)//"_all.ed",position='append')
-    write(unit,"(2F18.12,I7,90F18.12)")xmu,beta,loop,&
+    write(unit,"(I7,90F18.12)")loop,&
          (nimp(iorb),iorb=1,Norb),&
          (dimp(iorb),iorb=1,Norb),&
          (nupimp(iorb),iorb=1,Norb),&
@@ -241,43 +231,23 @@ contains
          (magimp(iorb),iorb=1,Norb),&
          ((m2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
          ((zimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
-         ((rimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
+                                ! ((rimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
          ((simp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
     close(unit)         
-    !Last loop observables:
-    flast = free_unit()
-    open(flast,file=reg(Ofile)//"_dens_docc.ed")
-    write(flast,"(2F18.12,I7,90F18.12)")xmu,beta,loop,&
+
+    unit = free_unit()
+    open(unit,file=reg(Ofile)//"_last.ed")
+    write(unit,"(I7,90F18.12)")loop,&
          (nimp(iorb),iorb=1,Norb),&
-         (dimp(iorb),iorb=1,Norb)
-    close(flast)
-    !
-    flast = free_unit()
-    open(flast,file=reg(Ofile)//"_nspin_mag.ed")
-    write(flast,"(2F18.12,I7,90F18.12)")xmu,beta,loop,&
+         (dimp(iorb),iorb=1,Norb),&
          (nupimp(iorb),iorb=1,Norb),&
          (ndwimp(iorb),iorb=1,Norb),&
-         (magimp(iorb),iorb=1,Norb)
-    close(flast)
-    !
-    flast = free_unit()
-    open(flast,file=reg(Ofile)//"_mom.ed")
-    write(flast,"(2F18.12,I7,90F18.12)")xmu,beta,loop,&
-         ((m2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb)
-    close(flast)
-    !
-    flast = free_unit()
-    open(flast,file=reg(Ofile)//"_z.ed")
-    write(flast,"(2F18.12,I7,90F18.12)")xmu,beta,loop,&
-         ((zimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
-    close(flast)
-    !
-    flast = free_unit()
-    open(flast,file=reg(Ofile)//"_rho_sig.ed")
-    write(flast,"(2F18.12,I7,90F18.12)")xmu,beta,loop,&
-         ((rimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
+         (magimp(iorb),iorb=1,Norb),&
+         ((m2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
+         ((zimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
+                                ! ((rimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
          ((simp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
-    close(flast)
+    close(unit)         
   end subroutine write_to_unit_column
 
 
