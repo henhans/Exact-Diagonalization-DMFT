@@ -40,23 +40,20 @@ contains
     integer,dimension(Ntot)          :: ib
     integer                          :: mpiQ,mpiR                
     integer                          :: dim,iup,idw
-    integer                          :: i,j,m,ms,iorb,jorb,ispin
+    integer                          :: i,j,m,ms,msup,msdw,iorb,jorb,ispin
     integer                          :: kp,k1,k2,k3,k4
     real(8)                          :: sg1,sg2,sg3,sg4
-    real(8)                          :: tef,htmp
-    real(8),dimension(Norb,Nbath)    :: eup,edw
-    real(8),dimension(Norb,Nbath)    :: vup,vdw
+    real(8)                          :: htmp
     real(8),dimension(Norb)          :: nup,ndw
     logical                          :: Jcondition,flanc
     integer                          :: first_state,last_state
-
-
+    !
     dim=getdim(isector)
     flanc=.true. ; if(present(h))flanc=.false.
-
+    !
     first_state= 1
     last_state = dim
-
+    !
     if(flanc)then
        if(spH0%status)call sp_delete_matrix(spH0) 
 #ifdef _MPI
@@ -75,10 +72,6 @@ contains
        h=0.d0
     endif
     !
-    eup=ebath(1,:,:)   ; edw=ebath(Nspin,:,:)
-    vup=vbath(1,:,:)   ; vdw=vbath(Nspin,:,:)
-    !
-
     do i=first_state,last_state
        m=Hmap(i)
        call bdecomp(m,ib)
@@ -110,13 +103,14 @@ contains
        endif
        !
        !Hbath: +energy of the bath=\sum_a=1,Norb\sum_{l=1,Nbath}\e^a_l n^a_l
-       do iorb=1,Norb
+       do iorb=1,size(dmft_bath%e,2)
           do kp=1,Nbath
-             ms=Norb+(iorb-1)*Nbath + kp
-             htmp =htmp + eup(iorb,kp)*real(ib(ms),8) + edw(iorb,kp)*real(ib(ms+Ns),8)
+             ! ms=Norb+(iorb-1)*Nbath + kp
+             ! if(bath_type=='hybrid')ms=Norb+kp
+             ms=getBathStride(iorb,kp)
+             htmp =htmp + dmft_bath%e(1,iorb,kp)*real(ib(ms),8) + dmft_bath%e(Nspin,iorb,kp)*real(ib(ms+Ns),8)
           enddo
        enddo
-       !
        !
        if(flanc)then
 #ifdef _MPI
@@ -127,7 +121,6 @@ contains
        else
           h(i,i)=h(i,i)+htmp
        endif
-       !
        !
        if(Norb>1.AND.Jhflag)then
           !SPIN-EXCHANGE (S-E) and PAIR-HOPPING TERMS
@@ -201,13 +194,12 @@ contains
        !NON-LOCAL PART
        do iorb=1,Norb
           do kp=1,Nbath
-             ms=Norb+(iorb-1)*Nbath + kp
+             ms=getBathStride(iorb,kp)
              if(ib(iorb) == 1 .AND. ib(ms) == 0)then
                 call c(iorb,m,k1,sg1)
                 call cdg(ms,k1,k2,sg2)
-                j=binary_search(Hmap,k2)
-                tef=vup(iorb,kp)
-                htmp = tef*sg1*sg2
+                j = binary_search(Hmap,k2)
+                htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -223,8 +215,7 @@ contains
                 call c(ms,m,k1,sg1)
                 call cdg(iorb,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                tef = vup(iorb,kp)
-                htmp = tef*sg1*sg2
+                htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -240,8 +231,7 @@ contains
                 call c(iorb+Ns,m,k1,sg1)
                 call cdg(ms+Ns,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                tef=vdw(iorb,kp)
-                htmp=tef*sg1*sg2
+                htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -257,8 +247,7 @@ contains
                 call c(ms+Ns,m,k1,sg1)
                 call cdg(iorb+Ns,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                tef=vdw(iorb,kp)
-                htmp=tef*sg1*sg2
+                htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)

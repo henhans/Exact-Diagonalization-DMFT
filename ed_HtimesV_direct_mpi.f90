@@ -5,25 +5,19 @@ subroutine HtimesV_mpi(Nchunk,NRest,Nloc,Nv,v,Hv)
   real(8),dimension(Nloc)       :: v    !this required by parpack and is small
   real(8),dimension(Nloc)       :: Hv   !this required by parpack and is small
   real(8),dimension(Nv)         :: vin       !this used here and is large
-  real(8),dimension(Nv)         :: vtmp,vout!
+  real(8),dimension(Nv)         :: vtmp
   integer                       :: isector
   integer,dimension(Ntot)       :: ib
   integer                       :: dim,iup,idw
-  integer                       :: i,j,k,m,ms,iorb,jorb,ispin
+  integer                       :: i,j,m,ms,iorb,jorb,ispin
   integer                       :: kp,k1,k2,k3,k4
   real(8)                       :: sg1,sg2,sg3,sg4
-  real(8),dimension(Norb,Nbath) :: eup,edw
-  real(8),dimension(Norb,Nbath) :: vup,vdw
   real(8),dimension(Norb)       :: nup,ndw
   real(8)                       :: tef,htmp
   logical                       :: Jcondition,flanc
   isector=Hsector
   dim=getdim(isector)
   if(.not.associated(Hmap).AND.size(Hmap)/=dim)stop "HtimesV: wrong allocation of Hmap"
-  !
-  eup=ebath(1,:,:)   ; edw=ebath(Nspin,:,:)
-  vup=vbath(1,:,:)   ; vdw=vbath(Nspin,:,:)
-  !
   if(Nv/=dim)stop "HtimesV error in dimensions"
 
   !each processor dump its small piece of vector v(i) into the large vtmp vector
@@ -69,15 +63,15 @@ subroutine HtimesV_mpi(Nchunk,NRest,Nloc,Nv,v,Hv)
         enddo
      endif
      !Hbath: +energy of the bath=\sum_a=1,Norb\sum_{l=1,Nbath}\e^a_l n^a_l
-     do iorb=1,Norb
+     do iorb=1,,size(dmft_bath%e,2)
         do kp=1,Nbath
            ms=Norb+(iorb-1)*Nbath + kp
-           htmp =htmp + eup(iorb,kp)*real(ib(ms),8) + edw(iorb,kp)*real(ib(ms+Ns),8)
+           htmp =htmp + dmft_bath%e(1,iorb,kp)*real(ib(ms),8) + dmft_bath%e(Nspin,iorb,kp)*real(ib(ms+Ns),8)
+           !htmp =htmp + eup(iorb,kp)*real(ib(ms),8) + edw(iorb,kp)*real(ib(ms+Ns),8)
         enddo
      enddo
      !
      vtmp(i) = vtmp(i) + htmp*vin(i)
-     !
      !
      if(Norb>1.AND.Jhflag)then
         !SPIN-EXCHANGE (S-E) and PAIR-HOPPING TERMS
@@ -99,15 +93,10 @@ subroutine HtimesV_mpi(Nchunk,NRest,Nloc,Nv,v,Hv)
                  call c(iorb+Ns,k1,k2,sg2)
                  call cdg(jorb+Ns,k2,k3,sg3)
                  call cdg(iorb,k3,k4,sg4)
-                 ! call c(jorb,m,k1,sg1)
-                 ! call cdg(jorb+Ns,k1,k2,sg2)
-                 ! call c(iorb+Ns,k2,k3,sg3)
-                 ! call cdg(iorb,k3,k4,sg4)
                  j=binary_search(Hmap,k4)
                  htmp = Jh*sg1*sg2*sg3*sg4
                  !
                  vtmp(i) = vtmp(i) + htmp*vin(j)
-                 vtmp(j) = vtmp(j) + htmp*vin(i)
                  !
               endif
            enddo
@@ -132,7 +121,6 @@ subroutine HtimesV_mpi(Nchunk,NRest,Nloc,Nv,v,Hv)
                  htmp = Jh*sg1*sg2*sg3*sg4
                  !
                  vtmp(i) = vtmp(i) + htmp*vin(j)
-                 vtmp(j) = vtmp(j) + htmp*vin(i)
                  !
               endif
            enddo
@@ -140,44 +128,52 @@ subroutine HtimesV_mpi(Nchunk,NRest,Nloc,Nv,v,Hv)
      endif
      !NON-LOCAL PART
      do iorb=1,Norb
-        do kp=1,Nbath!Norb+1,Ns
+        do kp=1,Nbath
            ms=Norb+(iorb-1)*Nbath + kp
            !UP
            if(ib(iorb) == 1 .AND. ib(ms) == 0)then
               call c(iorb,m,k1,sg1)
               call cdg(ms,k1,k2,sg2)
               j=binary_search(Hmap,k2)
-              tef=vup(iorb,kp)
-              htmp = tef*sg1*sg2
-              !
+              htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2 !vup(iorb,kp)
               vtmp(i) = vtmp(i) + htmp*vin(j)
-              vtmp(j) = vtmp(j) + htmp*vin(i)
-              !
+           endif
+           !
+           if(ib(iorb) == 0 .AND. ib(ms) == 1)then
+              call c(ms,m,k1,sg1)
+              call cdg(iorb,k1,k2,sg2)
+              j=binary_search(Hmap,k2)
+              htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2 !vup(iorb,kp)
+              vtmp(i) = vtmp(i) + htmp*vin(j)
            endif
            !DW
            if(ib(iorb+Ns) == 1 .AND. ib(ms+Ns) == 0)then
               call c(iorb+Ns,m,k1,sg1)
               call cdg(ms+Ns,k1,k2,sg2)
               j=binary_search(Hmap,k2)
-              tef=vdw(iorb,kp)
-              htmp=tef*sg1*sg2
-              !
+              htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2!vdw(iorb,kp)
               vtmp(i) = vtmp(i) + htmp*vin(j)
-              vtmp(j) = vtmp(j) + htmp*vin(i)
-              !
+           endif
+           !
+           if(ib(iorb+Ns) == 0 .AND. ib(ms+Ns) == 1)then
+              call c(ms+Ns,m,k1,sg1)
+              call cdg(iorb+Ns,k1,k2,sg2)
+              j=binary_search(Hmap,k2)
+              htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2!vdw(iorb,kp)
+              vtmp(i) = vtmp(i) + htmp*vin(j)
            endif
         enddo
      enddo
   enddo
 
   ! !the tmp array vtmp is now reduced to all nodes
-  vout=0.d0
-  call MPI_ALLREDUCE(vtmp,vout,Nloc,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,mpiERR)
+  !vout=0.d0
+  !call MPI_ALLREDUCE(vtmp,vout,Nloc,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,mpiERR)
 
   !and each piece is dumped back to the each copy of the small vector on each node
   Hv=0.d0
   do i=mpiID*Nchunk+1,(mpiID+1)*Nchunk+Nrest
-     Hv(i-mpiID*Nchunk)=vout(i)
+     Hv(i-mpiID*Nchunk)=vtmp(i)!vout(i)
   enddo
 
   !note I am not sure that the last ALLREDUCE is strictly necessary, because

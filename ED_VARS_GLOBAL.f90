@@ -1,9 +1,19 @@
+MODULE ED_BATH_TYPE
+  implicit none
+  type effective_bath
+     real(8),dimension(:,:,:),allocatable :: e
+     real(8),dimension(:,:,:),allocatable :: v
+     logical                              :: status=.false.
+  end type effective_bath
+END MODULE ED_BATH_TYPE
+!
 MODULE ED_VARS_GLOBAL
   USE SCIFOR_VERSION
   USE COMMON_VARS
   USE PARSE_CMD
   USE IOTOOLS, only:free_unit,reg,splot
   !LOCAL
+  USE ED_BATH_TYPE
   USE MATRIX_SPARSE
   USE EIGEN_SPACE
 #ifdef _MPI
@@ -50,7 +60,8 @@ MODULE ED_VARS_GLOBAL
   integer              :: cg_Type        !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
   logical              :: finiteT        !flag for finite temperature calculation
   character(len=4)     :: ed_method      !flag to set ed method solution: lanc=lanczos method, full=full diagonalization
-  character(len=1)     :: ed_type        !flag to choose real or complex Ham: d=symmetric H (real), c=hermitian H (cmplx)
+  character(len=1)     :: ed_type        !flag to set real or complex Ham: d=symmetric H (real), c=hermitian H (cmplx)
+  character(len=7)     :: bath_type      !flag to set bath type: irreducible (1bath/imp), reducible(1bath)
 
   !Dimension of the functions:
   !=========================================================
@@ -62,8 +73,14 @@ MODULE ED_VARS_GLOBAL
   integer,allocatable,dimension(:,:)   :: getsector
   integer,allocatable,dimension(:,:)   :: getCsector
   integer,allocatable,dimension(:,:)   :: getCDGsector
+  integer,allocatable,dimension(:,:)   :: getBathStride
   integer,allocatable,dimension(:,:)   :: impIndex
   integer,allocatable,dimension(:)     :: getdim,getnup,getndw
+
+
+  !Effective Bath used in the ED code (this is opaque to user)
+  !=========================================================
+  type(effective_bath) :: dmft_bath
 
 
   !Eigenvalues,Eigenvectors FULL DIAGONALIZATION
@@ -85,9 +102,8 @@ MODULE ED_VARS_GLOBAL
 
   !Functions for GETGFUNX
   !=========================================================
-  complex(8),allocatable,dimension(:,:,:) :: impGmats,impSmats
-  complex(8),allocatable,dimension(:,:,:) :: impGreal,impSreal
-
+  complex(8),allocatable,dimension(:,:,:,:) :: impSmats
+  complex(8),allocatable,dimension(:,:,:,:) :: impSreal
 
 
   !Variables for fixed density mu-loop 
@@ -117,7 +133,7 @@ MODULE ED_VARS_GLOBAL
        nread,nerr,ndelta,       &
        chiflag,Jhflag,cutoff,HFmode,   &
        eps_error,Nsuccess,      &
-       ed_method,ed_type,&
+       ed_method,ed_type,bath_type,&
        lanc_neigen,lanc_niter,lanc_ngfiter,lanc_nstates,&
        cg_niter,cg_ftol,cg_type,   &
        Hfile,Ofile,GFfile,CHIfile,LOGfile
@@ -174,6 +190,8 @@ contains
     cg_Type     = 0
     ed_method    = 'lanc'
     ed_type = 'd'
+    bath_type='normal' !hybrid,superc
+
     !ReadUnits
     Hfile  ="hamiltonian.restart"
     GFfile ="impG"
@@ -235,6 +253,7 @@ contains
     call parse_cmd_variable(cg_Type,"CG_TYPE")
     call parse_cmd_variable(ed_Type,"ED_TYPE")
     call parse_cmd_variable(ed_Method,"ED_METHOD")
+    call parse_cmd_variable(bath_type,"BATH_TYPE")
     call parse_cmd_variable(Hfile,"HFILE")
     call parse_cmd_variable(Ofile,"OFILE")
     call parse_cmd_variable(GFfile,"GFFILE")

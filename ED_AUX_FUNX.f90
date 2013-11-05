@@ -24,10 +24,15 @@ contains
   subroutine init_ed_structure
     integer          :: i,NP,nup,ndw
     !Norb=# of impurity orbitals
-    !Nbath=# of bath sites per orbital
+    !Nbath=# of bath sites (per orbital or not depending on bath_type)
     !Ns=total number of sites
     !Nbo=total number of bath sites (all sites - impurity sites)
-    Ns=(Nbath+1)*Norb
+    select case(bath_type)
+    case default
+       Ns = (Nbath+1)*Norb
+    case ('hybrid')
+       Ns = Nbath+Norb
+    end select
     Nbo   = Ns-Norb
     Ntot  = 2*Ns
     NN    = 2**Ntot
@@ -37,9 +42,7 @@ contains
     ndw=Ns-nup
     NP=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
     NP=NP*(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
-#ifdef _MPI
     if(mpiID==0)then
-#endif
        write(*,*)"Summary:"
        write(*,*)"--------------------------------------------"
        write(*,*)'Number of impurities         = ',Norb
@@ -51,16 +54,14 @@ contains
        write(*,*)'Number of sectors            = ',Nsect
        write(*,*)"--------------------------------------------"
        print*,''
-#ifdef _MPI
     endif
-#endif
 
     allocate(impIndex(Norb,2))
-    !allocate(Hmap(Nsect),invHmap(Nsect,NN))
     allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect))
     allocate(getsector(0:Ns,0:Ns))
     allocate(getCsector(2,Nsect))
     allocate(getCDGsector(2,Nsect))
+    allocate(getBathStride(Norb,Nbath))
     allocate(neigen_sector(Nsect))
 
     !check finiteT
@@ -68,16 +69,12 @@ contains
     if(lanc_nstates==1)then     !is you only want to keep 1 state
        lanc_neigen=1            !set the required eigen per sector to 1 see later for neigen_sector
        finiteT=.false.          !set to do zero temperature calculations
-#ifdef _MPI
        if(mpiID==0)then
-#endif
           write(*,*)"--------------------------------------------"
           write(LOGfile,"(A)")"Required Lanc_Nstates=1 => set T=0 calculation"
           write(*,*)"--------------------------------------------"
           write(*,*)""
-#ifdef _MPI
        endif
-#endif
     endif
 
 
@@ -85,40 +82,33 @@ contains
     if(finiteT)then
        if(mod(lanc_neigen,2)/=0)then
           lanc_neigen=lanc_neigen+1
-#ifdef _MPI
           if(mpiID==0)then
-#endif
              write(*,*)"--------------------------------------------"
              write(LOGfile,*)"Increased Lanc_Neigen:",lanc_neigen
              write(*,*)"--------------------------------------------"
              write(*,*)""
-#ifdef _MPI
           endif
-#endif
        endif
        if(mod(lanc_nstates,2)/=0)then
           lanc_nstates=lanc_nstates+1
-#ifdef _MPI
           if(mpiID==0)then
-#endif
              write(*,*)"--------------------------------------------"
              write(LOGfile,*)"Increased Lanc_Nstates:",lanc_nstates
              write(*,*)"--------------------------------------------"
              write(*,*)""
-#ifdef _MPI
           endif
-#endif
        endif
     endif
 
     !Some check:
     if(Nfit>NL)Nfit=NL
-    if(Norb>5)stop "Norb > 5 ERROR. I guess you need to open the code at this point..." 
+    if(Nspin>2)stop "Nspin > 2 ERROR. I guess you need to open the code at this point..."
+    if(Norb>3)stop "Norb > 3 ERROR. I guess more than 3 bands is not feasing at this stage... " 
     if(nerr > eps_error) nerr=eps_error    
 
     !allocate functions
-    allocate(impGmats(Nspin,Norb,NL),impSmats(Nspin,Norb,NL))
-    allocate(impGreal(Nspin,Norb,Nw),impSreal(Nspin,Norb,Nw))
+    allocate(impSmats(Nspin,Norb,Norb,NL))
+    allocate(impSreal(Nspin,Norb,Norb,Nw))
 
     !allocate observables
     allocate(nimp(Norb),dimp(Norb),nupimp(Norb),ndwimp(Norb),magimp(Norb))
@@ -131,10 +121,9 @@ contains
   !+------------------------------------------------------------------+
   subroutine setup_pointers
     integer                          :: i,in,dim,isector,jsector,dimup,dimdw
-    integer                          :: nup,ndw,jup,jdw
+    integer                          :: nup,ndw,jup,jdw,iorb
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
-
     if(mpiID==0)write(LOGfile,"(A)")"Setting up pointers:"
     call start_timer
     isector=0
@@ -157,6 +146,19 @@ contains
        impIndex(in,1)=in
        impIndex(in,2)=in+Ns
     enddo
+
+    select case(bath_type)
+    case default
+       do i=1,Nbath
+          do iorb=1,Norb
+             getBathStride(iorb,i) = Norb + (iorb-1)*Nbath + i
+          enddo
+       enddo
+    case ('hybrid')
+       do i=1,Nbath
+          getBathStride(:,i)      = Norb + i
+       enddo
+    end select
 
     getCsector=0
     do isector=1,Nsect
@@ -227,7 +229,7 @@ contains
     logical :: busy
     !this is the configuration vector |1,..,Ns,Ns+1,...,Ntot>
     !obtained from binary decomposition of the state/number i\in 2^Ntot
-    do l=0,Ntot-1                  !loop sul numero di "siti"
+    do l=0,Ntot-1
        busy=btest(i-1,l)
        ivec(l+1)=0
        if(busy)ivec(l+1)=1

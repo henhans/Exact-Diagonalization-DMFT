@@ -157,11 +157,11 @@ contains
     wm1 = pi/beta ; wm2=3.d0*pi/beta
     do ispin=1,Nspin
        do iorb=1,Norb
-          simp(iorb,ispin) = dimag(impSmats(ispin,iorb,1)) - &
-               wm1*(dimag(impSmats(ispin,iorb,2))-dimag(impSmats(ispin,iorb,1)))/(wm2-wm1)
-          zimp(iorb,ispin)   = 1.d0/( 1.d0 + abs( dimag(impSmats(ispin,iorb,1))/wm1 ))
-          rimp(iorb,ispin)   = dimag(impGmats(ispin,iorb,1)) - &
-               wm1*(dimag(impGmats(ispin,iorb,2))-dimag(impGmats(ispin,iorb,1)))/(wm2-wm1)
+          simp(iorb,ispin) = dimag(impSmats(ispin,iorb,iorb,1)) - &
+               wm1*(dimag(impSmats(ispin,iorb,iorb,2))-dimag(impSmats(ispin,iorb,iorb,1)))/(wm2-wm1)
+          zimp(iorb,ispin)   = 1.d0/( 1.d0 + abs( dimag(impSmats(ispin,iorb,iorb,1))/wm1 ))
+          ! rimp(iorb,ispin)   = dimag(impGmats(ispin,iorb,iorb,1)) - &
+          !      wm1*(dimag(impGmats(ispin,iorb,iorb,2))-dimag(impGmats(ispin,iorb,iorb,1)))/(wm2-wm1)
        enddo
     enddo
   end subroutine get_szr
@@ -183,7 +183,7 @@ contains
          ("mag_"//reg(txtfy(iorb)),iorb=1,Norb),&
          (("mom2_"//reg(txtfy(iorb))//reg(txtfy(jorb)),jorb=1,Norb),iorb=1,Norb),&
          (("z_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin),&
-         (("rho_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin),&
+                                ! (("rho_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin),&
          (("sig_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
     close(unit)
     !
@@ -231,7 +231,7 @@ contains
          (magimp(iorb),iorb=1,Norb),&
          ((m2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
          ((zimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
-         ((rimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
+                                ! ((rimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
          ((simp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
     close(unit)         
 
@@ -245,7 +245,7 @@ contains
          (magimp(iorb),iorb=1,Norb),&
          ((m2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
          ((zimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
-         ((rimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
+                                ! ((rimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
          ((simp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
     close(unit)         
   end subroutine write_to_unit_column

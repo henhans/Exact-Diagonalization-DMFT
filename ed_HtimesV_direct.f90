@@ -8,17 +8,12 @@ subroutine HtimesV(Nv,v,Hv)
   integer                       :: i,j,m,ms,iorb,jorb,ispin
   integer                       :: kp,k1,k2,k3,k4
   real(8)                       :: sg1,sg2,sg3,sg4
-  real(8),dimension(Norb,Nbath) :: eup,edw
-  real(8),dimension(Norb,Nbath) :: vup,vdw
   real(8),dimension(Norb)       :: nup,ndw
   real(8)                       :: tef,htmp
   logical                       :: Jcondition,flanc
   isector=Hsector
   dim=getdim(isector)
   if(.not.associated(Hmap).AND.size(Hmap)/=dim)stop "HtimesV: wrong allocation of Hmap"
-  !
-  eup=ebath(1,:,:)   ; edw=ebath(Nspin,:,:)
-  vup=vbath(1,:,:)   ; vdw=vbath(Nspin,:,:)
   !
   if(Nv/=dim)stop "HtimesV error in dimensions"
   Hv=0.d0
@@ -55,15 +50,15 @@ subroutine HtimesV(Nv,v,Hv)
         enddo
      endif
      !Hbath: +energy of the bath=\sum_a=1,Norb\sum_{l=1,Nbath}\e^a_l n^a_l
-     do iorb=1,Norb
+     do iorb=1,size(dmft_bath%e,2)
         do kp=1,Nbath
            ms=Norb+(iorb-1)*Nbath + kp
-           htmp =htmp + eup(iorb,kp)*real(ib(ms),8) + edw(iorb,kp)*real(ib(ms+Ns),8)
+           htmp =htmp + dmft_bath%e(1,iorb,kp)*real(ib(ms),8) + dmft_bath%e(Nspin,iorb,kp)*real(ib(ms+Ns),8)
+           !htmp =htmp + eup(iorb,kp)*real(ib(ms),8) + edw(iorb,kp)*real(ib(ms+Ns),8)
         enddo
      enddo
      !
      Hv(i) = Hv(i) + htmp*v(i)
-     !
      !
      if(Norb>1.AND.Jhflag)then
         !SPIN-EXCHANGE (S-E) and PAIR-HOPPING TERMS
@@ -85,15 +80,10 @@ subroutine HtimesV(Nv,v,Hv)
                  call c(iorb+Ns,k1,k2,sg2)
                  call cdg(jorb+Ns,k2,k3,sg3)
                  call cdg(iorb,k3,k4,sg4)
-                 ! call c(jorb,m,k1,sg1)
-                 ! call cdg(jorb+Ns,k1,k2,sg2)
-                 ! call c(iorb+Ns,k2,k3,sg3)
-                 ! call cdg(iorb,k3,k4,sg4)
                  j=binary_search(Hmap,k4)
                  htmp = Jh*sg1*sg2*sg3*sg4
                  !
                  Hv(i) = Hv(i) + htmp*v(j)
-                 Hv(j) = Hv(j) + htmp*v(i)
                  !
               endif
            enddo
@@ -118,7 +108,6 @@ subroutine HtimesV(Nv,v,Hv)
                  htmp = Jh*sg1*sg2*sg3*sg4
                  !
                  Hv(i) = Hv(i) + htmp*v(j)
-                 Hv(j) = Hv(j) + htmp*v(i)
                  !
               endif
            enddo
@@ -126,31 +115,39 @@ subroutine HtimesV(Nv,v,Hv)
      endif
      !NON-LOCAL PART
      do iorb=1,Norb
-        do kp=1,Nbath!Norb+1,Ns
+        do kp=1,Nbath
            ms=Norb+(iorb-1)*Nbath + kp
            !UP
            if(ib(iorb) == 1 .AND. ib(ms) == 0)then
               call c(iorb,m,k1,sg1)
               call cdg(ms,k1,k2,sg2)
               j=binary_search(Hmap,k2)
-              tef=vup(iorb,kp)
-              htmp = tef*sg1*sg2
-              !
+              htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2 !vup(iorb,kp)
               Hv(i) = Hv(i) + htmp*v(j)
-              Hv(j) = Hv(j) + htmp*v(i)
-              !
+           endif
+           !
+           if(ib(iorb) == 0 .AND. ib(ms) == 1)then
+              call c(ms,m,k1,sg1)
+              call cdg(iorb,k1,k2,sg2)
+              j=binary_search(Hmap,k2)
+              htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2 !vup(iorb,kp)
+              Hv(i) = Hv(i) + htmp*v(j)
            endif
            !DW
            if(ib(iorb+Ns) == 1 .AND. ib(ms+Ns) == 0)then
               call c(iorb+Ns,m,k1,sg1)
               call cdg(ms+Ns,k1,k2,sg2)
               j=binary_search(Hmap,k2)
-              tef=vdw(iorb,kp)
-              htmp=tef*sg1*sg2
-              !
+              htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2!vdw(iorb,kp)
               Hv(i) = Hv(i) + htmp*v(j)
-              Hv(j) = Hv(j) + htmp*v(i)
-              !
+           endif
+           !
+           if(ib(iorb+Ns) == 0 .AND. ib(ms+Ns) == 1)then
+              call c(ms+Ns,m,k1,sg1)
+              call cdg(iorb+Ns,k1,k2,sg2)
+              j=binary_search(Hmap,k2)
+              htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2!vdw(iorb,kp)
+              Hv(i) = Hv(i) + htmp*v(j)
            endif
         enddo
      enddo

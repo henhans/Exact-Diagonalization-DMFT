@@ -13,7 +13,7 @@ program lancED
   !Bath:
   real(8),allocatable    :: Bath(:)
   !The local hybridization function:
-  complex(8),allocatable :: Delta(:,:)
+  complex(8),allocatable :: Delta(:,:,:)
 
 #ifdef _MPI
   call MPI_INIT(mpiERR)
@@ -27,7 +27,7 @@ program lancED
   call parse_cmd_variable(wband,"wband",default=1.d0)
 
   !Allocate Weiss Field:
-  allocate(delta(Norb,NL))
+  allocate(delta(Norb,Norb,NL))
 
   !setup solver
   Nb=get_bath_size()
@@ -50,13 +50,11 @@ program lancED
      call chi2_fitgf(delta,bath,ispin=1)
 
      !Check convergence (if required change chemical potential)
-#ifdef _MPI
      if(mpiID==0)then
-#endif
-        converged = check_convergence(delta(1,:),eps_error,nsuccess,nloop)
+        converged = check_convergence(delta(1,1,:),eps_error,nsuccess,nloop)
         if(nread/=0.d0)call search_mu(nimp(1),converged)
-#ifdef _MPI
      endif
+#ifdef _MPI
      call MPI_BCAST(converged,1,MPI_LOGICAL,0,MPI_COMM_WORLD,mpiERR)
 #endif
      call end_loop
@@ -86,7 +84,7 @@ contains
           iw = xi*wm(i)
           zita    = iw + xmu - impSmats(1,iorb,iorb,i)
           gloc(i) = gfbethe(wm(i),zita,Wband)
-          delta(iorb,i)= iw + xmu - impSmats(1,iorb,iorb,i) - one/gloc(i)
+          delta(iorb,iorb,i)= iw + xmu - impSmats(1,iorb,iorb,i) - one/gloc(i)
        enddo
 
        do i=1,Nw
@@ -97,7 +95,7 @@ contains
        call splot("Gloc_"//reg(txtfy(iorb))//"_iw.ed",wm,gloc)
        call splot("Gloc_"//reg(txtfy(iorb))//"_realw.ed",wr,grloc)
        call splot("DOS"//reg(txtfy(iorb))//".ed",wr,-dimag(grloc)/pi)
-       call splot("Delta_"//reg(txtfy(iorb))//"_iw.ed",wm,delta(iorb,:))
+       call splot("Delta_"//reg(txtfy(iorb))//"_iw.ed",wm,delta(iorb,iorb,:))
     enddo
   end subroutine get_delta_bethe
   !+----------------------------------------+
