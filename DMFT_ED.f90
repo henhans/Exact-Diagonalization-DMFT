@@ -36,11 +36,19 @@ contains
   !+------------------------------------------------------------------+
   subroutine ed_solver(bath_)
     real(8),dimension(:),intent(in) :: bath_
-    integer                         :: unit
+    integer                         :: unit,i
     if(mpiID==0)write(LOGfile,"(A)")"ED SOLUTION"
     call check_bath_dimension(bath_)
     call allocate_bath(dmft_bath)
     call set_bath(bath_,dmft_bath)
+    !<DEBUG
+    dmft_bath%v(1,:,:)=0.5d0
+    dmft_bath%v(1,1,Nbath/2+1:Nbath)=0.d0
+    dmft_bath%v(1,2,1:Nbath/2)=0.d0
+    dmft_bath%e(1,1,1:Nbath/2)=[-2.d0,-1.d0,0.d0,1.d0]
+    dmft_bath%e(1,1,Nbath/2+1:Nbath)=dmft_bath%e(1,1,1:Nbath/2)
+    call write_bath(dmft_bath,LOGfile)
+    !>DEBUG
     select case(ed_method)
     case default
        call lanc_ed_diag

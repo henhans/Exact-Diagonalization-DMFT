@@ -34,6 +34,7 @@ program lancED
   allocate(bath(Nb))
   call init_ed_solver(bath)
 
+  
   !DMFT loop
   iloop=0;converged=.false.
   do while(.not.converged.OR.iloop>nloop)
