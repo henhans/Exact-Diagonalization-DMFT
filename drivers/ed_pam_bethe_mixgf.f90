@@ -151,7 +151,9 @@ contains
     complex(8),dimension(Norb,Norb) :: He,invg
     integer :: i,j
     He=zero
-    forall(i=1:Norb)He(i,i)=ek
+    !forall(i=1:Norb)He(i,i)=ek
+    He(1,1)=0.00001*ek
+    He(2,2)=ek
     invg=zeta-He
     call matrix_inverse(invg)
   end function invert_ge

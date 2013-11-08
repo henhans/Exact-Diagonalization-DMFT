@@ -121,7 +121,7 @@ contains
           enddo
        end select
 
-       allocate(simp(Norb,Nspin),zimp(Norb,Nspin),rimp(Norb,Nspin))
+       allocate(simp(Norb,Nspin),zimp(Norb,Nspin))!,rimp(Norb,Nspin))
        call get_szr
 
        if(iolegend)call write_legend
@@ -135,7 +135,7 @@ contains
           write(LOGfile,"(A,10f18.12)")"mag=   ",(magimp(iorb),iorb=1,Norb)
        endif
        write(LOGfile,*)""
-       deallocate(simp,zimp,rimp)
+       deallocate(simp,zimp)!,rimp)
 
 #ifdef _MPI
     endif

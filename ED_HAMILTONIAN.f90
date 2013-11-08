@@ -40,7 +40,7 @@ contains
     integer,dimension(Ntot)          :: ib
     integer                          :: mpiQ,mpiR                
     integer                          :: dim,iup,idw
-    integer                          :: i,j,m,ms,msup,msdw,iorb,jorb,ispin
+    integer                          :: i,j,m,ms,iorb,jorb,ispin
     integer                          :: kp,k1,k2,k3,k4
     real(8)                          :: sg1,sg2,sg3,sg4
     real(8)                          :: htmp
@@ -112,6 +112,7 @@ contains
           enddo
        enddo
        !
+       !
        if(flanc)then
 #ifdef _MPI
           call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,i)
@@ -121,6 +122,7 @@ contains
        else
           h(i,i)=h(i,i)+htmp
        endif
+       !
        !
        if(Norb>1.AND.Jhflag)then
           !SPIN-EXCHANGE (S-E) and PAIR-HOPPING TERMS
@@ -190,8 +192,46 @@ contains
           enddo
        endif
        !
-       !
-       !NON-LOCAL PART
+
+       !LOCAL HYBRIDIZATION
+       do iorb=1,Norb
+          do jorb=1,Norb
+             !SPIN UP
+             if((ib(iorb)==0).AND.(ib(jorb)==1))then
+                call c(jorb,m,k1,sg1)
+                call cdg(iorb,k1,k2,sg2)
+                j=binary_search(Hmap,k2)
+                htmp = hybrd(iorb,jorb)*sg1*sg2
+                if(flanc)then
+#ifdef _MPI
+                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+#else
+                   call sp_insert_element(spH0,htmp,i,j)
+#endif
+                else
+                   h(i,j)=h(i,j)+htmp
+                endif
+             endif
+             !SPIN DW
+             if((ib(iorb+Ns)==0).AND.(ib(jorb+Ns)==1))then
+                call c(jorb+Ns,m,k1,sg1)
+                call cdg(iorb+Ns,k1,k2,sg2)
+                j=binary_search(Hmap,k2)
+                htmp = hybrd(iorb,jorb)*sg1*sg2
+                if(flanc)then
+#ifdef _MPI
+                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+#else
+                   call sp_insert_element(spH0,htmp,i,j)
+#endif
+                else
+                   h(i,j)=h(i,j)+htmp
+                endif
+             endif
+          enddo
+       enddo
+
+       !IMP-BATH HYBRIDIZATION
        do iorb=1,Norb
           do kp=1,Nbath
              ms=getBathStride(iorb,kp)
@@ -269,9 +309,7 @@ contains
 
 
 
-  !####################################################################
   !               RELATED COMPUTATIONAL ROUTINES
-  !####################################################################
   !+------------------------------------------------------------------+
   !PURPOSE  : Perform the matrix-vector product H*v used in the
   ! Lanczos algorithm using serial double real, complex, and MPI
@@ -380,9 +418,9 @@ contains
   !Lanczos algorithm. this DOES NOT store the H-matrix (slower but 
   !more memory efficient)
   !+------------------------------------------------------------------+
-  include "ed_HtimesV_direct.f90"
+  include "ed_htimesv_direct.f90"
 #ifdef _MPI
-  include "ed_HtimesV_direct_mpi.f90"
+  include "ed_htimesv_direct_mpi.f90"
 #endif
 
 

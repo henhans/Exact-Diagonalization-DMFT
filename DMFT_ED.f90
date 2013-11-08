@@ -15,14 +15,17 @@ contains
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine init_ed_solver(bath_)
+  subroutine init_ed_solver(bath_,hwband)
     real(8),dimension(:),intent(inout) :: bath_
+    real(8),optional,intent(in)        :: hwband
+    real(8)                            :: hwband_
+    hwband_=1.d0;if(present(hwband))hwband_=hwband
     if(mpiID==0)write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
     bath_=0.d0
     call init_ed_structure
     call check_bath_dimension(bath_)
     call allocate_bath(dmft_bath)
-    call init_bath_ed(dmft_bath)
+    call init_bath_ed(dmft_bath,hwband_)
     call copy_bath(dmft_bath,bath_)
     call write_bath(dmft_bath,LOGfile)
     call setup_pointers
@@ -36,19 +39,11 @@ contains
   !+------------------------------------------------------------------+
   subroutine ed_solver(bath_)
     real(8),dimension(:),intent(in) :: bath_
-    integer                         :: unit,i
+    integer                         :: unit
     if(mpiID==0)write(LOGfile,"(A)")"ED SOLUTION"
     call check_bath_dimension(bath_)
     call allocate_bath(dmft_bath)
     call set_bath(bath_,dmft_bath)
-    !<DEBUG
-    dmft_bath%v(1,:,:)=0.5d0
-    dmft_bath%v(1,1,Nbath/2+1:Nbath)=0.d0
-    dmft_bath%v(1,2,1:Nbath/2)=0.d0
-    dmft_bath%e(1,1,1:Nbath/2)=[-2.d0,-1.d0,0.d0,1.d0]
-    dmft_bath%e(1,1,Nbath/2+1:Nbath)=dmft_bath%e(1,1,1:Nbath/2)
-    call write_bath(dmft_bath,LOGfile)
-    !>DEBUG
     select case(ed_method)
     case default
        call lanc_ed_diag

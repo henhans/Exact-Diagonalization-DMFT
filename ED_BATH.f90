@@ -13,6 +13,7 @@
 MODULE ED_BATH
   USE ED_VARS_GLOBAL
   implicit none
+
   private
 
   !type(effective_bath) :: dmft_bath
@@ -78,7 +79,7 @@ contains
     N_=size(bath_)
     select case(bath_type)
     case('hybrid')
-       Ntrue=Nspin*(Norb+1)*Nbath
+       Ntrue = Nspin*(Norb+1)*Nbath
     case default
        Ntrue = Nspin*(2*Norb)*Nbath
     end select
@@ -106,11 +107,12 @@ contains
   !PURPOSE  : Initialize the DMFT loop, builindg H parameters and/or 
   !reading previous (converged) solution
   !+------------------------------------------------------------------+
-  subroutine init_bath_ed(dmft_bath)
+  subroutine init_bath_ed(dmft_bath,hwband_)
     type(effective_bath) :: dmft_bath
-    integer              :: i,iorb,ispin,unit,n2
+    real(8)              :: hwband_
+    integer              :: i,iorb,ispin,unit
     logical              :: IOfile
-    real(8)              :: ran(Nbath)
+    real(8)              :: N2,di!ran(Nbath)
     if(.not.dmft_bath%status)stop "init_bath: bath not allocated"
     if(mpiID==0)then
        inquire(file=trim(Hfile),exist=IOfile)
@@ -127,18 +129,18 @@ contains
              enddo
           case ('hybrid')
              do i=1,Nbath
-                read(unit,"(90(F13.9,1X))")( dmft_bath%e(ispin,1,i),    (dmft_bath%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
+                read(unit,"(90(F13.9,1X))")( dmft_bath%e(ispin,1,i), (dmft_bath%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
              enddo
-
           end select
           close(unit)
        else
           write(LOGfile,"(A)")"Generating bath from scratch"
           write(LOGfile,"(A)")'- - - - - - - - - - - - - - -'
           !call random_number(ran(:))
-          N2=Nbath/2
+          !N2=Nbath/2.d0
+          di = 2.d0*hwband_/dble(Nbath-1)!abs(wfin-wini)/dble(Nbath-1)
           do i=1,Nbath
-             dmft_bath%e(:,:,i)=2.d0*real(i-1-n2,8)/real(n2,8)
+             dmft_bath%e(:,:,i)=-hwband_ + dble(i-1)*di!2.d0*real(i-1-n2,8)/real(n2,8)
              dmft_bath%v(:,:,i)=1.d0/sqrt(real(Nbath,8))
           enddo
        endif
@@ -181,9 +183,6 @@ contains
        end select
     endif
   end subroutine write_bath
-
-
-
 
 
 

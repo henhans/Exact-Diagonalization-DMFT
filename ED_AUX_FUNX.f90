@@ -103,7 +103,7 @@ contains
     !Some check:
     if(Nfit>NL)Nfit=NL
     if(Nspin>2)stop "Nspin > 2 ERROR. I guess you need to open the code at this point..."
-    if(Norb>3)stop "Norb > 3 ERROR. I guess more than 3 bands is not feasing at this stage... " 
+    if(Norb>3)stop "Norb > 3 ERROR. I guess more than 3 bands is not feasible at this stage... " 
     if(nerr > eps_error) nerr=eps_error    
 
     !allocate functions
