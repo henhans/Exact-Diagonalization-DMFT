@@ -36,7 +36,6 @@ subroutine full_ed_buildgf(iorb,ispin)
   complex(8)              :: iw
   integer,allocatable,dimension(:)     :: HJmap,HImap    !map of the Sector S to Hilbert space H
 
-
   nsite=1
   isite=impIndex(iorb,ispin)
   if(mpiID==0)write(LOGfile,"(A)")"Evaluating G_imp_Orb"//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin))
@@ -58,11 +57,10 @@ subroutine full_ed_buildgf(iorb,ispin)
            if(expterm < cutoff)cycle
            !
            do ll=1,jdim              !loop over the component of |j> (IN state!)
-              !m=Hmap(jsector)%map(ll)!map from IN state (j) to full Hilbert space
               m = HJmap(ll)
               call bdecomp(m,ib)
               if(ib(isite) == 0)then
-                 call cdg(isite,m,k,cc)!;cc=dble(k)/dble(abs(k));k=abs(k)
+                 call cdg(isite,m,k,cc)
                  r = binary_search(HImap,k)
                  cdgmat=cdgmat+espace(isector)%M(r,i)*cc*espace(jsector)%M(ll,j)
               endif
@@ -72,12 +70,10 @@ subroutine full_ed_buildgf(iorb,ispin)
            de=Ej-Ei
            peso=expterm/zeta_function
            matcdg=peso*cdgmat**2
-           !build Matsubara GF
            do m=1,NL
               iw=xi*wm(m)
               impGmats(ispin,iorb,iorb,m)=impGmats(ispin,iorb,iorb,m)+matcdg/(iw+de)
            enddo
-           !build Real-freq. GF
            do m=1,Nw 
               w0=wr(m);iw=cmplx(w0,eps)
               impGreal(ispin,iorb,iorb,m)=impGreal(ispin,iorb,iorb,m)+matcdg/(iw+de)

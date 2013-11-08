@@ -10,7 +10,7 @@ module ARPACK_LANCZOS
 
 #ifdef _MPI
   interface lanczos_parpack
-     module procedure lanczos_parpack_d!,lanczos_parpack_c
+     module procedure lanczos_parpack_d,lanczos_parpack_c
   end interface lanczos_parpack
   public :: lanczos_parpack
 #endif

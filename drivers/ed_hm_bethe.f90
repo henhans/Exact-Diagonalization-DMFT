@@ -7,11 +7,11 @@ program lancED
   USE FUNCTIONS
   USE TOOLS
   implicit none
-  integer :: iloop,Nb
-  logical :: converged
+  integer                :: iloop,Nb(2)
+  logical                :: converged
   real(8)                :: wband,ts
   !Bath:
-  real(8),allocatable    :: Bath(:)
+  real(8),allocatable    :: Bath(:,:)
   !The local hybridization function:
   complex(8),allocatable :: Delta(:,:)
 
@@ -31,10 +31,9 @@ program lancED
 
   !setup solver
   Nb=get_bath_size()
-  allocate(bath(Nb))
+  allocate(bath(Nb(1),Nb(2)))
   call init_ed_solver(bath)
 
-  
   !DMFT loop
   iloop=0;converged=.false.
   do while(.not.converged.OR.iloop>nloop)

@@ -16,14 +16,16 @@ contains
   !PURPOSE  : 
   !+------------------------------------------------------------------+
   subroutine init_ed_solver(bath_,hwband)
-    real(8),dimension(:),intent(inout) :: bath_
-    real(8),optional,intent(in)        :: hwband
-    real(8)                            :: hwband_
+    real(8),dimension(:,:),intent(inout) :: bath_
+    real(8),optional,intent(in)          :: hwband
+    real(8)                              :: hwband_
+    logical                              :: check
     hwband_=1.d0;if(present(hwband))hwband_=hwband
     if(mpiID==0)write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
     bath_=0.d0
     call init_ed_structure
-    call check_bath_dimension(bath_)
+    check = check_bath_dimension(bath_)
+    if(.not.check)stop "init_ed_solver: wrong bath dimensions"
     call allocate_bath(dmft_bath)
     call init_bath_ed(dmft_bath,hwband_)
     call copy_bath(dmft_bath,bath_)
@@ -38,10 +40,12 @@ contains
   !PURPOSE  : 
   !+------------------------------------------------------------------+
   subroutine ed_solver(bath_)
-    real(8),dimension(:),intent(in) :: bath_
-    integer                         :: unit
+    real(8),dimension(:,:),intent(in) :: bath_
+    integer                           :: unit
+    logical                           :: check
     if(mpiID==0)write(LOGfile,"(A)")"ED SOLUTION"
-    call check_bath_dimension(bath_)
+    check = check_bath_dimension(bath_)
+    if(.not.check)stop "init_ed_solver: wrong bath dimensions"
     call allocate_bath(dmft_bath)
     call set_bath(bath_,dmft_bath)
     select case(ed_method)

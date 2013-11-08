@@ -27,6 +27,7 @@ MODULE ED_GREENS_FUNCTIONS
   !Lanczos shared variables
   !=========================================================
   real(8),dimension(:),pointer              :: state_vec
+  complex(8),dimension(:),pointer           :: state_cvec
   real(8)                                   :: state_e
 
   !Impurity GF

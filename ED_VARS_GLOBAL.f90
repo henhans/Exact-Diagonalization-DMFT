@@ -37,32 +37,35 @@ MODULE ED_VARS_GLOBAL
 
   !Global variables
   !=========================================================
-  integer                :: nloop          !max dmft loop variables
-  real(8),dimension(3)   :: Uloc           !local interactions
-  real(8)                :: Ust,Jh         !intra-orbitals interactions
-  real(8),dimension(3)   :: eloc           !local energies
-  real(8),dimension(3,3) :: hybrd          !hybridizations
-  real(8)                :: xmu            !chemical potential
-  real(8)                :: beta           !inverse temperature
-  real(8)                :: eps            !broadening
-  real(8)                :: wini,wfin      !
-  integer                :: Nsuccess       !
-  logical                :: Jhflag         !spin-exchange and pair-hopping flag.
-  logical                :: chiflag        !
-  logical                :: HFmode         !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
-  real(8)                :: cutoff         !cutoff for spectral summation
-  real(8)                :: eps_error      !
-  integer                :: lanc_niter     !Max number of Lanczos iterations
-  integer                :: lanc_neigen    !Max number of required eigenvalues per sector
-  integer                :: lanc_ngfiter   !Max number of iteration in resolvant tri-diagonalization
-  integer                :: lanc_nstates   !Max number of states hold in the finite T calculation
-  integer                :: cg_niter       !Max number of iteration in the fit
-  real(8)                :: cg_Ftol        !Tolerance in the cg fit
-  integer                :: cg_Type        !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
-  logical                :: finiteT        !flag for finite temperature calculation
-  character(len=4)       :: ed_method      !flag to set ed method solution: lanc=lanczos method, full=full diagonalization
-  character(len=1)       :: ed_type        !flag to set real or complex Ham: d=symmetric H (real), c=hermitian H (cmplx)
-  character(len=7)       :: bath_type      !flag to set bath type: irreducible (1bath/imp), reducible(1bath)
+  integer                   :: nloop          !max dmft loop variables
+  real(8),dimension(3)      :: Uloc           !local interactions
+  real(8)                   :: Ust,Jh         !intra-orbitals interactions
+  real(8),dimension(3)      :: eloc           !local energies
+  complex(8),dimension(3,3) :: hybrd          !hybridizations
+  real(8),dimension(3,3)    :: rehybrd        !hybridizations
+  real(8),dimension(3,3)    :: imhybrd        !hybridizations
+  real(8)                   :: xmu            !chemical potential
+  real(8)                   :: beta           !inverse temperature
+  real(8)                   :: eps            !broadening
+  real(8)                   :: wini,wfin      !
+  integer                   :: Nsuccess       !
+  logical                   :: Jhflag         !spin-exchange and pair-hopping flag.
+  logical                   :: chiflag        !
+  logical                   :: HFmode         !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
+  real(8)                   :: cutoff         !cutoff for spectral summation
+  real(8)                   :: eps_error      !
+  integer                   :: lanc_niter     !Max number of Lanczos iterations
+  integer                   :: lanc_neigen    !Max number of required eigenvalues per sector
+  integer                   :: lanc_ngfiter   !Max number of iteration in resolvant tri-diagonalization
+  integer                   :: lanc_nstates   !Max number of states hold in the finite T calculation
+  integer                   :: cg_Niter       !Max number of iteration in the fit
+  real(8)                   :: cg_Ftol        !Tolerance in the cg fit
+  integer                   :: cg_Weight      !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
+  character(len=5)          :: cg_Scheme      !fit scheme: delta (default), weiss for G0^
+  logical                   :: finiteT        !flag for finite temperature calculation
+  character(len=4)          :: ed_method      !flag to set ed method solution: lanc=lanczos method, full=full diagonalization
+  character(len=1)          :: ed_type        !flag to set real or complex Ham: d=symmetric H (real), c=hermitian H (cmplx)
+  character(len=7)          :: bath_type      !flag to set bath type: irreducible (1bath/imp), reducible(1bath)
 
   !Dimension of the functions:
   !=========================================================
@@ -128,7 +131,7 @@ MODULE ED_VARS_GLOBAL
 
 
   namelist/EDvars/Norb,Nbath,Nspin,&       
-       beta,xmu,nloop,uloc,Ust,Jh,Eloc,hybrd,   &
+       beta,xmu,nloop,uloc,Ust,Jh,Eloc,rehybrd,imhybrd,   &
        eps,wini,wfin,      &
        NL,Nw,Ltau,Nfit,         &
        nread,nerr,ndelta,       &
@@ -136,7 +139,7 @@ MODULE ED_VARS_GLOBAL
        eps_error,Nsuccess,      &
        ed_method,ed_type,bath_type,&
        lanc_neigen,lanc_niter,lanc_ngfiter,lanc_nstates,&
-       cg_niter,cg_ftol,cg_type,   &
+       cg_niter,cg_ftol,cg_weight,cg_scheme,  &
        Hfile,Ofile,GFfile,CHIfile,LOGfile
 
 contains
@@ -160,7 +163,8 @@ contains
     Uloc       = [ 2.d0, 0.d0, 0.d0 ]
     Ust        = 0.d0
     Jh         = 0.d0
-    Hybrd      = 0.d0
+    reHybrd    = 0.d0
+    imHybrd    = 0.d0
     Eloc       = 0.d0
     xmu        = 0.d0
     beta       = 500.d0
@@ -189,7 +193,8 @@ contains
     lanc_nstates = 1            !set to T=0 calculation
     cg_niter   = 200
     cg_Ftol     = 1.d-9
-    cg_Type     = 0
+    cg_weight     = 0
+    cg_scheme     = 'delta'
     ed_method    = 'lanc'
     ed_type = 'd'
     bath_type='normal' !hybrid,superc
@@ -230,6 +235,8 @@ contains
     call parse_cmd_variable(ust,"UST")
     call parse_cmd_variable(Jh,"JH")
     call parse_cmd_variable(eloc,"ELOC")
+    call parse_cmd_variable(reHybrd,"reHybrd")
+    call parse_cmd_variable(imHybrd,"imHybrd")
     call parse_cmd_variable(nloop,"NLOOP")
     call parse_cmd_variable(eps_error,"EPS_ERROR")
     call parse_cmd_variable(nsuccess,"NSUCCESS")
@@ -251,8 +258,9 @@ contains
     call parse_cmd_variable(lanc_nstates,"LANC_NSTATES")
     call parse_cmd_variable(lanc_ngfiter,"LANC_NGFITER")
     call parse_cmd_variable(cg_niter,"CG_NITER")
+    call parse_cmd_variable(cg_scheme,"CG_SCHEME")
     call parse_cmd_variable(cg_ftol,"CG_FTOL")
-    call parse_cmd_variable(cg_Type,"CG_TYPE")
+    call parse_cmd_variable(cg_weight,"CG_WEIGHT")
     call parse_cmd_variable(ed_Type,"ED_TYPE")
     call parse_cmd_variable(ed_Method,"ED_METHOD")
     call parse_cmd_variable(bath_type,"BATH_TYPE")

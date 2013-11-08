@@ -8,11 +8,11 @@ program lancED
   USE TOOLS
   USE MATRIX
   implicit none
-  integer :: iloop,Nb,Le
+  integer :: iloop,Nb(2),Le
   logical :: converged
   real(8)                :: wband,ts
   !Bath:
-  real(8),allocatable    :: Bath(:)
+  real(8),allocatable    :: Bath(:,:)
   !The local hybridization function:
   complex(8),allocatable :: Delta(:,:,:)
 
@@ -33,7 +33,7 @@ program lancED
 
   !setup solver
   Nb=get_bath_size()
-  allocate(bath(Nb))
+  allocate(bath(Nb(1),Nb(2)))
   call init_ed_solver(bath)
 
   !DMFT loop

@@ -102,9 +102,13 @@ contains
 
     !Some check:
     if(Nfit>NL)Nfit=NL
-    if(Nspin>2)stop "Nspin > 2 ERROR. I guess you need to open the code at this point..."
-    if(Norb>3)stop "Norb > 3 ERROR. I guess more than 3 bands is not feasible at this stage... " 
+    if(Nspin>2)stop "Nspin > 2 ERROR. ask developer or develop your own on separate branch"
+    if(Norb>3)stop "Norb > 3 ERROR. ask developer or develop your own on separate branch" 
     if(nerr > eps_error) nerr=eps_error    
+    if(ed_method=='full'.AND.bath_type=='hybrid')stop "FULL ED & HYBRID not implemented yet:ask developer..."
+
+    !set up Hybridizations
+    hybrd = dcmplx(reHybrd,imHybrd)
 
     !allocate functions
     allocate(impSmats(Nspin,Norb,Norb,NL))
@@ -114,6 +118,8 @@ contains
     allocate(nimp(Norb),dimp(Norb),nupimp(Norb),ndwimp(Norb),magimp(Norb))
     allocate(m2imp(Norb,Norb))
   end subroutine init_ed_structure
+
+
 
 
   !+------------------------------------------------------------------+

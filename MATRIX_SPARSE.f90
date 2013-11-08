@@ -44,15 +44,15 @@ MODULE MATRIX_SPARSE
      module procedure sp_dump_matrix_d,sp_dump_matrix_c
   end interface sp_dump_matrix
 
-  interface sp_matrix_vector_product
-     module procedure sp_matrix_vector_product_dd, sp_matrix_vector_product_dc
-  end interface sp_matrix_vector_product
+  ! interface sp_matrix_vector_product
+  !    module procedure sp_matrix_vector_product_dd, sp_matrix_vector_product_dc
+  ! end interface sp_matrix_vector_product
 
-#ifdef _MPI
-  interface sp_matrix_vector_product_mpi
-     module procedure sp_matrix_vector_product_d_mpi,sp_matrix_vector_product_c_mpi
-  end interface sp_matrix_vector_product_mpi
-#endif
+  ! #ifdef _MPI
+  !   interface sp_matrix_vector_product_mpi
+  !      module procedure sp_matrix_vector_product_d_mpi,sp_matrix_vector_product_c_mpi
+  !   end interface sp_matrix_vector_product_mpi
+  ! #endif
 
   public :: sparse_matrix
   !
@@ -69,11 +69,14 @@ MODULE MATRIX_SPARSE
   public :: sp_dump_matrix      !checked
   public :: sp_print_matrix     !checked
   !
-  public :: sp_matrix_vector_product !checked
+  public :: sp_matrix_vector_product_dd !checked
+  public :: sp_matrix_vector_product_dc !checked
   public :: sp_matrix_vector_product_cc !checked
 
 #ifdef _MPI
-  public :: sp_matrix_vector_product_mpi
+  public :: sp_matrix_vector_product_mpi_dd
+  public :: sp_matrix_vector_product_mpi_dc
+  public :: sp_matrix_vector_product_mpi_cc
 #endif
 
 contains       
@@ -626,8 +629,9 @@ contains
   end subroutine sp_matrix_vector_product_cc
 
 
+
 #ifdef _MPI
-  subroutine sp_matrix_vector_product_d_mpi(sparse,Q,R,Ndim,vin,Nloc,vout)
+  subroutine sp_matrix_vector_product_mpi_dd(sparse,Q,R,Ndim,vin,Nloc,vout)
     integer                               :: Ndim,Nloc
     type(sparse_matrix),intent(in)        :: sparse
     real(8),dimension(Ndim),intent(in)    :: vin
@@ -645,9 +649,9 @@ contains
        end do matmul
     end do
     !call MPI_ALLREDUCE(vtmp,vout,Ndim,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,mpiERR)
-  end subroutine sp_matrix_vector_product_d_mpi
+  end subroutine sp_matrix_vector_product_mpi_dd
   !+------------------------------------------------------------------+
-  subroutine sp_matrix_vector_product_c_mpi(sparse,Q,R,Ndim,vin,Nloc,vout)
+  subroutine sp_matrix_vector_product_mpi_dc(sparse,Q,R,Ndim,vin,Nloc,vout)
     integer                                  :: Ndim,Nloc
     type(sparse_matrix),intent(in)           :: sparse
     complex(8),dimension(Ndim),intent(in)    :: vin
@@ -655,7 +659,7 @@ contains
     type(sparse_element),pointer             :: c
     integer                                  :: i
     integer                                  :: R,Q,Nini,Nfin
-    vout=cmplx(0.d0,0.d0,8)
+    vout=zero
     do i=1,Q+R
        c => sparse%row(i)%root%next       
        matmul: do
@@ -664,7 +668,26 @@ contains
           c => c%next
        end do matmul
     end do
-  end subroutine sp_matrix_vector_product_c_mpi
+  end subroutine sp_matrix_vector_product_mpi_dc
+  !+------------------------------------------------------------------+
+  subroutine sp_matrix_vector_product_mpi_cc(sparse,Q,R,Ndim,vin,Nloc,vout)
+    integer                                  :: Ndim,Nloc
+    type(sparse_matrix),intent(in)           :: sparse
+    complex(8),dimension(Ndim),intent(in)    :: vin
+    complex(8),dimension(Nloc),intent(inout) :: vout
+    type(sparse_element),pointer             :: c
+    integer                                  :: i
+    integer                                  :: R,Q,Nini,Nfin
+    vout=zero
+    do i=1,Q+R
+       c => sparse%row(i)%root%next       
+       matmul: do
+          if(.not.associated(c))exit matmul
+          vout(i) = vout(i) + c%cval*vin(c%col)
+          c => c%next
+       end do matmul
+    end do
+  end subroutine sp_matrix_vector_product_mpi_cc
 #endif
 
 end module MATRIX_SPARSE

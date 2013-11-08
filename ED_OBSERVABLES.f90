@@ -7,7 +7,7 @@ MODULE ED_OBSERVABLES
   implicit none
   private
 
-  public       :: ed_getobs
+  public              :: ed_getobs
 
   logical,save        :: iolegend=.true.
   integer,save        :: loop=0
@@ -26,12 +26,13 @@ contains
     integer                      :: izero,isect0,jsect0,m
     integer                      :: dim,dim0,iup,idw
     integer                      :: iorb,jorb,ispin,numstates
-    real(8)                      :: gs
+    real(8)                      :: gs_weight
     real(8)                      :: Ei,Egs,norm0,sgn,nup(Norb),ndw(Norb),peso
     real(8)                      :: factor
     real(8),dimension(:),pointer :: gsvec
+    complex(8),dimension(:),pointer :: gscvec
     integer,allocatable,dimension(:)     :: Hmap
-
+    !
 #ifdef _MPI
     if(mpiID==0)then
 #endif
@@ -51,14 +52,20 @@ contains
              isect0 = es_return_sector(state_list,izero)
              Ei     = es_return_energy(state_list,izero)
              dim0   = getdim(isect0)
-             gsvec  => es_return_vector(state_list,izero)
-             peso   = 1.d0
-             if(finiteT)peso=exp(-beta*(Ei-Egs))
-             norm0=sqrt(dot_product(gsvec,gsvec))
+             if(ed_type=='d')then
+                gsvec  => es_return_vector(state_list,izero)
+                norm0=sqrt(dot_product(gsvec,gsvec))
+             elseif(ed_type=='c')then
+                gscvec  => es_return_cvector(state_list,izero)
+                norm0=sqrt(dot_product(gscvec,gscvec))
+             endif
              if(abs(norm0-1.d0)>1.d-9)then
                 write(LOGfile,*) "GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0)
                 stop
              endif
+             !
+             peso   = 1.d0
+             if(finiteT)peso=exp(-beta*(Ei-Egs))
              !
              allocate(Hmap(dim0))
              call build_sector(isect0,Hmap)
@@ -66,17 +73,21 @@ contains
              do i=1,dim0
                 m=Hmap(i)
                 call bdecomp(m,ib)
-                gs=gsvec(i)
+                if(ed_type=='d')then
+                   gs_weight=gsvec(i)**2
+                elseif(ed_type=='c')then
+                   gs_weight=abs(gscvec(i))**2
+                endif
                 do iorb=1,Norb
                    nup(iorb)=real(ib(iorb),8)
                    ndw(iorb)=real(ib(iorb+Ns),8)
-                   nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*gs**2*peso
-                   nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*gs**2*peso
-                   ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*gs**2*peso
-                   dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*gs**2*peso
-                   magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*gs**2*peso
+                   nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*gs_weight*peso
+                   nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*gs_weight*peso
+                   ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*gs_weight*peso
+                   dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*gs_weight*peso
+                   magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*gs_weight*peso
                    do jorb=1,Norb
-                      m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs**2*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*peso
+                      m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs_weight*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*peso
                    enddo
                 enddo
              enddo
@@ -89,7 +100,6 @@ contains
           dimp   = dimp/zeta_function
           magimp = magimp/zeta_function
           m2imp  = m2imp/zeta_function
-
        case ('full')
           do isector=1,Nsect
              dim=getdim(isector)
@@ -101,18 +111,18 @@ contains
                 if(peso < cutoff)cycle
                 do j=1,dim
                    ia=Hmap(j)
-                   gs=espace(isector)%M(j,i)
+                   gs_weight=espace(isector)%M(j,i)**2
                    call bdecomp(ia,ib)
                    do iorb=1,Norb
                       nup(iorb)=real(ib(iorb),8)
                       ndw(iorb)=real(ib(iorb+Ns),8)
-                      nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*peso*gs**2
-                      nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*peso*gs**2
-                      ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*peso*gs**2
-                      dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*peso*gs**2
-                      magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*peso*gs**2
+                      nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*peso*gs_weight
+                      nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*peso*gs_weight
+                      ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*peso*gs_weight
+                      dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*peso*gs_weight
+                      magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*peso*gs_weight
                       do jorb=1,Norb
-                         m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs**2*peso*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))
+                         m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs_weight*peso*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))
                       enddo
                    enddo
                 enddo
@@ -120,12 +130,11 @@ contains
              deallocate(Hmap)
           enddo
        end select
-
        allocate(simp(Norb,Nspin),zimp(Norb,Nspin))!,rimp(Norb,Nspin))
        call get_szr
-
+       !
        if(iolegend)call write_legend
-
+       !
        loop=loop+1
        call write_to_unit_column()
        write(LOGfile,"(A,10f18.12)")"nimp=  ",(nimp(iorb),iorb=1,Norb)
