@@ -1,9 +1,19 @@
+MODULE ED_BATH_TYPE
+  implicit none
+  type effective_bath
+     real(8),dimension(:,:,:),allocatable :: e
+     real(8),dimension(:,:,:),allocatable :: v
+     logical                              :: status=.false.
+  end type effective_bath
+END MODULE ED_BATH_TYPE
+!
 MODULE ED_VARS_GLOBAL
   USE SCIFOR_VERSION
   USE COMMON_VARS
   USE PARSE_CMD
   USE IOTOOLS, only:free_unit,reg,splot
   !LOCAL
+  USE ED_BATH_TYPE
   USE MATRIX_SPARSE
   USE EIGEN_SPACE
 #ifdef _MPI
@@ -27,31 +37,32 @@ MODULE ED_VARS_GLOBAL
 
   !Global variables
   !=========================================================
-  integer              :: nloop          !max dmft loop variables
-  real(8),dimension(3) :: Uloc           !local interactions
-  real(8)              :: Ust,Jh         !intra-orbitals interactions
-  real(8),dimension(3) :: eloc           !local energies
-  real(8)              :: xmu            !chemical potential
-  real(8)              :: beta           !inverse temperature
-  real(8)              :: eps            !broadening
-  real(8)              :: wini,wfin      !
-  integer              :: Nsuccess       !
-  logical              :: Jhflag         !spin-exchange and pair-hopping flag.
-  logical              :: chiflag        !
-  logical              :: HFmode         !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
-  real(8)              :: cutoff         !cutoff for spectral summation
-  real(8)              :: eps_error      !
-  integer              :: lanc_niter     !Max number of Lanczos iterations
-  integer              :: lanc_neigen    !Max number of required eigenvalues per sector
-  integer              :: lanc_ngfiter   !Max number of iteration in resolvant tri-diagonalization
-  integer              :: lanc_nstates   !Max number of states hold in the finite T calculation
-  integer              :: cg_niter       !Max number of iteration in the fit
-  real(8)              :: cg_Ftol        !Tolerance in the cg fit
-  integer              :: cg_Type        !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
-  logical              :: finiteT        !flag for finite temperature calculation
-  character(len=4)     :: ed_method      !flag to set ed method solution: lanc=lanczos method, full=full diagonalization
-  character(len=1)     :: ed_type        !flag to set real or complex Ham: d=symmetric H (real), c=hermitian H (cmplx)
-  character(len=7)     :: bath_type      !flag to set bath type: irreducible (1bath/imp), reducible(1bath)
+  integer                :: nloop          !max dmft loop variables
+  real(8),dimension(3)   :: Uloc           !local interactions
+  real(8)                :: Ust,Jh         !intra-orbitals interactions
+  real(8),dimension(3)   :: eloc           !local energies
+  real(8),dimension(3,3) :: hybrd          !hybridizations
+  real(8)                :: xmu            !chemical potential
+  real(8)                :: beta           !inverse temperature
+  real(8)                :: eps            !broadening
+  real(8)                :: wini,wfin      !
+  integer                :: Nsuccess       !
+  logical                :: Jhflag         !spin-exchange and pair-hopping flag.
+  logical                :: chiflag        !
+  logical                :: HFmode         !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
+  real(8)                :: cutoff         !cutoff for spectral summation
+  real(8)                :: eps_error      !
+  integer                :: lanc_niter     !Max number of Lanczos iterations
+  integer                :: lanc_neigen    !Max number of required eigenvalues per sector
+  integer                :: lanc_ngfiter   !Max number of iteration in resolvant tri-diagonalization
+  integer                :: lanc_nstates   !Max number of states hold in the finite T calculation
+  integer                :: cg_niter       !Max number of iteration in the fit
+  real(8)                :: cg_Ftol        !Tolerance in the cg fit
+  integer                :: cg_Type        !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
+  logical                :: finiteT        !flag for finite temperature calculation
+  character(len=4)       :: ed_method      !flag to set ed method solution: lanc=lanczos method, full=full diagonalization
+  character(len=1)       :: ed_type        !flag to set real or complex Ham: d=symmetric H (real), c=hermitian H (cmplx)
+  character(len=7)       :: bath_type      !flag to set bath type: irreducible (1bath/imp), reducible(1bath)
 
   !Dimension of the functions:
   !=========================================================
@@ -66,6 +77,11 @@ MODULE ED_VARS_GLOBAL
   integer,allocatable,dimension(:,:)   :: getBathStride
   integer,allocatable,dimension(:,:)   :: impIndex
   integer,allocatable,dimension(:)     :: getdim,getnup,getndw
+
+
+  !Effective Bath used in the ED code (this is opaque to user)
+  !=========================================================
+  type(effective_bath) :: dmft_bath
 
 
   !Eigenvalues,Eigenvectors FULL DIAGONALIZATION
@@ -87,8 +103,8 @@ MODULE ED_VARS_GLOBAL
 
   !Functions for GETGFUNX
   !=========================================================
-  complex(8),allocatable,dimension(:,:,:) :: impSmats
-  complex(8),allocatable,dimension(:,:,:) :: impSreal
+  complex(8),allocatable,dimension(:,:,:,:) :: impSmats
+  complex(8),allocatable,dimension(:,:,:,:) :: impSreal
 
 
   !Variables for fixed density mu-loop 
@@ -112,7 +128,7 @@ MODULE ED_VARS_GLOBAL
 
 
   namelist/EDvars/Norb,Nbath,Nspin,&       
-       beta,xmu,nloop,uloc,Ust,Jh,Eloc,   &
+       beta,xmu,nloop,uloc,Ust,Jh,Eloc,hybrd,   &
        eps,wini,wfin,      &
        NL,Nw,Ltau,Nfit,         &
        nread,nerr,ndelta,       &
@@ -144,6 +160,7 @@ contains
     Uloc       = [ 2.d0, 0.d0, 0.d0 ]
     Ust        = 0.d0
     Jh         = 0.d0
+    Hybrd      = 0.d0
     Eloc       = 0.d0
     xmu        = 0.d0
     beta       = 500.d0

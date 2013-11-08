@@ -157,11 +157,11 @@ contains
     wm1 = pi/beta ; wm2=3.d0*pi/beta
     do ispin=1,Nspin
        do iorb=1,Norb
-          simp(iorb,ispin) = dimag(impSmats(ispin,iorb,1)) - &
-               wm1*(dimag(impSmats(ispin,iorb,2))-dimag(impSmats(ispin,iorb,1)))/(wm2-wm1)
-          zimp(iorb,ispin)   = 1.d0/( 1.d0 + abs( dimag(impSmats(ispin,iorb,1))/wm1 ))
-          ! rimp(iorb,ispin)   = dimag(impGmats(ispin,iorb,1)) - &
-          !      wm1*(dimag(impGmats(ispin,iorb,2))-dimag(impGmats(ispin,iorb,1)))/(wm2-wm1)
+          simp(iorb,ispin) = dimag(impSmats(ispin,iorb,iorb,1)) - &
+               wm1*(dimag(impSmats(ispin,iorb,iorb,2))-dimag(impSmats(ispin,iorb,iorb,1)))/(wm2-wm1)
+          zimp(iorb,ispin)   = 1.d0/( 1.d0 + abs( dimag(impSmats(ispin,iorb,iorb,1))/wm1 ))
+          ! rimp(iorb,ispin)   = dimag(impGmats(ispin,iorb,iorb,1)) - &
+          !      wm1*(dimag(impGmats(ispin,iorb,iorb,2))-dimag(impGmats(ispin,iorb,iorb,1)))/(wm2-wm1)
        enddo
     enddo
   end subroutine get_szr

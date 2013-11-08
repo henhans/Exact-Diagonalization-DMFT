@@ -34,6 +34,7 @@ program lancED
   allocate(bath(Nb))
   call init_ed_solver(bath)
 
+  
   !DMFT loop
   iloop=0;converged=.false.
   do while(.not.converged.OR.iloop>nloop)
@@ -73,9 +74,9 @@ contains
   !+----------------------------------------+
   subroutine get_delta_bethe
     integer                   :: i,j,iorb
-    complex(8)                :: iw,zita,g0and,g0loc
-    complex(8),dimension(NL)  :: self,gloc
-    complex(8),dimension(Nw)  :: selfr,grloc
+    complex(8)                :: iw,zita,g0loc
+    complex(8),dimension(NL)  :: gloc
+    complex(8),dimension(Nw)  :: grloc
     real(8)                   :: wm(NL),wr(Nw)
 
     wm = pi/beta*real(2*arange(1,NL)-1,8)
@@ -84,25 +85,18 @@ contains
     do iorb=1,Norb
        do i=1,NL
           iw = xi*wm(i)
-          g0and   = iw + xmu - eloc(iorb) - delta_and(1,iorb,iw,bath)
-          self(i) = g0and - one/impGmats(1,iorb,i)
-          zita    = iw + xmu - self(i)
+          zita    = iw + xmu - impSmats(1,iorb,iorb,i)
           gloc(i) = gfbethe(wm(i),zita,Wband)
-          g0loc   = self(i) + one/gloc(i)
-          delta(iorb,i)= iw + xmu - g0loc
+          delta(iorb,i)= iw + xmu - impSmats(1,iorb,iorb,i) - one/gloc(i)
        enddo
 
        do i=1,Nw
           iw=cmplx(wr(i),eps)
-          g0and    = wr(i) + xmu - eloc(iorb) - delta_and(1,iorb,wr(i)+zero,bath)
-          selfr(i) = g0and - one/impGreal(1,iorb,i)    
-          zita     = iw + xmu - selfr(i)
+          zita     = iw + xmu - impSreal(1,iorb,iorb,i)
           grloc(i) = gfbether(wr(i),zita,Wband)
        enddo
        call splot("Gloc_"//reg(txtfy(iorb))//"_iw.ed",wm,gloc)
-       call splot("Sigma_"//reg(txtfy(iorb))//"_iw.ed",wm,self)
        call splot("Gloc_"//reg(txtfy(iorb))//"_realw.ed",wr,grloc)
-       call splot("Sigma_"//reg(txtfy(iorb))//"_realw.ed",wr,selfr)
        call splot("DOS"//reg(txtfy(iorb))//".ed",wr,-dimag(grloc)/pi)
        call splot("Delta_"//reg(txtfy(iorb))//"_iw.ed",wm,delta(iorb,:))
     enddo

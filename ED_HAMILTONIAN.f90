@@ -43,20 +43,17 @@ contains
     integer                          :: i,j,m,ms,iorb,jorb,ispin
     integer                          :: kp,k1,k2,k3,k4
     real(8)                          :: sg1,sg2,sg3,sg4
-    real(8)                          :: tef,htmp
-    real(8),dimension(Norb,Nbath)    :: eup,edw
-    real(8),dimension(Norb,Nbath)    :: vup,vdw
+    real(8)                          :: htmp
     real(8),dimension(Norb)          :: nup,ndw
     logical                          :: Jcondition,flanc
     integer                          :: first_state,last_state
-
-
+    !
     dim=getdim(isector)
     flanc=.true. ; if(present(h))flanc=.false.
-
+    !
     first_state= 1
     last_state = dim
-
+    !
     if(flanc)then
        if(spH0%status)call sp_delete_matrix(spH0) 
 #ifdef _MPI
@@ -75,10 +72,6 @@ contains
        h=0.d0
     endif
     !
-    eup=ebath(1,:,:)   ; edw=ebath(Nspin,:,:)
-    vup=vbath(1,:,:)   ; vdw=vbath(Nspin,:,:)
-    !
-
     do i=first_state,last_state
        m=Hmap(i)
        call bdecomp(m,ib)
@@ -110,10 +103,12 @@ contains
        endif
        !
        !Hbath: +energy of the bath=\sum_a=1,Norb\sum_{l=1,Nbath}\e^a_l n^a_l
-       do iorb=1,Norb
+       do iorb=1,size(dmft_bath%e,2)
           do kp=1,Nbath
-             ms=Norb+(iorb-1)*Nbath + kp
-             htmp =htmp + eup(iorb,kp)*real(ib(ms),8) + edw(iorb,kp)*real(ib(ms+Ns),8)
+             ! ms=Norb+(iorb-1)*Nbath + kp
+             ! if(bath_type=='hybrid')ms=Norb+kp
+             ms=getBathStride(iorb,kp)
+             htmp =htmp + dmft_bath%e(1,iorb,kp)*real(ib(ms),8) + dmft_bath%e(Nspin,iorb,kp)*real(ib(ms+Ns),8)
           enddo
        enddo
        !
@@ -197,17 +192,54 @@ contains
           enddo
        endif
        !
-       !
-       !NON-LOCAL PART
+
+       !LOCAL HYBRIDIZATION
+       do iorb=1,Norb
+          do jorb=1,Norb
+             !SPIN UP
+             if((ib(iorb)==0).AND.(ib(jorb)==1))then
+                call c(jorb,m,k1,sg1)
+                call cdg(iorb,k1,k2,sg2)
+                j=binary_search(Hmap,k2)
+                htmp = hybrd(iorb,jorb)*sg1*sg2
+                if(flanc)then
+#ifdef _MPI
+                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+#else
+                   call sp_insert_element(spH0,htmp,i,j)
+#endif
+                else
+                   h(i,j)=h(i,j)+htmp
+                endif
+             endif
+             !SPIN DW
+             if((ib(iorb+Ns)==0).AND.(ib(jorb+Ns)==1))then
+                call c(jorb+Ns,m,k1,sg1)
+                call cdg(iorb+Ns,k1,k2,sg2)
+                j=binary_search(Hmap,k2)
+                htmp = hybrd(iorb,jorb)*sg1*sg2
+                if(flanc)then
+#ifdef _MPI
+                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+#else
+                   call sp_insert_element(spH0,htmp,i,j)
+#endif
+                else
+                   h(i,j)=h(i,j)+htmp
+                endif
+             endif
+          enddo
+       enddo
+
+       !IMP-BATH HYBRIDIZATION
        do iorb=1,Norb
           do kp=1,Nbath
-             ms=Norb+(iorb-1)*Nbath + kp
+             ms=getBathStride(iorb,kp)
              if(ib(iorb) == 1 .AND. ib(ms) == 0)then
                 call c(iorb,m,k1,sg1)
                 call cdg(ms,k1,k2,sg2)
-                j=binary_search(Hmap,k2)
-                tef=vup(iorb,kp)
-                htmp = tef*sg1*sg2
+                j = binary_search(Hmap,k2)
+                htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -223,8 +255,7 @@ contains
                 call c(ms,m,k1,sg1)
                 call cdg(iorb,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                tef = vup(iorb,kp)
-                htmp = tef*sg1*sg2
+                htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -240,8 +271,7 @@ contains
                 call c(iorb+Ns,m,k1,sg1)
                 call cdg(ms+Ns,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                tef=vdw(iorb,kp)
-                htmp=tef*sg1*sg2
+                htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -257,8 +287,7 @@ contains
                 call c(ms+Ns,m,k1,sg1)
                 call cdg(iorb+Ns,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                tef=vdw(iorb,kp)
-                htmp=tef*sg1*sg2
+                htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -280,9 +309,7 @@ contains
 
 
 
-  !####################################################################
   !               RELATED COMPUTATIONAL ROUTINES
-  !####################################################################
   !+------------------------------------------------------------------+
   !PURPOSE  : Perform the matrix-vector product H*v used in the
   ! Lanczos algorithm using serial double real, complex, and MPI
@@ -391,9 +418,9 @@ contains
   !Lanczos algorithm. this DOES NOT store the H-matrix (slower but 
   !more memory efficient)
   !+------------------------------------------------------------------+
-  include "ed_HtimesV_direct.f90"
+  include "ed_htimesv_direct.f90"
 #ifdef _MPI
-  include "ed_HtimesV_direct_mpi.f90"
+  include "ed_htimesv_direct_mpi.f90"
 #endif
 
 
