@@ -15,43 +15,41 @@ contains
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine init_ed_solver(bath)
-    real(8),dimension(:),intent(inout) :: bath
-#ifdef _MPI
-    if(mpiID==0)then
-#endif
-       write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
-#ifdef _MPI
-    endif
-#endif
+  subroutine init_ed_solver(bath_,hwband)
+    real(8),dimension(:,:),intent(inout) :: bath_
+    real(8),optional,intent(in)          :: hwband
+    real(8)                              :: hwband_
+    logical                              :: check
+    hwband_=2.d0;if(present(hwband))hwband_=hwband
+    if(mpiID==0)write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
+    bath_=0.d0
     call init_ed_structure
-    call check_bath_dimension(bath)
-    call init_bath_ed
-    call write_bath(LOGfile)
+    check = check_bath_dimension(bath_)
+    if(.not.check)stop "init_ed_solver: wrong bath dimensions"
+    call allocate_bath(dmft_bath)
+    call init_bath_ed(dmft_bath,hwband_)
+    call copy_bath(dmft_bath,bath_)
+    !call write_bath(dmft_bath,LOGfile)
     call setup_pointers
-    if(ed_type=='full')call setup_eigenspace
-    bath = copy_bath()
-    call deallocate_bath
+    if(ed_method=='full')call setup_eigenspace
+    call deallocate_bath(dmft_bath)
   end subroutine init_ed_solver
 
 
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine ed_solver(bath)
-    real(8),dimension(:),intent(in) :: bath
-    integer                         :: unit
-#ifdef _MPI
-    if(mpiID==0)then
-#endif
-       write(LOGfile,"(A)")"ED SOLUTION"
-#ifdef _MPI
-    endif
-#endif
-    call check_bath_dimension(bath)
-    call allocate_bath
-    call set_bath(bath)
-    select case(ed_type)
+  subroutine ed_solver(bath_)
+    real(8),dimension(:,:),intent(in) :: bath_
+    integer                           :: unit
+    logical                           :: check
+    if(mpiID==0)write(LOGfile,"(A)")"ED SOLUTION"
+    check = check_bath_dimension(bath_)
+    if(.not.check)stop "init_ed_solver: wrong bath dimensions"
+    call allocate_bath(dmft_bath)
+    call set_bath(bath_,dmft_bath)
+    call write_bath(dmft_bath,LOGfile)
+    select case(ed_method)
     case default
        call lanc_ed_diag
        call lanc_ed_getgf
@@ -63,17 +61,13 @@ contains
        if(chiflag)call full_ed_getchi
     end select
     call ed_getobs
-#ifdef _MPI
     if(mpiID==0)then
-#endif
        unit=free_unit()
        open(unit,file=trim(Hfile))
-       call write_bath(unit)
+       call write_bath(dmft_bath,unit)
        close(unit)
-#ifdef _MPI
     endif
-#endif
-    call deallocate_bath
+    call deallocate_bath(dmft_bath)
   end subroutine ed_solver
 
 

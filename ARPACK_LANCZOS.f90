@@ -10,7 +10,7 @@ module ARPACK_LANCZOS
 
 #ifdef _MPI
   interface lanczos_parpack
-     module procedure lanczos_parpack_d!,lanczos_parpack_c
+     module procedure lanczos_parpack_d,lanczos_parpack_c
   end interface lanczos_parpack
   public :: lanczos_parpack
 #endif
@@ -42,7 +42,7 @@ contains
   ! complex-hermitian (_c.f90) cmatrix
   !+-------------------------------------------------------------------+ 
   include "lanczos_parpack_d.f90"
-  !include "lanczos_parpack_c.f90" << missing 
+  include "lanczos_parpack_c.f90" !<< missing 
 #endif
 
 end module ARPACK_LANCZOS
