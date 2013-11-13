@@ -125,7 +125,7 @@ contains
        enddo
        !Print the impurity functions:
        do iorb=1,Norb
-          suffix="_orb"//reg(txtfy(iorb))
+          suffix="_l"//reg(txtfy(iorb))//"_m"//reg(txtfy(iorb))
           call open_units(reg(suffix))
           do i=1,NL
              write(unit(1),"(F26.15,6(F26.15))")wm(i),&
@@ -251,6 +251,7 @@ contains
       do i=1,6
          close(unit(i))
       enddo
+      print*,""
     end subroutine close_units
 
   end subroutine print_imp_gf
@@ -264,6 +265,7 @@ contains
   subroutine print_imp_chi
     integer                               :: i,j,iorb
     integer                               :: unit(3)
+    write(LOGfile,"(A)")"Printing the spin Chi:"
     do iorb=1,Norb
        unit(1)=free_unit()
        open(unit(1),file=reg(CHIfile)//"_orb"//reg(txtfy(iorb))//"_tau.ed")
@@ -284,6 +286,7 @@ contains
        close(unit(2))
        close(unit(3))
     enddo
+    print*,""
   end subroutine print_imp_chi
 
 

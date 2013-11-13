@@ -70,9 +70,7 @@ contains
        lanc_neigen=1            !set the required eigen per sector to 1 see later for neigen_sector
        finiteT=.false.          !set to do zero temperature calculations
        if(mpiID==0)then
-          write(*,*)"--------------------------------------------"
           write(LOGfile,"(A)")"Required Lanc_Nstates=1 => set T=0 calculation"
-          write(*,*)"--------------------------------------------"
           write(*,*)""
        endif
     endif
@@ -83,21 +81,24 @@ contains
        if(mod(lanc_neigen,2)/=0)then
           lanc_neigen=lanc_neigen+1
           if(mpiID==0)then
-             write(*,*)"--------------------------------------------"
-             write(LOGfile,*)"Increased Lanc_Neigen:",lanc_neigen
-             write(*,*)"--------------------------------------------"
+             write(LOGfile,"(A,I10)")"Increased Lanc_Neigen:",lanc_neigen
              write(*,*)""
           endif
        endif
        if(mod(lanc_nstates,2)/=0)then
           lanc_nstates=lanc_nstates+1
           if(mpiID==0)then
-             write(*,*)"--------------------------------------------"
-             write(LOGfile,*)"Increased Lanc_Nstates:",lanc_nstates
-             write(*,*)"--------------------------------------------"
+             write(LOGfile,"(A,I10)")"Increased Lanc_Nstates:",lanc_nstates
              write(*,*)""
           endif
        endif
+
+    endif
+
+    if(finiteT)then
+       write(LOGfile,"(A)")" LANCZOS FINITE TEMPERATURE CALCULATION:"
+    else
+       write(LOGfile,"(A)")" LANCZOS ZERO TEMPERATURE CALCULATION:"
     endif
 
     !Some check:

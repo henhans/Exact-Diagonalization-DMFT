@@ -12,7 +12,7 @@ subroutine search_mu(ntmp,convergence)
      inquire(file="searchmu_file.restart",exist=check)
      if(check)then
         open(10,file="searchmu_file.restart")
-        read(10,*)ndelta,nindex          
+        read(10,*)ndelta,nindex
         close(10)
      endif
   endif
@@ -40,6 +40,6 @@ subroutine search_mu(ntmp,convergence)
   print*,"Convergence:",convergence
   print*,""
   open(10,file="searchmu_file.restart.new")
-  write(10,*)ndelta,nindex
+  write(10,*)ndelta,nindex,xmu
   close(10)
 end subroutine search_mu

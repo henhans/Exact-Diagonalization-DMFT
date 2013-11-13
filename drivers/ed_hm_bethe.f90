@@ -47,7 +47,7 @@ program lancED
      call get_delta_bethe
 
      !Perform the SELF-CONSISTENCY by fitting the new bath
-     call chi2_fitgf(delta,bath,ispin=1)
+     call chi2_fitgf(delta,bath,ispin=1,iverbose=.true.)
 
      !Check convergence (if required change chemical potential)
 #ifdef _MPI
@@ -86,7 +86,11 @@ contains
           iw = xi*wm(i)
           zita    = iw + xmu - impSmats(1,iorb,iorb,i)
           gloc(i) = gfbethe(wm(i),zita,Wband)
-          delta(iorb,i)= iw + xmu - impSmats(1,iorb,iorb,i) - one/gloc(i)
+          if(cg_scheme=='weiss')then
+             delta(iorb,i)= one/(one/gloc(i) + impSmats(1,iorb,iorb,i))
+          else
+             delta(iorb,i)= iw + xmu - impSmats(1,iorb,iorb,i) - one/gloc(i)
+          endif
        enddo
 
        do i=1,Nw

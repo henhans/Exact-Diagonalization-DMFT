@@ -174,7 +174,7 @@ contains
           hist_n = Nsect
           hist_a = 1.d0
           hist_b = real(Nsect,8)
-          hist_w = 1.d0/real(state_list%size,8)
+          hist_w = 1.d0!/real(state_list%size,8)
           hist = histogram_allocate(hist_n)
           call histogram_set_range_uniform(hist,hist_a,hist_b)
           do i=1,state_list%size
@@ -359,7 +359,7 @@ contains
           hist_n = Nsect
           hist_a = 1.d0
           hist_b = real(Nsect,8)
-          hist_w = 1.d0/real(state_list%size,8)
+          hist_w = 1.d0!/real(state_list%size,8)
           hist = histogram_allocate(hist_n)
           call histogram_set_range_uniform(hist,hist_a,hist_b)
           do i=1,state_list%size

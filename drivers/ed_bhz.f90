@@ -1,50 +1,48 @@
-!This program solves the DMFT equations
-!using complete ED at finite (high) T 
-!reading the Hamiltonian model H(k)
-!from a file with the standard
-!wannier90 form.
-!IMPORTANT: The ED solver uses HFmode=.true. 
-!by default this means that chemical potential 
-!SHOULD NOT include the U/2 shift.
-program ed_lda1b
+!                    MODEL Hamiltonian is:
+!
+! |     h^{2x2}(k)              &         hso^{2x2}(k)        |
+! |      [hso^{2x2}]*(k)        &        [h^{2x2}]*(-k)       |
+!
+!
+! h^{2x2}(k):=
+!
+! | m-(Cos{kx}+Cos{ky})         & \lambda*(Sin{kx}-i*Sin{ky}) |
+! | \lambda*(Sin{kx}+i*Sin{ky}) & -m+(Cos{kx}+Cos{ky})        |
+!
+! hso^{2x2}(k):=
+! | xi*rh*(sin(kx)-xi*sin(ky))  &         \delta              |
+! |         -\delta             &             0               |
+program ed_bhz
   USE DMFT_ED
   USE FFTGF
   USE TOOLS
-  USE FUNCTIONS
+  USE MATRIX
   implicit none
-  integer                :: i,ik,iorb,jorb,ispin,iloop,Lk,Nb
+  integer                :: i,ik,iorb,jorb,ispin,iloop,Lk
   integer                :: Norb_d,Lorb
   logical                :: converged
   real(8)                :: kx,ky,foo,ntotal,npimp
-  real(8),allocatable    :: wm(:),wr(:)
-  complex(8)             :: iw
   !variables for the model:
   character(len=32)      :: file
   integer                :: ntype
   real(8)                :: nobj
   logical                :: rerun,bool
   !Bath:
-  real(8),allocatable    :: Bath(:)
+  integer                :: Nb(2)
+  real(8),allocatable    :: Bath(:,:)
   !The local hybridization function:
   complex(8),allocatable :: Delta(:,:,:)
   !Hamiltonian input:
   complex(8),allocatable :: Hk(:,:,:)
   real(8),allocatable    :: dos_wt(:),e0(:)
-  logical                :: fbethe
-  real(8)                :: wbath
 
-  call read_input("inputED.in")
-  !parse additional variables
+  !Parse additional variables
   call parse_cmd_variable(file,"FILE",default="hkfile.in")
   call parse_cmd_variable(ntype,"NTYPE",default=0)
-  call parse_cmd_variable(fbethe,"FBETHE",default=.false.)
-  call parse_cmd_variable(wbath,"WBATH",default=1.d0)
 
-
-  !Allocate:
-  allocate(wm(NL),wr(Nw))
-  wm = pi/beta*real(2*arange(1,NL)-1,8)
-  wr = linspace(wini,wfin,Nw)
+  !Read input file:
+  call read_input("inputED.in")
+  if(Nspin/=2.OR.Norb/=2)stop "wrong setup from input file: Nspin=Norb=2"
 
   !Read Hamiltoanian H(k)
   call read_hk(trim(file))
@@ -54,7 +52,7 @@ program ed_lda1b
 
   !Setup solver
   Nb=get_bath_size()
-  allocate(bath(Nb))
+  allocate(bath(Nb(1),Nb(2)))
   call init_ed_solver(bath)
 
 
@@ -70,16 +68,12 @@ program ed_lda1b
      !Get the Weiss field/Delta function to be fitted (user defined)
      call get_delta
 
-     stop
-
      !Fit the new bath, starting from the old bath + the supplied delta
      call chi2_fitgf(delta(1,1:Norb,1:NL),bath,ispin=1)
      call chi2_fitgf(delta(2,1:Norb,1:NL),bath,ispin=2)
 
      !Check convergence (if required change chemical potential)
      converged = check_convergence(delta(1,1,:),eps_error,nsuccess,nloop)
-     !if(nread/=0.d0)call search_mu(nobj,converged)
-     !if(iloop>=nloop)converged=.true.
      call end_loop
   enddo
 
@@ -87,43 +81,47 @@ program ed_lda1b
 contains
 
 
-
   subroutine read_hk(file)
     character(len=*)       :: file
     integer                :: ik
     real(8)                :: de,e
     complex(8),allocatable :: fg(:,:,:)
-    complex(8) :: w
+    complex(8)             :: iw
+    real(8)                :: wr(Nw)
+
+    wr = linspace(wini,wfin,Nw)
+
     open(50,file=file,status='old')
-    read(50,*)Lk,foo,Norb_d,foo,foo
+    read(50,*)Lk,Norb_d,foo,foo,foo
+    if(Norb_d/=2)stop "Norb_d in Hk should be 2."
     Lorb=Nspin*Norb_d
-    allocate(Hk(Lorb,Lorb,Lk))
-    allocate(dos_wt(Lk))
-    allocate(e0(Lorb))
+    if(Lorb/=4)stop "# of SObands should be 4"
+    allocate(Hk(Lorb,Lorb,Lk),dos_wt(Lk),e0(Lorb))
     do ik=1,Lk
        read(50,"(3(F10.7,1x))")kx,ky,foo
        do iorb=1,Lorb
           read(50,"(10(2F10.7,1x))")(Hk(iorb,jorb,ik),jorb=1,Lorb)
        enddo
     enddo
+    dos_wt=1.d0/dble(Lk)
     write(*,*)"# of k-points:",Lk
-    write(*,*)"# of d-bands :",Norb_d
-    dos_wt=1.d0/dfloat(Lk)      !why 2.d0*wbath @ numerator?
+    write(*,*)"# of SO-bands :",Lorb
     write(*,*)"Evaluate non-interacting G(w):"
     allocate(fg(Nw,Lorb,Lorb))
     fg=zero
     e0=0.d0
     do ik=1,Lk
        do i=1,Nw
-          w = cmplx(wr(i),eps,8)+xmu
-          fg(i,:,:)=fg(i,:,:)+inverse_g0k(w,Hk(:,:,ik))*dos_wt(ik)
+          iw = cmplx(wr(i),eps,8)+xmu
+          fg(i,:,:)=fg(i,:,:)+inverse_g0k(iw,Hk(:,:,ik))*dos_wt(ik)
        enddo
-       do i=1,4
+       do i=1,Lorb
           e0(i)=e0(i)+Hk(i,i,ik)*dos_wt(ik)
        enddo
     enddo
     print*,e0
-    call splot("DOS0.ed",wr,-dimag(fg(:,1,1))/pi,-dimag(fg(:,2,2))/pi,-dimag(fg(:,3,3))/pi,-dimag(fg(:,4,4))/pi)
+    call splot("DOS0.ed",wr,-dimag(fg(:,1,1))/pi,-dimag(fg(:,2,2))/pi,&
+         -dimag(fg(:,3,3))/pi,-dimag(fg(:,4,4))/pi)
     deallocate(fg)
   end subroutine read_hk
 
@@ -132,87 +130,64 @@ contains
   subroutine get_delta
     integer                                 :: i,j,iorb,ispin
     complex(8)                              :: iw,zita(Lorb),fg(Lorb,Lorb)
-    complex(8),dimension(:,:,:),allocatable :: gd,sd,g0d
+    complex(8),dimension(:,:,:),allocatable :: gloc
+    real(8)                                 :: wm(NL),wr(Nw)
+
+    wm = pi/beta*real(2*arange(1,NL)-1,8)
+    wr = linspace(wini,wfin,Nw)
+
     delta=zero
 
-    allocate(gd(Nspin,Norb,NL),sd(Nspin,Norb,NL),g0d(Nspin,Norb,NL))
     print*,"Get Gloc_iw:"
-    open(100,file="Delta_iw.ed")
-    open(101,file="G_iw.ed")
-    open(102,file="Sigma_iw.ed")
+    allocate(gloc(Nspin,Norb,NL))
     do i=1,NL
        iw = xi*wm(i)
-       do ispin=1,Nspin
-          do iorb=1,Norb
-             g0d(ispin,iorb,i) = iw + xmu - delta_and(ispin,iorb,iw,bath)
-             sd(ispin,iorb,i)  = g0d(ispin,iorb,i) - one/impGmats(ispin,iorb,i)
-          enddo
-       enddo
-       zita(1)= iw + xmu - sd(1,1,i)
-       zita(2)= iw + xmu - sd(1,2,i)
-       zita(3)= iw + xmu - sd(2,1,i)
-       zita(4)= iw + xmu - sd(2,2,i)
+       zita(1)= iw + xmu - impSmats(1,1,1,i)
+       zita(2)= iw + xmu - impSmats(1,2,2,i)
+       zita(3)= iw + xmu - impSmats(2,1,1,i)
+       zita(4)= iw + xmu - impSmats(2,2,2,i)
 
        fg=zero
        do ik=1,Lk
           fg=fg+inverse_gk(zita,Hk(:,:,ik))*dos_wt(ik)
        enddo
-       gd(1,1,i)  = fg(1,1)
-       gd(1,2,i)  = fg(2,2)
-       gd(2,1,i)  = fg(3,3)
-       gd(2,2,i)  = fg(4,4)
+       gloc(1,1,i)  = fg(1,1)
+       gloc(1,2,i)  = fg(2,2)
+       gloc(2,1,i)  = fg(3,3)
+       gloc(2,2,i)  = fg(4,4)
+       call matrix_inverse(fg)
        !
-       delta(1,1,i) = iw+xmu-one/gd(1,1,i)-sd(1,1,i)
-       delta(1,2,i) = iw+xmu-one/gd(1,2,i)-sd(1,2,i)
-       delta(2,1,i) = iw+xmu-one/gd(2,1,i)-sd(2,1,i)
-       delta(2,2,i) = iw+xmu-one/gd(2,2,i)-sd(2,2,i)
+       delta(1,1,i) = zita(1)-fg(1,1)
+       delta(1,2,i) = zita(2)-fg(2,2)
+       delta(2,1,i) = zita(3)-fg(3,3)
+       delta(2,2,i) = zita(4)-fg(4,4)
        !
-       write(100,"(9F25.12)")wm(i),dimag(delta(1,1,i)),dimag(delta(1,2,i)),dimag(delta(2,1,i)),dimag(delta(2,2,i)),&
-            dreal(delta(1,1,i)),dreal(delta(1,2,i)),dreal(delta(2,1,i)),dreal(delta(2,2,i))
-       write(101,"(9F25.12)")wm(i),dimag(gd(1,1,i)),dimag(gd(1,2,i)),dimag(gd(2,1,i)),dimag(gd(2,2,i)),&
-            dreal(gd(1,1,i)),dreal(gd(1,2,i)),dreal(gd(2,1,i)),dreal(gd(2,2,i))
-       write(102,"(9F25.12)")wm(i),dimag(sd(1,1,i)),dimag(sd(1,2,i)),dimag(sd(2,1,i)),dimag(sd(2,2,i)),&
-            dreal(sd(1,1,i)),dreal(sd(1,2,i)),dreal(sd(2,1,i)),dreal(sd(2,2,i))
     enddo
-    deallocate(gd,sd,g0d)
-    close(100);close(101);close(102)
+    call splot("Delta_iw.ed",wm,delta(1,1,:),delta(1,2,:),delta(2,1,:),delta(2,2,:))
+    call splot("Gloc_iw.ed",wm,gloc(1,1,:),gloc(1,2,:),gloc(2,1,:),gloc(2,2,:))
+    deallocate(gloc)
 
-
-    allocate(gd(Nspin,Norb,Nw),sd(Nspin,Norb,Nw),g0d(Nspin,Norb,Nw))
+    allocate(gloc(Nspin,Norb,Nw))
     print*,"Get Gloc_realw:"
-    open(100,file="DOS.ed")
-    open(101,file="G_realw.ed")
-    open(102,file="Sigma_realw.ed")
     do i=1,Nw
        iw=cmplx(wr(i),eps)
-       do ispin=1,Nspin
-          do iorb=1,Norb
-             g0d(ispin,iorb,i) = iw + xmu - delta_and(ispin,iorb,iw,bath)
-             sd(ispin,iorb,i)  = g0d(ispin,iorb,i) - one/impGreal(ispin,iorb,i)
-          enddo
-       enddo
-       zita(1)= iw + xmu - sd(1,1,i)
-       zita(2)= iw + xmu - sd(1,2,i)
-       zita(3)= iw + xmu - sd(2,1,i)
-       zita(4)= iw + xmu - sd(2,2,i)
-
+       zita(1)= iw + xmu - impSreal(1,1,1,i)
+       zita(2)= iw + xmu - impSreal(1,2,2,i)
+       zita(3)= iw + xmu - impSreal(2,1,1,i)
+       zita(4)= iw + xmu - impSreal(2,2,2,i)
        fg=zero
        do ik=1,Lk
           fg=fg+inverse_gk(zita,Hk(:,:,ik))*dos_wt(ik)
        enddo
-       gd(1,1,i)  = fg(1,1)
-       gd(1,2,i)  = fg(2,2)
-       gd(2,1,i)  = fg(3,3)
-       gd(2,2,i)  = fg(4,4)
-
-       write(100,"(5F25.12)")wr(i),-dimag(gd(1,1,i))/pi,-dimag(gd(1,2,i))/pi,-dimag(gd(2,1,i))/pi,-dimag(gd(2,2,i))/pi
-       write(101,"(9F25.12)")wr(i),dimag(gd(1,1,i)),dimag(gd(1,2,i)),dimag(gd(2,1,i)),dimag(gd(2,2,i)),&
-            dreal(gd(1,1,i)),dreal(gd(1,2,i)),dreal(gd(2,1,i)),dreal(gd(2,2,i))
-       write(102,"(9F25.12)")wr(i),dimag(sd(1,1,i)),dimag(sd(1,2,i)),dimag(sd(2,1,i)),dimag(sd(2,2,i)),&
-            dreal(sd(1,1,i)),dreal(sd(1,2,i)),dreal(sd(2,1,i)),dreal(sd(2,2,i))
+       gloc(1,1,i)  = fg(1,1)
+       gloc(1,2,i)  = fg(2,2)
+       gloc(2,1,i)  = fg(3,3)
+       gloc(2,2,i)  = fg(4,4)
     enddo
-    deallocate(gd,sd,g0d)
-    close(100);close(101);close(102)
+    call splot("Gloc_realw.ed",wr,gloc(1,1,:),gloc(1,2,:),gloc(2,1,:),gloc(2,2,:))
+    call splot("DOS.ed",wr,-dimag(gloc(1,1,:))/pi,-dimag(gloc(1,2,:))/pi,&
+         -dimag(gloc(2,1,:))/pi,-dimag(gloc(2,2,:))/pi)
+    deallocate(gloc)
 
 
     ntotal=sum(nimp)
@@ -222,6 +197,7 @@ contains
     else
        nobj=ntotal
     endif
+
   end subroutine get_delta
 
 
@@ -240,7 +216,7 @@ contains
     complex(8),dimension(2,2)   :: hk
     complex(8)                  :: iw
     complex(8),dimension(2,2)   :: g0k
-    Complex(8)                  :: delta,ppi,vmix
+    complex(8)                  :: delta,ppi,vmix
     g0k=zero
     delta = iw - hk(1,1)
     ppi   = iw - hk(2,2)
@@ -250,8 +226,6 @@ contains
     g0k(1,2) = -vmix/(ppi*delta - abs(vmix)**2)
     g0k(2,1) = conjg(g0k(1,2))
   end function inverse_g0k2x2
-
-
 
 
   function inverse_gk(zeta,hk) result(gk)
@@ -288,10 +262,7 @@ contains
     n = -2.d0*gtau(size(giw))
   end function get_density_fromFFT
 
-
-
-
-end program ed_lda1b
+end program ed_bhz
 
 
 

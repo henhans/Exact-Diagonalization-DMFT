@@ -139,10 +139,10 @@ contains
        else
           write(LOGfile,"(A)")"Generating bath from scratch"
           write(LOGfile,"(A)")'- - - - - - - - - - - - - - -'
-          di = 2.d0*hwband_/dble(Nbath-1)
+          di = 2.d0*hwband_/dble(Nbath) !/dble(Nbath-1)
           do i=1,Nbath
              dmft_bath%e(:,:,i)=-hwband_ + dble(i-1)*di
-             dmft_bath%v(:,:,i)=1.d0/sqrt(real(Nbath,8))
+             dmft_bath%v(:,:,i)=1.d-1/sqrt(dble(Nbath))
           enddo
        endif
     endif
