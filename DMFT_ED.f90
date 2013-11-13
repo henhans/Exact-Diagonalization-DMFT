@@ -20,7 +20,7 @@ contains
     real(8),optional,intent(in)          :: hwband
     real(8)                              :: hwband_
     logical                              :: check
-    hwband_=1.d0;if(present(hwband))hwband_=hwband
+    hwband_=2.d0;if(present(hwband))hwband_=hwband
     if(mpiID==0)write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
     bath_=0.d0
     call init_ed_structure
@@ -29,7 +29,7 @@ contains
     call allocate_bath(dmft_bath)
     call init_bath_ed(dmft_bath,hwband_)
     call copy_bath(dmft_bath,bath_)
-    call write_bath(dmft_bath,LOGfile)
+    !call write_bath(dmft_bath,LOGfile)
     call setup_pointers
     if(ed_method=='full')call setup_eigenspace
     call deallocate_bath(dmft_bath)
@@ -48,6 +48,7 @@ contains
     if(.not.check)stop "init_ed_solver: wrong bath dimensions"
     call allocate_bath(dmft_bath)
     call set_bath(bath_,dmft_bath)
+    call write_bath(dmft_bath,LOGfile)
     select case(ed_method)
     case default
        call lanc_ed_diag
