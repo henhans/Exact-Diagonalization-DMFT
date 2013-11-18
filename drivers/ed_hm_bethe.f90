@@ -16,11 +16,7 @@ program lancED
   complex(8),allocatable :: Delta(:,:)
 
 #ifdef _MPI
-  call MPI_INIT(mpiERR)
-  call MPI_COMM_RANK(MPI_COMM_WORLD,mpiID,mpiERR)
-  call MPI_COMM_SIZE(MPI_COMM_WORLD,mpiSIZE,mpiERR)
-  write(*,"(A,I4,A,I4,A)")'Processor ',mpiID,' of ',mpiSIZE,' is alive'
-  call MPI_BARRIER(MPI_COMM_WORLD,mpiERR)
+  call ed_init_mpi()
 #endif
 
   call read_input("inputED.in")
@@ -50,20 +46,18 @@ program lancED
      call chi2_fitgf(delta,bath,ispin=1,iverbose=.true.)
 
      !Check convergence (if required change chemical potential)
-#ifdef _MPI
      if(mpiID==0)then
-#endif
         converged = check_convergence(delta(1,:),eps_error,nsuccess,nloop)
-        if(nread/=0.d0)call search_mu(nimp(1),converged)
-#ifdef _MPI
+        if(nread/=0.d0)call search_chemical_potential(nimp(1),niter,converged)
      endif
+#ifdef _MPI
      call MPI_BCAST(converged,1,MPI_LOGICAL,0,MPI_COMM_WORLD,mpiERR)
 #endif
      call end_loop
   enddo
 
 #ifdef _MPI
-  call MPI_FINALIZE(mpiERR)
+  call ed_finalize_mpi()
 #endif
 
 

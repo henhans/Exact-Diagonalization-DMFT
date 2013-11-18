@@ -16,11 +16,6 @@ program ed_lda1b
   integer                :: Norb_d,Norb_p,Nopd,Nineq
   logical                :: converged
   real(8)                :: kx,ky,foo,ntotal,npimp
-  !variables for the model:
-  character(len=32)      :: file
-  integer                :: ntype
-  real(8)                :: nobj
-  logical                :: rerun,bool
   !Bath:
   integer,dimension(2)   :: Nb
   real(8),allocatable    :: Bath(:,:)
@@ -30,6 +25,11 @@ program ed_lda1b
   complex(8),allocatable :: Hk(:,:,:)
   real(8),allocatable    :: fg0(:,:,:)
   real(8),allocatable    :: dos_wt(:)
+  !variables for the model:
+  character(len=32)      :: file
+  integer                :: ntype
+  real(8)                :: nobj
+  logical                :: rerun,bool
   logical                :: fbethe
   real(8)                :: whband
 
@@ -62,9 +62,6 @@ program ed_lda1b
      stop
   endif
   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
 
   call read_input("inputED.in")
 

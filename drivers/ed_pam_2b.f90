@@ -8,14 +8,15 @@ program lancED
   USE TOOLS
   USE MATRIX
   implicit none
-  integer :: iloop,Nb(2),Le
-  logical :: converged
-  real(8)                :: wband,ts
+  integer                :: iloop,Le
+  logical                :: converged
+  real(8)                :: wband
   !Bath:
+  integer                :: Nb(2)
   real(8),allocatable    :: Bath(:,:)
   !The local hybridization function:
   complex(8),allocatable :: Delta(:,:,:)
-
+  character(len=16)      :: input_file
 #ifdef _MPI
   call MPI_INIT(mpiERR)
   call MPI_COMM_RANK(MPI_COMM_WORLD,mpiID,mpiERR)
@@ -24,9 +25,13 @@ program lancED
   call MPI_BARRIER(MPI_COMM_WORLD,mpiERR)
 #endif
 
-  call read_input("inputED.in")
+
+  !parse additional variables && read input file
   call parse_cmd_variable(wband,"wband",default=1.d0)
   call parse_cmd_variable(Le,"LE",default=1000)
+  call parse_cmd_variable(input_file,'input',default='inputED.in')
+  call read_input(trim(input_file))
+
 
   !Allocate Weiss Field:
   allocate(delta(Norb,Norb,NL))
@@ -94,9 +99,9 @@ contains
     do i=1,NL
        zeta=zero
        do iorb=1,Norb
-          zeta(iorb,iorb) = (xi*wm(i) + xmu) - eloc(iorb)
+          zeta(iorb,iorb) = (xi*wm(i) + xmu)
           do jorb=1,Norb
-             zeta(iorb,jorb) = zeta(iorb,jorb) - impSmats(1,iorb,jorb,i)
+             zeta(iorb,jorb) = zeta(iorb,jorb) - Hloc(iorb,jorb) - impSmats(1,iorb,jorb,i)
           enddo
        enddo
        !
@@ -107,7 +112,7 @@ contains
        gloc(:,:,i) = fg
        !
        call matrix_inverse(fg)
-       delta(:,:,i)=zeta - fg
+       delta(:,:,i)=zeta - fg 
     enddo
     !print
     do iorb=1,Norb
@@ -123,9 +128,9 @@ contains
     do i=1,Nw
        zeta=zero
        do iorb=1,Norb
-          zeta(iorb,iorb) = (cmplx(wr(i),eps) + xmu) - eloc(iorb)
+          zeta(iorb,iorb) = (cmplx(wr(i),eps) + xmu) 
           do jorb=1,Norb
-             zeta(iorb,jorb) = zeta(iorb,jorb) - impSreal(1,iorb,jorb,i)
+             zeta(iorb,jorb) = zeta(iorb,jorb) - Hloc(iorb,jorb) - impSreal(1,iorb,jorb,i)
           enddo
        enddo
        !
@@ -151,14 +156,14 @@ contains
     complex(8),dimension(Norb,Norb) :: He,invg
     integer :: i,j
     He=zero
-    !forall(i=1:Norb)He(i,i)=ek
-    He(1,1)=0.00001*ek
+    He(1,1)=1.d-9*ek
     He(2,2)=ek
     invg=zeta-He
     call matrix_inverse(invg)
   end function invert_ge
 
   include 'search_mu.f90'
+
 end program lancED
 
 

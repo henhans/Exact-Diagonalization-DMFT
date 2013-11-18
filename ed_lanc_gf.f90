@@ -19,9 +19,6 @@ subroutine lanc_ed_getgf()
         case default
            call lanc_ed_buildgf_d(iorb,ispin,.false.)
         case ('c')
-           !<DEBUG
-           print*,"DOING COMPLEX"
-           !>DEBUG
            call lanc_ed_buildgf_c(iorb,ispin,.false.)              
         end select
      enddo
@@ -37,9 +34,6 @@ subroutine lanc_ed_getgf()
               case default
                  call lanc_ed_buildgf_mix_d(iorb,jorb,ispin,.false.)
               case ('c')
-                 !<DEBUG
-                 print*,"DOING COMPLEX"
-                 !>DEBUG
                  call lanc_ed_buildgf_mix_c(iorb,jorb,ispin,.false.)                    
               end select
            enddo

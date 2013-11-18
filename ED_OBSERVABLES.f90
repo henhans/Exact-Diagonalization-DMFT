@@ -11,7 +11,7 @@ MODULE ED_OBSERVABLES
 
   logical,save        :: iolegend=.true.
   integer,save        :: loop=0
-  real(8),allocatable :: zimp(:,:),simp(:,:),rimp(:,:)
+  real(8),allocatable :: zimp(:,:),simp(:,:)
 
 contains 
 
@@ -79,19 +79,22 @@ contains
                    gs_weight=abs(gscvec(i))**2
                 endif
                 do iorb=1,Norb
-                   nup(iorb)=real(ib(iorb),8)
-                   ndw(iorb)=real(ib(iorb+Ns),8)
+                   nup(iorb)=dble(ib(iorb))
+                   ndw(iorb)=dble(ib(iorb+Ns))
                    nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*gs_weight*peso
                    nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*gs_weight*peso
                    ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*gs_weight*peso
                    dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*gs_weight*peso
                    magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*gs_weight*peso
-                   do jorb=1,Norb
-                      m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs_weight*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*peso
+                   m2imp(iorb,iorb) = m2imp(iorb,iorb)  +  (nup(iorb)-ndw(iorb))*(nup(iorb)-ndw(iorb))*gs_weight*peso
+                   do jorb=iorb+1,Norb
+                      m2imp(iorb,jorb) = m2imp(iorb,jorb)  +  (nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*gs_weight*peso
+                      m2imp(jorb,iorb) = m2imp(jorb,iorb)  +  (nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*gs_weight*peso
                    enddo
                 enddo
              enddo
-             nullify(gsvec)
+             if(associated(gsvec))nullify(gsvec)
+             if(associated(gscvec))nullify(gscvec)
              deallocate(Hmap)
           enddo
           nimp  = nimp/zeta_function
@@ -121,8 +124,10 @@ contains
                       ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*peso*gs_weight
                       dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*peso*gs_weight
                       magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*peso*gs_weight
-                      do jorb=1,Norb
-                         m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs_weight*peso*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))
+                      m2imp(iorb,iorb) = m2imp(iorb,iorb)  +  (nup(iorb)-ndw(iorb))*(nup(iorb)-ndw(iorb))*gs_weight*peso
+                      do jorb=iorb+1,Norb
+                         m2imp(iorb,jorb) = m2imp(iorb,jorb)  +  (nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*gs_weight*peso
+                         m2imp(jorb,iorb) = m2imp(jorb,iorb)  +  (nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*gs_weight*peso
                       enddo
                    enddo
                 enddo
@@ -130,6 +135,8 @@ contains
              deallocate(Hmap)
           enddo
        end select
+       !forall(iorb=1:Norb,jorb=1:Norb,iorb>jorb)m2imp(iorb,jorb)=m2imp(jorb,iorb)
+
        allocate(simp(Norb,Nspin),zimp(Norb,Nspin))
        call get_szr
        !
@@ -139,12 +146,12 @@ contains
        call write_to_unit_column()
        write(LOGfile,"(A,10f18.12)")"nimp=  ",(nimp(iorb),iorb=1,Norb)
        write(LOGfile,"(A,10f18.12)")"docc=  ",(dimp(iorb),iorb=1,Norb)
-       write(LOGfile,"(A,10f18.12)")"mom2=  ",(m2imp(iorb,iorb),iorb=1,Norb)
+       write(LOGfile,"(A,20f18.12)")"mom2=  ",((m2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb)
        if(Nspin==2)then
           write(LOGfile,"(A,10f18.12)")"mag=   ",(magimp(iorb),iorb=1,Norb)
        endif
        write(LOGfile,*)""
-       deallocate(simp,zimp)!,rimp)
+       deallocate(simp,zimp)
 
 #ifdef _MPI
     endif

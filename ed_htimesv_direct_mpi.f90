@@ -63,7 +63,7 @@ subroutine HtimesV_mpi(Nchunk,NRest,Nloc,Nv,v,Hv)
         enddo
      endif
      !Hbath: +energy of the bath=\sum_a=1,Norb\sum_{l=1,Nbath}\e^a_l n^a_l
-     do iorb=1,,size(dmft_bath%e,2)
+     do iorb=1,size(dmft_bath%e,2)
         do kp=1,Nbath
            ms=Norb+(iorb-1)*Nbath + kp
            htmp =htmp + dmft_bath%e(1,iorb,kp)*real(ib(ms),8) + dmft_bath%e(Nspin,iorb,kp)*real(ib(ms+Ns),8)
