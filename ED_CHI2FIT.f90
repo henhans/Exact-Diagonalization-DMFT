@@ -39,10 +39,10 @@ contains
     real(8)                              :: chi
     logical                              :: check
     type(effective_bath)                 :: dmft_bath
-    logical,optional :: iverbose
-    logical          :: iverbose_
-    complex(8) :: fgand
-    real(8) :: w
+    logical,optional                     :: iverbose
+    logical                              :: iverbose_
+    complex(8)                           :: fgand
+    real(8)                              :: w
     if(mpiID==0)then
        iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
        if(cg_scheme=='weiss')then
@@ -71,11 +71,11 @@ contains
           Wdelta=Xdelta
        end select
        !
+       call allocate_bath(dmft_bath)
+       call set_bath(bath_,dmft_bath)
        do iorb=1,Norb
           Orb_indx=iorb
           Fdelta(1,1:Ldelta) = fg(iorb,1:Ldelta)
-          call allocate_bath(dmft_bath)
-          call set_bath(bath_,dmft_bath)
           a(1:Nbath)         = dmft_bath%e(ispin,iorb,1:Nbath) 
           a(Nbath+1:2*Nbath) = dmft_bath%v(ispin,iorb,1:Nbath)
           if(cg_scheme=='weiss')then
@@ -86,11 +86,11 @@ contains
           write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
           dmft_bath%e(ispin,iorb,1:Nbath) = a(1:Nbath)
           dmft_bath%v(ispin,iorb,1:Nbath) = a(Nbath+1:2*Nbath)
-          if(iverbose_)call write_bath(dmft_bath,LOGfile)
-          call copy_bath(dmft_bath,bath_)
-          call deallocate_bath(dmft_bath)
        enddo
-       call dump_fit_result(bath_,ispin)
+       if(iverbose_)call write_bath(dmft_bath,LOGfile)
+       call write_fit_result(ispin)
+       call copy_bath(dmft_bath,bath_)
+       call deallocate_bath(dmft_bath)
        !
        print*," "
        deallocate(Fdelta,Xdelta,Wdelta)
@@ -98,9 +98,10 @@ contains
 #ifdef _MPI
     call MPI_BCAST(bath_,size(bath_),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
 #endif
+
   contains
-    subroutine dump_fit_result(bath_,ispin)
-      real(8),dimension(:,:)       :: bath_
+
+    subroutine write_fit_result(ispin)
       complex(8)                   :: fgand
       integer                      :: i,j,iorb,ispin
       real(8)                      :: w
@@ -111,25 +112,20 @@ contains
          fgand=zero
          unit=free_unit()
          open(unit,file="fit_delta"//reg(suffix))
-         if(cg_scheme=='weiss')then
-            do i=1,Ldelta
-               w = Xdelta(i)
-               fgand = xi*w + xmu - eloc(iorb) - delta_and(ispin,iorb,xi*w,bath_)
+         do i=1,Ldelta
+            w = Xdelta(i)
+            if(cg_scheme=='weiss')then
+               fgand = xi*w + xmu - hloc(iorb,iorb) - delta_bath(ispin,iorb,xi*w,dmft_bath)!delta_and(ispin,iorb,xi*w,bath_)
                fgand = one/fgand
-               write(unit,"(5F24.15)")Xdelta(i),dimag(Fdelta(1,i)),dimag(fgand),&
-                    dreal(Fdelta(1,i)),dreal(fgand)
-            enddo
-         else
-            do i=1,Ldelta
-               w = Xdelta(i)
-               fgand = delta_and(ispin,iorb,xi*w,bath_)
-               write(unit,"(5F24.15)")Xdelta(i),dimag(Fdelta(1,i)),dimag(fgand),&
-                    dreal(Fdelta(1,i)),dreal(fgand)
-            enddo
-         endif
+            else
+               fgand = delta_bath(ispin,iorb,xi*w,dmft_bath)!delta_and(ispin,iorb,xi*w,bath_)
+            endif
+            write(unit,"(5F24.15)")Xdelta(i),dimag(Fdelta(1,i)),dimag(fgand),&
+                 dreal(Fdelta(1,i)),dreal(fgand)
+         enddo
          close(unit)
       enddo
-    end subroutine dump_fit_result
+    end subroutine write_fit_result
   end subroutine chi2_fitgf_irred
 
 
@@ -142,7 +138,7 @@ contains
   !+-------------------------------------------------------------+
   !PURPOSE  : 
   !+-------------------------------------------------------------+
-  subroutine chi2_fitgf_hybrd(fg,bath_,ispin)
+  subroutine chi2_fitgf_hybrd(fg,bath_,ispin,iverbose)
     complex(8),dimension(:,:,:)          :: fg
     real(8),dimension(:,:),intent(inout) :: bath_
     integer                              :: ispin
@@ -152,8 +148,14 @@ contains
     real(8)                              :: chi
     complex(8),dimension(size(fg,3))     ::  g0
     logical                              :: check
+    type(effective_bath)                 :: dmft_bath
+    logical,optional                     :: iverbose
+    logical                              :: iverbose_
+    complex(8)                           :: fgand
+    real(8)                              :: w
     !
     if(mpiID==0)then
+       iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
        if(cg_scheme=='weiss')then
           write(LOGfile,"(A)")"CHI2FIT: Weiss field function:"
        else
@@ -193,6 +195,7 @@ contains
           Wdelta=Xdelta
        end select
        !
+       call allocate_bath(dmft_bath)
        a(:) = bath_(ispin,:)
        if(cg_scheme=='weiss')then
           call fmin_cg(a,chi2_hybrd_weiss,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
@@ -200,7 +203,11 @@ contains
           call fmin_cg(a,chi2_hybrd,dchi2_hybrd,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
        endif
        bath_(ispin,:) = a(:)
-       call dump_fit_result(bath_,ispin)
+       call set_bath(bath_,dmft_bath)
+
+       if(iverbose_)call write_bath(dmft_bath,LOGfile)
+       call write_fit_result(ispin)
+       call deallocate_bath(dmft_bath)
        write(*,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
        print*," "
        deallocate(Fdelta,Xdelta,Wdelta)
@@ -210,29 +217,45 @@ contains
     call MPI_BCAST(bath_,size(bath_),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
 #endif
   contains
-    subroutine dump_fit_result(bath_,ispin)
-      real(8),dimension(:,:) :: bath_
-      complex(8)             :: fgand
-      integer                :: i,j,l,iorb,jorb,ispin
-      real(8)                :: w
-      character(len=20)      :: suffix
-      integer                :: unit
+    subroutine write_fit_result(ispin)
+      integer                              :: i,j,l,m,iorb,jorb,ispin
+      real(8)                              :: w
+      character(len=20)                    :: suffix
+      integer                              :: unit
+      complex(8),dimension(Norb,Norb)      :: gwf
+      complex(8),dimension(totNorb,Ldelta) :: fgand
+      do i=1,Ldelta
+         w=Xdelta(i)
+         gwf=zero
+         do l=1,Norb
+            gwf(l,l)=xi*w + xmu - hloc(l,l) - &
+                 sum(dmft_bath%v(ispin,l,:)*dmft_bath%v(ispin,l,:)/(xi*w-dmft_bath%e(ispin,1,:)))
+            do m=l+1,Norb
+               gwf(l,m) = - hloc(l,m) - sum(dmft_bath%v(ispin,l,:)*dmft_bath%v(ispin,m,:)/(xi*w-dmft_bath%e(ispin,1,:)))
+               gwf(m,l) = - hloc(m,l) - sum(dmft_bath%v(ispin,m,:)*dmft_bath%v(ispin,l,:)/(xi*w-dmft_bath%e(ispin,1,:)))
+            enddo
+         enddo
+         call matrix_inverse(gwf)
+         do l=1,totNorb
+            iorb=getIorb(l)
+            jorb=getJorb(l)
+            fgand(l,i)=gwf(iorb,jorb)
+         enddo
+      enddo
+      !
       do l=1,totNorb
-         iorb=getIorb(l)
-         jorb=getJorb(l)
          suffix="_l"//reg(txtfy(iorb))//"_m"//reg(txtfy(jorb))//".ed"
-         fgand=zero
          unit=free_unit()
          open(unit,file="fit_delta"//reg(suffix))
          do i=1,Ldelta
-            w=Xdelta(i)
-            fgand = delta_and(ispin,iorb,jorb,xi*w,bath_)
-            write(unit,"(5F24.15)")Xdelta(i),dimag(Fdelta(l,i)),dimag(fgand),&
-                 dreal(Fdelta(l,i)),dreal(fgand)
+            ! w=Xdelta(i)
+            ! fgand = delta_and(ispin,iorb,jorb,xi*w,bath_)
+            write(unit,"(5F24.15)")Xdelta(i),dimag(Fdelta(l,i)),dimag(fgand(l,i)),&
+                 dreal(Fdelta(l,i)),dreal(fgand(l,i))
          enddo
          close(unit)
       enddo
-    end subroutine dump_fit_result
+    end subroutine write_fit_result
   end subroutine chi2_fitgf_hybrd
 
 
@@ -241,6 +264,19 @@ contains
   !*****************************************************************************
   !*****************************************************************************
   !*****************************************************************************
+
+
+
+
+
+  !*****************************************************************************
+  !*****************************************************************************
+  !*****************************************************************************
+  !*****************************************************************************
+
+
+
+
 
 
 
@@ -256,7 +292,7 @@ contains
     integer                      ::  i,iorb
     chi2 = 0.d0 
     iorb=Orb_indx
-    do i=1,Ldelta   !Number of freq. in common to the module
+    do i=1,Ldelta
        g0(i)   = fg_anderson(xdelta(i),iorb,a)
     enddo
     chi2=sum(abs(Fdelta(1,:)-g0(:))**2/Wdelta(:))
@@ -317,29 +353,10 @@ contains
     Nb=size(a)/2
     eps=a(1:Nb)
     vps=a(Nb+1:2*Nb)
-    ! select case(cg_scheme)
-    ! case default
     do i=1,Nb
        dgz(i)    = vps(i)*vps(i)/(xi*w-eps(i))**2
        dgz(i+Nb) = 2.d0*vps(i)/(xi*w-eps(i))
     enddo
-    ! case ('weiss')
-    !    !get the WF gg = one/(iw+mu-eloc-\Delta)
-    !    delta=zero
-    !    do i=1,Nb
-    !       delta=delta + vps(i)**2/(xi*w-eps(i))
-    !    enddo
-    !    gg = (xi*w+xmu-eloc(iorb)-delta)
-    !    !get the gradient \partial_a \Delta
-    !    do i=1,Nb
-    !       dgz(i)    = vps(i)*vps(i)/(xi*w-eps(i))**2
-    !       dgz(i+Nb) = 2.d0*vps(i)/(xi*w-eps(i))
-    !    enddo
-    !    !build the total gradient
-    !    !\partial_a G_0 = \partial_a (iw+mu-eloc-\Delta(a))^{-1}
-    !    ! = \partial_a\Delta(a)*(iw+mu-eloc-\Delta(a))^{-2}
-    !    dgz=dgz/gg/gg
-    ! end select
   end function grad_fg_anderson
 
 
@@ -452,10 +469,13 @@ contains
 
 
 
+
+
   !*****************************************************************************
   !*****************************************************************************
   !*****************************************************************************
   !*****************************************************************************
+
 
 
 
@@ -496,7 +516,7 @@ contains
     do i=1,Nb
        delta=delta + vps(i)**2/(xi*w-eps(i))
     enddo
-    gg = one/(xi*w+xmu-eloc(iorb)-delta)
+    gg = one/(xi*w+xmu-hloc(iorb,iorb)-delta)
   end function fg_weiss
 
 
@@ -517,7 +537,7 @@ contains
        iorb=getIorb(l)
        jorb=getJorb(l)
        do i=1,Ldelta
-          Delta_orb(i)= fg_anderson_hybrd(xdelta(i),iorb,jorb,a)
+          Delta_orb(i)= fg_hybrd_weiss(xdelta(i),iorb,jorb,a)
        enddo
        chi_orb(l) = sum(abs(Fdelta(l,:)-Delta_orb(:))**2/Wdelta(:))
     enddo
@@ -542,11 +562,10 @@ contains
     enddo
     gwf=zero
     do l=1,Norb
-       gwf(l,l)=xi*w + xmu - eloc(l)
-       do m=1,Norb
-          do i=1,Nbath
-             gwf(l,m) = gwf(l,m) - vps(orb1,i)*vps(orb2,i)/(xi*w-eps(i))
-          enddo
+       gwf(l,l)=xi*w + xmu - hloc(l,l) - sum(vps(l,:)*vps(l,:)/(xi*w-eps(:)))
+       do m=l+1,Norb
+          gwf(l,m) = -hloc(l,m) - sum(vps(l,:)*vps(m,:)/(xi*w-eps(:)))
+          gwf(m,l) = -hloc(m,l) - sum(vps(m,:)*vps(l,:)/(xi*w-eps(:)))
        enddo
     enddo
     call matrix_inverse(gwf)
@@ -555,4 +574,4 @@ contains
 
 
 
-end MODULE ED_CHI2FIT
+   end MODULE ED_CHI2FIT

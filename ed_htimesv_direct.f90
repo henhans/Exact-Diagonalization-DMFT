@@ -8,7 +8,7 @@ subroutine HtimesV(Nv,v,Hv)
   integer                       :: i,j,m,ms,iorb,jorb,ispin
   integer                       :: kp,k1,k2,k3,k4
   real(8)                       :: sg1,sg2,sg3,sg4
-  real(8),dimension(Norb)       :: nup,ndw
+  real(8),dimension(Norb)       :: nup,ndw,eloc
   real(8)                       :: tef,htmp
   logical                       :: Jcondition,flanc
   isector=Hsector
@@ -16,6 +16,12 @@ subroutine HtimesV(Nv,v,Hv)
   if(.not.associated(Hmap).AND.size(Hmap)/=dim)stop "HtimesV: wrong allocation of Hmap"
   !
   if(Nv/=dim)stop "HtimesV error in dimensions"
+  !
+  !dump Hloc
+  do iorb=1,Norb
+     eloc(iorb)=dreal(Hloc(iorb,iorb))
+  enddo
+  !
   Hv=0.d0
   do i=1,dim
      m=Hmap(i)

@@ -11,7 +11,7 @@ MODULE ED_OBSERVABLES
 
   logical,save        :: iolegend=.true.
   integer,save        :: loop=0
-  real(8),allocatable :: zimp(:,:),simp(:,:),rimp(:,:)
+  real(8),allocatable :: zimp(:,:),simp(:,:)
 
 contains 
 
@@ -19,19 +19,19 @@ contains
   !PURPOSE  : Evaluate and print out many interesting physical qties
   !+-------------------------------------------------------------------+
   subroutine ed_getobs()
-    integer,dimension(Ntot)      :: ib
-    integer                      :: i,j
-    integer                      :: k,r
-    integer                      :: ia,isector
-    integer                      :: izero,isect0,jsect0,m
-    integer                      :: dim,dim0,iup,idw
-    integer                      :: iorb,jorb,ispin,numstates
-    real(8)                      :: gs_weight
-    real(8)                      :: Ei,Egs,norm0,sgn,nup(Norb),ndw(Norb),peso
-    real(8)                      :: factor
-    real(8),dimension(:),pointer :: gsvec
-    complex(8),dimension(:),pointer :: gscvec
-    integer,allocatable,dimension(:)     :: Hmap
+    integer,dimension(Ntot)          :: ib
+    integer                          :: i,j
+    integer                          :: k,r
+    integer                          :: ia,isector
+    integer                          :: izero,isect0,jsect0,m
+    integer                          :: dim,dim0,iup,idw
+    integer                          :: iorb,jorb,ispin,numstates
+    real(8)                          :: gs_weight
+    real(8)                          :: Ei,Egs,norm0,sgn,nup(Norb),ndw(Norb),peso
+    real(8)                          :: factor
+    real(8),dimension(:),pointer     :: gsvec
+    complex(8),dimension(:),pointer  :: gscvec
+    integer,allocatable,dimension(:) :: Hmap
     !
 #ifdef _MPI
     if(mpiID==0)then
@@ -79,19 +79,22 @@ contains
                    gs_weight=abs(gscvec(i))**2
                 endif
                 do iorb=1,Norb
-                   nup(iorb)=real(ib(iorb),8)
-                   ndw(iorb)=real(ib(iorb+Ns),8)
+                   nup(iorb)=dble(ib(iorb))
+                   ndw(iorb)=dble(ib(iorb+Ns))
                    nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*gs_weight*peso
                    nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*gs_weight*peso
                    ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*gs_weight*peso
                    dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*gs_weight*peso
                    magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*gs_weight*peso
-                   do jorb=1,Norb
-                      m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs_weight*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*peso
+                   m2imp(iorb,iorb) = m2imp(iorb,iorb)  +  (nup(iorb)-ndw(iorb))*(nup(iorb)-ndw(iorb))*gs_weight*peso
+                   do jorb=iorb+1,Norb
+                      m2imp(iorb,jorb) = m2imp(iorb,jorb)  +  (nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*gs_weight*peso
+                      m2imp(jorb,iorb) = m2imp(jorb,iorb)  +  (nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*gs_weight*peso
                    enddo
                 enddo
              enddo
-             nullify(gsvec)
+             if(associated(gsvec))nullify(gsvec)
+             if(associated(gscvec))nullify(gscvec)
              deallocate(Hmap)
           enddo
           nimp  = nimp/zeta_function
@@ -121,8 +124,10 @@ contains
                       ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*peso*gs_weight
                       dimp(iorb)   = dimp(iorb)    +  (nup(iorb)*ndw(iorb))*peso*gs_weight
                       magimp(iorb) = magimp(iorb)  +  (nup(iorb)-ndw(iorb))*peso*gs_weight
-                      do jorb=1,Norb
-                         m2imp(iorb,jorb)  = m2imp(iorb,jorb)  +  gs_weight*peso*(nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))
+                      m2imp(iorb,iorb) = m2imp(iorb,iorb)  +  (nup(iorb)-ndw(iorb))*(nup(iorb)-ndw(iorb))*gs_weight*peso
+                      do jorb=iorb+1,Norb
+                         m2imp(iorb,jorb) = m2imp(iorb,jorb)  +  (nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*gs_weight*peso
+                         m2imp(jorb,iorb) = m2imp(jorb,iorb)  +  (nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*gs_weight*peso
                       enddo
                    enddo
                 enddo
@@ -130,7 +135,9 @@ contains
              deallocate(Hmap)
           enddo
        end select
-       allocate(simp(Norb,Nspin),zimp(Norb,Nspin))!,rimp(Norb,Nspin))
+       !forall(iorb=1:Norb,jorb=1:Norb,iorb>jorb)m2imp(iorb,jorb)=m2imp(jorb,iorb)
+
+       allocate(simp(Norb,Nspin),zimp(Norb,Nspin))
        call get_szr
        !
        if(iolegend)call write_legend
@@ -139,12 +146,12 @@ contains
        call write_to_unit_column()
        write(LOGfile,"(A,10f18.12)")"nimp=  ",(nimp(iorb),iorb=1,Norb)
        write(LOGfile,"(A,10f18.12)")"docc=  ",(dimp(iorb),iorb=1,Norb)
-       write(LOGfile,"(A,10f18.12)")"mom2=  ",(m2imp(iorb,iorb),iorb=1,Norb)
+       write(LOGfile,"(A,20f18.12)")"mom2=  ",((m2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb)
        if(Nspin==2)then
           write(LOGfile,"(A,10f18.12)")"mag=   ",(magimp(iorb),iorb=1,Norb)
        endif
        write(LOGfile,*)""
-       deallocate(simp,zimp)!,rimp)
+       deallocate(simp,zimp)
 
 #ifdef _MPI
     endif
@@ -169,8 +176,6 @@ contains
           simp(iorb,ispin) = dimag(impSmats(ispin,iorb,iorb,1)) - &
                wm1*(dimag(impSmats(ispin,iorb,iorb,2))-dimag(impSmats(ispin,iorb,iorb,1)))/(wm2-wm1)
           zimp(iorb,ispin)   = 1.d0/( 1.d0 + abs( dimag(impSmats(ispin,iorb,iorb,1))/wm1 ))
-          ! rimp(iorb,ispin)   = dimag(impGmats(ispin,iorb,iorb,1)) - &
-          !      wm1*(dimag(impGmats(ispin,iorb,iorb,2))-dimag(impGmats(ispin,iorb,iorb,1)))/(wm2-wm1)
        enddo
     enddo
   end subroutine get_szr
@@ -184,7 +189,7 @@ contains
     integer :: unit,iorb,jorb,ispin
     unit = free_unit()
     open(unit,file="columns_info.ed")
-    write(unit,"(A1,1A7,90A18)")"#","loop",&
+    write(unit,"(A1,1A7,90(A12,6X))")"#","loop","xmu",&
          ("nimp_"//reg(txtfy(iorb)),iorb=1,Norb),&
          ("docc_"//reg(txtfy(iorb)),iorb=1,Norb),&
          ("nup_"//reg(txtfy(iorb)),iorb=1,Norb),&
@@ -192,33 +197,9 @@ contains
          ("mag_"//reg(txtfy(iorb)),iorb=1,Norb),&
          (("mom2_"//reg(txtfy(iorb))//reg(txtfy(jorb)),jorb=1,Norb),iorb=1,Norb),&
          (("z_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin),&
-                                ! (("rho_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin),&
          (("sig_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
     close(unit)
     !
-    ! unit = free_unit()
-    ! open(unit,file="columns_dens.ed")
-    ! write(unit,"(A1,2A18,1A7,90A18)")"#","xmu","beta","loop",&
-    !      ("nimp_"//reg(txtfy(iorb)),iorb=1,Norb),&
-    !      ("nup_"//reg(txtfy(iorb)),iorb=1,Norb),&
-    !      ("ndw_"//reg(txtfy(iorb)),iorb=1,Norb),&
-    !      ("mag_"//reg(txtfy(iorb)),iorb=1,Norb)
-    ! close(unit)
-    ! !
-    ! unit = free_unit()
-    ! open(unit,file="columns_docc_mom_z.ed")
-    ! write(unit,"(A1,2A18,1A7,90A18)")"#","xmu","beta","loop",&
-    !      ("docc_"//reg(txtfy(iorb)),iorb=1,Norb),&
-    !      (("mom2_"//reg(txtfy(iorb))//reg(txtfy(jorb)),jorb=1,Norb),iorb=1,Norb),&
-    !      (("z_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
-    ! close(unit)
-    ! !
-    ! unit = free_unit()
-    ! open(unit,file="columns_rho_sig.ed")
-    ! write(unit,"(A1,2A18,1A7,90A18)")"#","xmu","beta","loop",&
-    !      (("rho_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin),&
-    !      (("sig_"//reg(txtfy(iorb))//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
-    ! close(unit)
     iolegend=.false.
   end subroutine write_legend
 
@@ -232,7 +213,7 @@ contains
     integer :: iorb,jorb,ispin
     unit = free_unit()
     open(unit,file=reg(Ofile)//"_all.ed",position='append')
-    write(unit,"(I7,90F18.12)")loop,&
+    write(unit,"(I7,90F18.12)")loop,xmu,&
          (nimp(iorb),iorb=1,Norb),&
          (dimp(iorb),iorb=1,Norb),&
          (nupimp(iorb),iorb=1,Norb),&
@@ -240,13 +221,12 @@ contains
          (magimp(iorb),iorb=1,Norb),&
          ((m2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
          ((zimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
-                                ! ((rimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
          ((simp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
     close(unit)         
 
     unit = free_unit()
     open(unit,file=reg(Ofile)//"_last.ed")
-    write(unit,"(I7,90F18.12)")loop,&
+    write(unit,"(I7,90F18.12)")loop,xmu,&
          (nimp(iorb),iorb=1,Norb),&
          (dimp(iorb),iorb=1,Norb),&
          (nupimp(iorb),iorb=1,Norb),&
@@ -254,7 +234,6 @@ contains
          (magimp(iorb),iorb=1,Norb),&
          ((m2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
          ((zimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
-                                ! ((rimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
          ((simp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
     close(unit)         
   end subroutine write_to_unit_column

@@ -8,7 +8,6 @@ subroutine lanc_ed_getchi()
   Chitau=0.d0
   Chiw=zero
   Chiiw=zero
-  if(mpiID==0)write(LOGfile,"(A)")"Evaluating Susceptibility:"
   do iorb=1,Norb
      if(mpiID==0)write(LOGfile,"(A)")"Evaluating Chi_Orb"//reg(txtfy(iorb))
      select case(ed_type)

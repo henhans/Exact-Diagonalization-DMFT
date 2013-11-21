@@ -32,6 +32,7 @@ MODULE ED_BATH
   public :: write_bath
   public :: set_bath
   public :: copy_bath
+  public :: spin_symmetrize_bath
   public :: delta_and
   public :: delta_bath
   !
@@ -119,26 +120,24 @@ contains
        inquire(file=trim(Hfile),exist=IOfile)
        if(IOfile)then
           write(LOGfile,"(A)")'Reading bath from file'
-          write(LOGfile,"(A)")'- - - - - - - - - - - -'
           unit = free_unit()
           open(unit,file=trim(Hfile))
           read(unit,*)
           select case(bath_type)
           case default
              do i=1,Nbath
-                read(unit,"(90(F22.15,1X))")((dmft_bath%e(ispin,iorb,i),&
+                read(unit,"(90(F21.12,1X))")((dmft_bath%e(ispin,iorb,i),&
                      dmft_bath%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
              enddo
           case ('hybrid')
              do i=1,Nbath
-                read(unit,"(90(F13.9,1X))")( dmft_bath%e(ispin,1,i),&
+                read(unit,"(90(F21.12,1X))")( dmft_bath%e(ispin,1,i),&
                      (dmft_bath%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
              enddo
           end select
           close(unit)
        else
           write(LOGfile,"(A)")"Generating bath from scratch"
-          write(LOGfile,"(A)")'- - - - - - - - - - - - - - -'
           di = 2.d0*hwband_/dble(Nbath) !/dble(Nbath-1)
           do i=1,Nbath
              dmft_bath%e(:,:,i)=-hwband_ + dble(i-1)*di
@@ -167,19 +166,19 @@ contains
     if(mpiID==0)then
        select case(bath_type)
        case default
-          write(unit,"(90(A22,1X))")&
-               (("# Ek_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),&
+          write(unit,"(90(A21,1X))")&
+               (("#Ek_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),&
                "Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
           do i=1,Nbath
-             write(unit,"(90(F22.15,1X))")((dmft_bath%e(ispin,iorb,i),&
+             write(unit,"(90(F21.12,1X))")((dmft_bath%e(ispin,iorb,i),&
                   dmft_bath%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
           enddo
 
        case('hybrid')
-          write(unit,"(90(A22,1X))")("# Ek_s"//reg(txtfy(ispin)),&
+          write(unit,"(90(A21,1X))")("#Ek_s"//reg(txtfy(ispin)),&
                ("Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
           do i=1,Nbath
-             write(unit,"(90(F22.15,1X))")(dmft_bath%e(ispin,1,i),&
+             write(unit,"(90(F21.12,1X))")( dmft_bath%e(ispin,1,i),&
                   (dmft_bath%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
           enddo
        end select
@@ -279,6 +278,26 @@ contains
   end subroutine copy_bath
 
 
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : given a bath array set both spin components to have 
+  !the same bath, i.e. impose non-magnetic solution
+  !+-------------------------------------------------------------------+
+  subroutine spin_symmetrize_bath(bath_)
+    real(8),dimension(:,:) :: bath_
+    type(effective_bath)   :: dmft_bath_
+    if(Nspin==1)then
+       write(LOGfile,"(A)")"spin_symmetrize_bath: Nspin=1 nothing to symmetrize"
+       return
+    endif
+    if(Nspin>2)stop "spin_symmetrize_bath: Nspin>2..."
+    call allocate_bath(dmft_bath_)
+    call set_bath(bath_,dmft_bath_)
+    dmft_bath_%e(Nspin,:,:)=dmft_bath_%e(1,:,:)
+    dmft_bath_%v(Nspin,:,:)=dmft_bath_%v(1,:,:)
+    call copy_bath(dmft_bath_,bath_)
+    call deallocate_bath(dmft_bath_)
+  end subroutine spin_symmetrize_bath
 
 
 

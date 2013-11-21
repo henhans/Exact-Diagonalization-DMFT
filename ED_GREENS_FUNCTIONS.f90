@@ -9,7 +9,7 @@
 MODULE ED_GREENS_FUNCTIONS
   USE TIMER
   USE IOTOOLS, only: free_unit,reg
-  USE TOOLS,   only: arange,linspace
+  USE ARRAYS,   only: arange,linspace
   USE MATRIX,  only: matrix_inverse
   USE PLAIN_LANCZOS
   USE ED_VARS_GLOBAL
@@ -92,7 +92,7 @@ contains
   !+------------------------------------------------------------------+
   subroutine print_imp_gf
     integer                                  :: i,j,ispin,unit(6),iorb,jorb
-    complex(8)                               :: iw
+    complex(8)                               :: iw,fg0
     complex(8),dimension(Nspin,Norb,Norb,NL) :: impG0iw
     complex(8),dimension(Nspin,Norb,Norb,Nw) :: impG0wr
     complex(8),dimension(Norb,Norb)          :: invGimp,impG0
@@ -108,21 +108,21 @@ contains
           do iorb=1,Norb
              do i=1,NL
                 iw=xi*wm(i)
-                impG0iw(ispin,iorb,iorb,i) = iw+xmu-eloc(iorb)-delta_bath(ispin,iorb,iw,dmft_bath)
-                impSmats(ispin,iorb,iorb,i)= impG0iw(ispin,iorb,iorb,i) - one/impGmats(ispin,iorb,iorb,i)
-                impG0iw(ispin,iorb,iorb,i) = delta_bath(ispin,iorb,iw,dmft_bath)
+                fg0                        = iw+xmu-hloc(iorb,iorb)-delta_bath(ispin,iorb,iw,dmft_bath)
+                impSmats(ispin,iorb,iorb,i)= fg0 - one/impGmats(ispin,iorb,iorb,i)
+                impG0iw(ispin,iorb,iorb,i) = one/fg0!delta_bath(ispin,iorb,iw,dmft_bath)
              enddo
              do i=1,Nw
                 iw=cmplx(wr(i),eps)
-                impG0wr(ispin,iorb,iorb,i) = wr(i)+xmu-eloc(iorb)-delta_bath(ispin,iorb,iw,dmft_bath)
-                impSreal(ispin,iorb,iorb,i)= impG0wr(ispin,iorb,iorb,i) - one/impGreal(ispin,iorb,iorb,i)
-                impG0wr(ispin,iorb,iorb,i) = delta_bath(ispin,iorb,iw,dmft_bath)
+                fg0                        = wr(i)+xmu-hloc(iorb,iorb)-delta_bath(ispin,iorb,iw,dmft_bath)
+                impSreal(ispin,iorb,iorb,i)= fg0 - one/impGreal(ispin,iorb,iorb,i)
+                impG0wr(ispin,iorb,iorb,i) = one/fg0!delta_bath(ispin,iorb,iw,dmft_bath)
              enddo
           enddo
        enddo
        !Print the impurity functions:
        do iorb=1,Norb
-          suffix="_orb"//reg(txtfy(iorb))
+          suffix="_l"//reg(txtfy(iorb))//"_m"//reg(txtfy(iorb))
           call open_units(reg(suffix))
           do i=1,NL
              write(unit(1),"(F26.15,6(F26.15))")wm(i),&
@@ -151,12 +151,11 @@ contains
              !Get WF diagonals:
              do i=1,NL
                 iw=xi*wm(i)
-                impG0iw(ispin,iorb,iorb,i)= iw + xmu-eloc(iorb)-delta_bath(ispin,iorb,iorb,iw,dmft_bath)
+                impG0iw(ispin,iorb,iorb,i)= iw+xmu-hloc(iorb,iorb)-delta_bath(ispin,iorb,iorb,iw,dmft_bath)
              enddo
              do i=1,Nw
                 iw=cmplx(wr(i),eps)
-                !impG0wr(ispin,iorb,iorb,i)= wr(i)+xmu-eloc(iorb)-delta_bath(ispin,iorb,iorb,iw,dmft_bath)
-                impG0wr(ispin,iorb,iorb,i)= iw+xmu-eloc(iorb)-delta_bath(ispin,iorb,iorb,iw,dmft_bath)
+                impG0wr(ispin,iorb,iorb,i)= iw+xmu-hloc(iorb,iorb)-delta_bath(ispin,iorb,iorb,iw,dmft_bath)
              enddo
           enddo
           !Get WF off-diagonals
@@ -164,13 +163,13 @@ contains
              do jorb=iorb+1,Norb
                 do i=1,NL
                    iw=xi*wm(i)
-                   impG0iw(ispin,iorb,jorb,i)= -delta_bath(ispin,iorb,jorb,iw,dmft_bath)
-                   impG0iw(ispin,jorb,iorb,i)= -delta_bath(ispin,jorb,iorb,iw,dmft_bath)
+                   impG0iw(ispin,iorb,jorb,i)= -hloc(iorb,jorb)-delta_bath(ispin,iorb,jorb,iw,dmft_bath)
+                   impG0iw(ispin,jorb,iorb,i)= -hloc(iorb,jorb)-delta_bath(ispin,jorb,iorb,iw,dmft_bath)
                 enddo
                 do i=1,Nw
                    iw=cmplx(wr(i),eps)
-                   impG0wr(ispin,iorb,jorb,i)= -delta_bath(ispin,iorb,jorb,iw,dmft_bath)
-                   impG0wr(ispin,jorb,iorb,i)= -delta_bath(ispin,jorb,iorb,iw,dmft_bath)
+                   impG0wr(ispin,iorb,jorb,i)= -hloc(iorb,jorb)-delta_bath(ispin,iorb,jorb,iw,dmft_bath)
+                   impG0wr(ispin,jorb,iorb,i)= -hloc(iorb,jorb)-delta_bath(ispin,jorb,iorb,iw,dmft_bath)
                 enddo
              enddo
           enddo
@@ -224,6 +223,7 @@ contains
              call close_units()
           enddo
        enddo
+       write(LOGfile,*)""
     end select
 
   contains
@@ -239,9 +239,9 @@ contains
       unit(4)=free_unit()
       open(unit(4),file="impSigma"//string//"_realw.ed")
       unit(5)=free_unit()
-      open(unit(5),file="impDelta"//string//"_iw.ed")
+      open(unit(5),file="impG0"//string//"_iw.ed")
       unit(6)=free_unit()
-      open(unit(6),file="impDelta"//string//"_realw.ed")
+      open(unit(6),file="impG0"//string//"_realw.ed")
     end subroutine open_units
 
     subroutine close_units()
@@ -261,6 +261,7 @@ contains
   subroutine print_imp_chi
     integer                               :: i,j,iorb
     integer                               :: unit(3)
+    write(LOGfile,"(A)")"Printing the spin Chi:"
     do iorb=1,Norb
        unit(1)=free_unit()
        open(unit(1),file=reg(CHIfile)//"_orb"//reg(txtfy(iorb))//"_tau.ed")
@@ -281,6 +282,7 @@ contains
        close(unit(2))
        close(unit(3))
     enddo
+    print*,""
   end subroutine print_imp_chi
 
 

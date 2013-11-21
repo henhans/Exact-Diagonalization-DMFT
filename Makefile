@@ -3,13 +3,21 @@ include sfmake.inc
 FC=$(SFMPI)/mpif90
 #FPP=MPI
 #=========================================================================
-EXE=ed_hm_bethe
+#--> HUBBARD MODELS:
+#EXE=ed_hm_bethe
 #EXE=ed_hm_2dsquare
 #EXE=ed_hm_bethe_mixgf
-#EXE=ed_pam_bethe_mixgf
+
+#--> PERIODIC ANDERSON & P-D MODELS
+#EXE=ed_pam_1b
+#EXE=ed_pam_2b
 #EXE=ed_lda1b
-#EXE=ed_pam_test
+#EXE=ed_lda
+
+#--> B-H-Z MODELS
 #EXE=ed_2x2bhz
+EXE=ed_bhz
+
 DIR =drivers
 DIREXE=$(HOME)/.bin
 

@@ -20,10 +20,10 @@ MODULE ED_HAMILTONIAN
   !Direct Matrix-vector product (no allocation of H)
   public :: setup_Hv_sector
   public :: delete_Hv_sector
-  public :: HtimesV
-#ifdef _MPI
-  public :: HtimesV_mpi
-#endif
+  !   public :: HtimesV
+  ! #ifdef _MPI
+  !   public :: HtimesV_mpi
+  ! #endif
 
   integer                      :: Hsector
   integer,dimension(:),pointer :: Hmap    !map of the Sector S to Hilbert space H
@@ -45,9 +45,10 @@ contains
     integer                          :: kp,k1,k2,k3,k4
     real(8)                          :: sg1,sg2,sg3,sg4
     real(8)                          :: htmp
-    real(8),dimension(Norb)          :: nup,ndw
+    real(8),dimension(Norb)          :: nup,ndw,eloc
     logical                          :: Jcondition,flanc
     integer                          :: first_state,last_state
+
     !
     dim=getdim(isector)
     flanc=.true. ; if(present(h))flanc=.false.
@@ -72,6 +73,11 @@ contains
        if(size(h,2)/=dim)stop "ED_GETH: wrong dimension 2 of H"
        h=0.d0
     endif
+    !
+    !dump Hloc
+    do iorb=1,Norb
+       eloc(iorb)=dreal(Hloc(iorb,iorb))
+    enddo
     !
     do i=first_state,last_state
        m=Hmap(i)
@@ -203,7 +209,7 @@ contains
                 call c(jorb,m,k1,sg1)
                 call cdg(iorb,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                htmp = hybrd(iorb,jorb)*sg1*sg2
+                htmp = Hloc(iorb,jorb)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -219,7 +225,7 @@ contains
                 call c(jorb+Ns,m,k1,sg1)
                 call cdg(iorb+Ns,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                htmp = hybrd(iorb,jorb)*sg1*sg2
+                htmp = Hloc(iorb,jorb)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -309,6 +315,9 @@ contains
 
 
 
+
+
+
   !+------------------------------------------------------------------+
   !PURPOSE  : Build Hamiltonian sparse matrix DOUBLE COMPLEX
   !+------------------------------------------------------------------+
@@ -322,7 +331,7 @@ contains
     integer                            :: kp,k1,k2,k3,k4
     real(8)                            :: sg1,sg2,sg3,sg4
     complex(8)                         :: htmp
-    real(8),dimension(Norb)            :: nup,ndw
+    real(8),dimension(Norb)            :: nup,ndw,eloc
     logical                            :: Jcondition,flanc
     integer                            :: first_state,last_state
     !
@@ -349,6 +358,11 @@ contains
        if(size(h,2)/=dim)stop "ED_GETH: wrong dimension 2 of H"
        h=0.d0
     endif
+    !
+    !dump Hloc
+    do iorb=1,Norb
+       eloc(iorb)=dreal(Hloc(iorb,iorb))
+    enddo
     !
     do i=first_state,last_state
        m=Hmap(i)
@@ -480,7 +494,7 @@ contains
                 call c(jorb,m,k1,sg1)
                 call cdg(iorb,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                htmp = hybrd(iorb,jorb)*sg1*sg2
+                htmp = Hloc(iorb,jorb)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -496,7 +510,7 @@ contains
                 call c(jorb+Ns,m,k1,sg1)
                 call cdg(iorb+Ns,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                htmp = hybrd(iorb,jorb)*sg1*sg2
+                htmp = Hloc(iorb,jorb)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -742,9 +756,9 @@ contains
   !Lanczos algorithm. this DOES NOT store the H-matrix (slower but 
   !more memory efficient)
   !+------------------------------------------------------------------+
-  include "ed_htimesv_direct.f90"
+  !include "ed_htimesv_direct.f90"
 #ifdef _MPI
-  include "ed_htimesv_direct_mpi.f90"
+  !include "ed_htimesv_direct_mpi.f90"
 #endif
 
   !+------------------------------------------------------------------+

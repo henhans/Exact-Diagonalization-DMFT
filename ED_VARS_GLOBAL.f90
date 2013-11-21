@@ -40,10 +40,9 @@ MODULE ED_VARS_GLOBAL
   integer                   :: nloop          !max dmft loop variables
   real(8),dimension(3)      :: Uloc           !local interactions
   real(8)                   :: Ust,Jh         !intra-orbitals interactions
-  real(8),dimension(3)      :: eloc           !local energies
-  complex(8),dimension(3,3) :: hybrd          !hybridizations
-  real(8),dimension(3,3)    :: rehybrd        !hybridizations
-  real(8),dimension(3,3)    :: imhybrd        !hybridizations
+  real(8),dimension(3,3)    :: reHloc         !local hamiltonian, real part 
+  real(8),dimension(3,3)    :: imHloc         !local hamiltonian, imag part
+  complex(8),dimension(3,3) :: Hloc           !local hamiltonian
   real(8)                   :: xmu            !chemical potential
   real(8)                   :: beta           !inverse temperature
   real(8)                   :: eps            !broadening
@@ -53,7 +52,7 @@ MODULE ED_VARS_GLOBAL
   logical                   :: chiflag        !
   logical                   :: HFmode         !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
   real(8)                   :: cutoff         !cutoff for spectral summation
-  real(8)                   :: eps_error      !
+  real(8)                   :: dmft_error     !dmft convergence threshold
   integer                   :: lanc_niter     !Max number of Lanczos iterations
   integer                   :: lanc_neigen    !Max number of required eigenvalues per sector
   integer                   :: lanc_ngfiter   !Max number of iteration in resolvant tri-diagonalization
@@ -66,6 +65,10 @@ MODULE ED_VARS_GLOBAL
   character(len=4)          :: ed_method      !flag to set ed method solution: lanc=lanczos method, full=full diagonalization
   character(len=1)          :: ed_type        !flag to set real or complex Ham: d=symmetric H (real), c=hermitian H (cmplx)
   character(len=7)          :: bath_type      !flag to set bath type: irreducible (1bath/imp), reducible(1bath)
+  real(8)                   :: nread          !fixed density. if 0.d0 fixed chemical potential calculation.
+  real(8)                   :: nerr           !fix density threshold. a loop over from 1.d-1 to required nerr is performed
+  real(8)                   :: ndelta         !initial chemical potential step
+  integer                   :: niter
 
   !Dimension of the functions:
   !=========================================================
@@ -103,16 +106,11 @@ MODULE ED_VARS_GLOBAL
   !=========================================================
   real(8) :: zeta_function
 
-
   !Functions for GETGFUNX
   !=========================================================
   complex(8),allocatable,dimension(:,:,:,:) :: impSmats
   complex(8),allocatable,dimension(:,:,:,:) :: impSreal
 
-
-  !Variables for fixed density mu-loop 
-  !=========================================================
-  real(8) :: nread,nerr,ndelta
 
   !Qties needed to get energy
   !=========================================================
@@ -131,157 +129,15 @@ MODULE ED_VARS_GLOBAL
 
 
   namelist/EDvars/Norb,Nbath,Nspin,&       
-       beta,xmu,nloop,uloc,Ust,Jh,Eloc,rehybrd,imhybrd,   &
+       beta,xmu,nloop,uloc,Ust,Jh,reHloc,imHloc,& 
        eps,wini,wfin,      &
        NL,Nw,Ltau,Nfit,         &
        nread,nerr,ndelta,       &
        chiflag,Jhflag,cutoff,HFmode,   &
-       eps_error,Nsuccess,      &
+       dmft_error,Nsuccess,      &
        ed_method,ed_type,bath_type,&
        lanc_neigen,lanc_niter,lanc_ngfiter,lanc_nstates,&
        cg_niter,cg_ftol,cg_weight,cg_scheme,  &
        Hfile,Ofile,GFfile,CHIfile,LOGfile
-
-contains
-
-  !+-------------------------------------------------------------------+
-  !PROGRAM  : 
-  !TYPE     : subroutine
-  !PURPOSE  : 
-  !+-------------------------------------------------------------------+
-  subroutine read_input(INPUTunit)
-    character(len=*) :: INPUTunit
-    logical          :: control
-
-    if(mpiID==0)call version(revision)
-
-    !DEFAULT VALUES OF THE PARAMETERS:
-    !ModelConf
-    Norb       = 1
-    Nbath      = 4
-    Nspin      = 1
-    Uloc       = [ 2.d0, 0.d0, 0.d0 ]
-    Ust        = 0.d0
-    Jh         = 0.d0
-    reHybrd    = 0.d0
-    imHybrd    = 0.d0
-    Eloc       = 0.d0
-    xmu        = 0.d0
-    beta       = 500.d0
-    !Loops
-    nloop      = 100
-    chiflag    =.true.
-    Jhflag     =.false.
-    hfmode     =.true.
-    !parameters
-    NL         = 2000
-    Nw         = 2000
-    Ltau       = 1000
-    Nfit       = 1000
-    eps        = 0.01d0
-    nread      = 0.d0
-    nerr       = 1.d-4
-    ndelta     = 0.1d0
-    wini       =-4.d0
-    wfin       = 4.d0
-    cutoff     = 1.d-9
-    eps_error  = 1.d-5
-    nsuccess   = 2
-    lanc_niter = 512
-    lanc_neigen = 1
-    lanc_ngfiter = 100
-    lanc_nstates = 1            !set to T=0 calculation
-    cg_niter   = 200
-    cg_Ftol     = 1.d-9
-    cg_weight     = 0
-    cg_scheme     = 'delta'
-    ed_method    = 'lanc'
-    ed_type = 'd'
-    bath_type='normal' !hybrid,superc
-
-    !ReadUnits
-    Hfile  ="hamiltonian.restart"
-    GFfile ="impG"
-    CHIfile ="Chi"
-    Ofile  ="observables"
-    LOGfile=6
-
-    inquire(file=INPUTunit,exist=control)    
-    if(control)then
-       open(50,file=INPUTunit,status='old')
-       read(50,nml=EDvars)
-       close(50)
-    else
-#ifdef _MPI
-       if(mpiID==0)then
-#endif
-          print*,"Can not find INPUT file"
-          print*,"Printing a default version in default."//INPUTunit
-          open(50,file="default."//INPUTunit)
-          write(50,nml=EDvars)
-          write(50,*)""
-#ifdef _MPI
-       endif
-#endif
-       stop
-    endif
-
-    call parse_cmd_variable(Norb,"NORB")    
-    call parse_cmd_variable(Nbath,"NBATH")
-    call parse_cmd_variable(Nspin,"NSPIN")
-    call parse_cmd_variable(beta,"BETA")
-    call parse_cmd_variable(xmu,"XMU")
-    call parse_cmd_variable(uloc,"ULOC")
-    call parse_cmd_variable(ust,"UST")
-    call parse_cmd_variable(Jh,"JH")
-    call parse_cmd_variable(eloc,"ELOC")
-    call parse_cmd_variable(reHybrd,"reHybrd")
-    call parse_cmd_variable(imHybrd,"imHybrd")
-    call parse_cmd_variable(nloop,"NLOOP")
-    call parse_cmd_variable(eps_error,"EPS_ERROR")
-    call parse_cmd_variable(nsuccess,"NSUCCESS")
-    call parse_cmd_variable(NL,"NL")
-    call parse_cmd_variable(Nw,"NW")
-    call parse_cmd_variable(Ltau,"LTAU")
-    call parse_cmd_variable(Nfit,"NFIT")
-    call parse_cmd_variable(nread,"NREAD")
-    call parse_cmd_variable(nerr,"NERR")
-    call parse_cmd_variable(ndelta,"NDELTA")
-    call parse_cmd_variable(wini,"WINI")
-    call parse_cmd_variable(wfin,"WFIN")
-    call parse_cmd_variable(chiflag,"CHIFLAG")
-    call parse_cmd_variable(hfmode,"HFMODE")
-    call parse_cmd_variable(eps,"EPS")
-    call parse_cmd_variable(cutoff,"CUTOFF")
-    call parse_cmd_variable(lanc_neigen,"LANC_NEIGEN")
-    call parse_cmd_variable(lanc_niter,"LANC_NITER")
-    call parse_cmd_variable(lanc_nstates,"LANC_NSTATES")
-    call parse_cmd_variable(lanc_ngfiter,"LANC_NGFITER")
-    call parse_cmd_variable(cg_niter,"CG_NITER")
-    call parse_cmd_variable(cg_scheme,"CG_SCHEME")
-    call parse_cmd_variable(cg_ftol,"CG_FTOL")
-    call parse_cmd_variable(cg_weight,"CG_WEIGHT")
-    call parse_cmd_variable(ed_Type,"ED_TYPE")
-    call parse_cmd_variable(ed_Method,"ED_METHOD")
-    call parse_cmd_variable(bath_type,"BATH_TYPE")
-    call parse_cmd_variable(Hfile,"HFILE")
-    call parse_cmd_variable(Ofile,"OFILE")
-    call parse_cmd_variable(GFfile,"GFFILE")
-    call parse_cmd_variable(CHIfile,"CHIFILE")
-    call parse_cmd_variable(LOGfile,"LOGFILE")
-
-#ifdef _MPI
-    if(mpiID==0)then
-#endif
-       open(50,file="used."//INPUTunit)
-       write(50,nml=EDvars)
-       close(50)
-       write(*,*)"CONTROL PARAMETERS"
-       write(*,nml=EDvars)
-#ifdef _MPI
-    endif
-#endif
-
-  end subroutine read_input
 
 END MODULE ED_VARS_GLOBAL
