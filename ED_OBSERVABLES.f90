@@ -7,11 +7,13 @@ MODULE ED_OBSERVABLES
   implicit none
   private
 
-  public              :: ed_getobs
+  public                             :: ed_getobs
 
-  logical,save        :: iolegend=.true.
-  integer,save        :: loop=0
-  real(8),allocatable :: zimp(:,:),simp(:,:)
+  logical,save                       :: iolegend=.true.
+  integer,save                       :: loop=0
+  real(8),dimension(:),allocatable   :: nupimp,ndwimp,magimp
+  real(8),dimension(:,:),allocatable :: m2imp
+  real(8),dimensioN(:,:),allocatable :: zimp,simp
 
 contains 
 
@@ -33,11 +35,10 @@ contains
     complex(8),dimension(:),pointer  :: gscvec
     integer,allocatable,dimension(:) :: Hmap
     !
-#ifdef _MPI
     if(mpiID==0)then
-#endif
        write(LOGfile,"(A)")"Evaluating Observables:"
-       Egs = state_list%emin       !es_return_energy(state_list,1)
+       allocate(nupimp(Norb),ndwimp(Norb),magimp(Norb),m2imp(Norb,Norb))
+       Egs = state_list%emin
        nimp  = 0.d0
        nupimp = 0.d0
        ndwimp = 0.d0
@@ -151,12 +152,14 @@ contains
           write(LOGfile,"(A,10f18.12)")"mag=   ",(magimp(iorb),iorb=1,Norb)
        endif
        write(LOGfile,*)""
+       deallocate(nupimp,ndwimp,magimp,m2imp)
        deallocate(simp,zimp)
+    endif
 
 #ifdef _MPI
-    endif
     call MPI_BCAST(nimp,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
 #endif
+
   end subroutine ed_getobs
 
 
@@ -173,9 +176,9 @@ contains
     wm1 = pi/beta ; wm2=3.d0*pi/beta
     do ispin=1,Nspin
        do iorb=1,Norb
-          simp(iorb,ispin) = dimag(impSmats(ispin,iorb,iorb,1)) - &
-               wm1*(dimag(impSmats(ispin,iorb,iorb,2))-dimag(impSmats(ispin,iorb,iorb,1)))/(wm2-wm1)
-          zimp(iorb,ispin)   = 1.d0/( 1.d0 + abs( dimag(impSmats(ispin,iorb,iorb,1))/wm1 ))
+          simp(iorb,ispin) = dimag(impSmats(ispin,ispin,iorb,iorb,1)) - &
+               wm1*(dimag(impSmats(ispin,ispin,iorb,iorb,2))-dimag(impSmats(ispin,ispin,iorb,iorb,1)))/(wm2-wm1)
+          zimp(iorb,ispin)   = 1.d0/( 1.d0 + abs( dimag(impSmats(ispin,ispin,iorb,iorb,1))/wm1 ))
        enddo
     enddo
   end subroutine get_szr
@@ -212,7 +215,7 @@ contains
     integer :: unit,flast
     integer :: iorb,jorb,ispin
     unit = free_unit()
-    open(unit,file=reg(Ofile)//"_all.ed",position='append')
+    open(unit,file="observables_all.ed",position='append')
     write(unit,"(I7,90F18.12)")loop,xmu,&
          (nimp(iorb),iorb=1,Norb),&
          (dimp(iorb),iorb=1,Norb),&
@@ -225,7 +228,7 @@ contains
     close(unit)         
 
     unit = free_unit()
-    open(unit,file=reg(Ofile)//"_last.ed")
+    open(unit,file="observables_last.ed")
     write(unit,"(I7,90F18.12)")loop,xmu,&
          (nimp(iorb),iorb=1,Norb),&
          (dimp(iorb),iorb=1,Norb),&

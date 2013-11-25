@@ -26,20 +26,19 @@ program lancED
   integer                :: ntype
   real(8)                :: nobj
   logical                :: fbethe
-  real(8)                :: whband
-  real(8)                :: alpha
-  character(len=16)      :: finput
+  real(8)                :: ts(3)
+  character(len=16)      :: finput,fhloc
 
   !parse additional variables && read input file && read Hk
   call parse_cmd_variable(hkfile,"HKFILE",default="hkfile.in")
   call parse_cmd_variable(ntype,"NTYPE",default=0)
   call parse_cmd_variable(fbethe,"FBETHE",default=.false.)
-  call parse_cmd_variable(whband,"WHBAND",default=1.d0)
   call parse_cmd_variable(Lk,"Lk",default=1000)
-  call parse_cmd_variable(alpha,"ALPHA",default=0.d0)
+  call parse_cmd_variable(ts,"TS",default=[1.d0,0.d0,0.d0])
   call parse_cmd_variable(finput,"FINPUT",default='inputED.in')
+  call parse_cmd_variable(fhloc,"FHLOC",default='inputHLOC.in')
   !
-  call read_input(trim(finput))
+  call ed_read_input(trim(finput),trim(fhloc))
   !
   call read_hk(trim(hkfile))
 
@@ -81,27 +80,28 @@ contains
 
   subroutine read_hk(file)
     character(len=*) :: file
-    integer          :: ik,iorb,jorb,Norb_d,Norb_p
-    real(8)          :: de,e,kx,ky,kz,foo
+    integer          :: i,j,ik,iorb,jorb,Norb_d,Norb_p
+    real(8)          :: de,e,kx,ky,kz,foo,D=1.d0
 
     if(fbethe)then
        !
        allocate(Hk(Norb,Norb,Lk))
        allocate(dos_wt(Lk))
-       de=2.d0*WHband/dble(Lk)
+       de=2.d0*D/dble(Lk)
        do ik=1,Lk
-          e = -WHband + dble(ik-1)*de
-          Hk(:Norb,:Norb,ik) = reHloc(:Norb,:Norb)
-          Hk(1,1,ik) = Hk(1,1,ik) - alpha*e
-          Hk(2:Norb,2:Norb,ik) = Hk(2,2,ik) - e
-          dos_wt(ik)=dens_bethe(e,WHband)*de
+          e = -D + dble(ik-1)*de
+          Hk(:,:,ik) = Hloc(1,1,:,:) !set local part
+          do iorb=1,Norb
+             Hk(iorb,iorb,ik) = Hk(iorb,iorb,ik) - 2.d0*ts(iorb)*e
+          enddo
+          dos_wt(ik)=dens_bethe(e,D)*de
        enddo
        !
     else
        !
        open(50,file=file,status='old')
        read(50,*)Lk,Norb_d,Norb_p,foo,foo
-       if((Norb_d+Norb_p)/=Norb)stop "Reading a wrong Hk.file: check Norb_d,Norb_p"
+       if((Norb_d+Norb_p)/=Norb)stop "Can not read Hk.file: check Norb_d,Norb_p or FBETHE flag"
        allocate(Hk(Norb,Norb,Lk))
        allocate(dos_wt(Lk))
        do ik=1,Lk
@@ -112,14 +112,11 @@ contains
        enddo
        close(50)
        dos_wt=1.d0/dble(Lk)
-       reHloc(1:2,1:2) = sum(Hk(1:2,1:2,:),dim=3)/dble(Lk)
+       Hloc(1,1,:Norb,:Norb) = sum(Hk(:,:,:),dim=3)/dble(Lk)
        !
     endif
     print*,"Hloc:"
-    do i=1,Norb
-       write(*,*)(reHloc(i,j),j=1,Norb)
-    enddo
-    print*,""
+    call print_Hloc(Hloc)
   end subroutine read_hk
 
 
@@ -129,7 +126,7 @@ contains
   subroutine get_delta
     integer                                 :: i,j,ik,iorb,jorb
     complex(8)                              :: iw
-    complex(8),dimension(Norb,Norb)         :: zeta,fg,He
+    complex(8),dimension(Norb,Norb)         :: zeta,fg,self,gdelta
     complex(8),allocatable,dimension(:,:,:) :: gloc
     real(8)                                 :: wm(NL),wr(Nw)
 
@@ -144,7 +141,7 @@ contains
        do iorb=1,Norb
           zeta(iorb,iorb) = (xi*wm(i) + xmu)
           do jorb=1,Norb
-             zeta(iorb,jorb) = zeta(iorb,jorb)  - impSmats(1,iorb,jorb,i)
+             zeta(iorb,jorb) = zeta(iorb,jorb)  - impSmats(1,1,iorb,jorb,i)
           enddo
        enddo
        !
@@ -154,8 +151,20 @@ contains
        enddo
        gloc(:,:,i) = fg
        !
-       call matrix_inverse(fg)
-       delta(:,:,i)=zeta - hloc - fg
+       if(Norb>1)then
+          call matrix_inverse(fg)
+       else
+          fg(1,1)=one/fg(1,1)
+       endif
+
+       if(cg_scheme=='weiss')then
+          gdelta = fg + impSmats(1,1,:,:,i)
+          call matrix_inverse(gdelta)
+       else
+          gdelta = zeta - hloc(1,1,:,:) - fg
+       endif
+       delta(:,:,i)=gdelta
+
     enddo
     !print
     do iorb=1,Norb
@@ -171,9 +180,9 @@ contains
     do i=1,Nw
        zeta=zero
        do iorb=1,Norb
-          zeta(iorb,iorb) = (cmplx(wr(i),eps) + xmu)
+          zeta(iorb,iorb) = dcmplx(wr(i),eps) + xmu
           do jorb=1,Norb
-             zeta(iorb,jorb) = zeta(iorb,jorb)  - impSreal(1,iorb,jorb,i)
+             zeta(iorb,jorb) = zeta(iorb,jorb)  - impSreal(1,1,iorb,jorb,i)
           enddo
        enddo
        !
@@ -191,14 +200,16 @@ contains
     enddo
     deallocate(gloc)
 
-    if(ntype==1)then
-       nobj=nimp(1)
-    elseif(ntype==2)then
-       nobj=nimp(2)
-    else
-       nobj=nimp(1)+nimp(2)
+    nobj=nimp(1)
+    if(Norb>1)then
+       if(ntype==1)then
+          nobj=nimp(1)
+       elseif(ntype==2)then
+          nobj=nimp(2)
+       else
+          nobj=nimp(1)+nimp(2)
+       endif
     endif
-
   end subroutine get_delta
 
 
@@ -241,7 +252,11 @@ contains
     complex(8),dimension(Norb,Norb) :: zeta,Hk
     complex(8),dimension(Norb,Norb) :: invg
     invg=zeta-Hk
-    call matrix_inverse(invg)
+    if(Norb>1)then
+       call matrix_inverse(invg)
+    else
+       invg(1,1)=one/invg(1,1)
+    endif
   end function invert_gk
 
   !include 'search_mu.f90'

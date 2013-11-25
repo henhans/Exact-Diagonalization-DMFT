@@ -45,7 +45,8 @@ contains
     integer                          :: kp,k1,k2,k3,k4
     real(8)                          :: sg1,sg2,sg3,sg4
     real(8)                          :: htmp
-    real(8),dimension(Norb)          :: nup,ndw,eloc
+    real(8),dimension(Norb)          :: nup,ndw
+    real(8),dimension(Nspin,Norb)    :: eloc
     logical                          :: Jcondition,flanc
     integer                          :: first_state,last_state
 
@@ -74,9 +75,11 @@ contains
        h=0.d0
     endif
     !
-    !dump Hloc
-    do iorb=1,Norb
-       eloc(iorb)=dreal(Hloc(iorb,iorb))
+    !Get diagonal part of Hloc
+    do ispin=1,Nspin
+       do iorb=1,Norb
+          eloc(ispin,iorb)=dreal(Hloc(ispin,ispin,iorb,iorb))
+       enddo
     enddo
     !
     do i=first_state,last_state
@@ -89,7 +92,10 @@ contains
        enddo
        !
        !LOCAL HAMILTONIAN PART:
-       htmp = -xmu*(sum(nup)+sum(ndw))  + dot_product(eloc,nup+ndw) !+ heff*(sum(nup)-sum(ndw))
+       !local energies
+       htmp = -xmu*(sum(nup)+sum(ndw))  + &
+            dot_product(eloc(1,:),nup)  + &
+            dot_product(eloc(Nspin,:),ndw)
        !Density-density interaction: same orbital, opposite spins
        htmp = htmp + dot_product(uloc,nup*ndw)!=\sum=i U_i*(n_u*n_d)_i
        if(hfmode)htmp=htmp - 0.5d0*dot_product(uloc,nup+ndw) + 0.25d0*sum(uloc)
@@ -201,7 +207,7 @@ contains
        endif
        !
 
-       !LOCAL HYBRIDIZATION
+       !LOCAL HYBRIDIZATION !missing the \sigma-\sigma` inter-spins exchange!!
        do iorb=1,Norb
           do jorb=1,Norb
              !SPIN UP
@@ -209,7 +215,7 @@ contains
                 call c(jorb,m,k1,sg1)
                 call cdg(iorb,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                htmp = Hloc(iorb,jorb)*sg1*sg2
+                htmp = Hloc(1,1,iorb,jorb)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -225,7 +231,7 @@ contains
                 call c(jorb+Ns,m,k1,sg1)
                 call cdg(iorb+Ns,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                htmp = Hloc(iorb,jorb)*sg1*sg2
+                htmp = Hloc(Nspin,Nspin,iorb,jorb)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -335,7 +341,8 @@ contains
     integer                            :: kp,k1,k2,k3,k4
     real(8)                            :: sg1,sg2,sg3,sg4
     complex(8)                         :: htmp
-    real(8),dimension(Norb)            :: nup,ndw,eloc
+    real(8),dimension(Norb)            :: nup,ndw
+    real(8),dimension(Nspin,Norb)      :: eloc
     logical                            :: Jcondition,flanc
     integer                            :: first_state,last_state
     !
@@ -363,10 +370,13 @@ contains
        h=0.d0
     endif
     !
-    !dump Hloc
-    do iorb=1,Norb
-       eloc(iorb)=dreal(Hloc(iorb,iorb))
+    !Get diagonal part of Hloc
+    do ispin=1,Nspin
+       do iorb=1,Norb
+          eloc(ispin,iorb)=dreal(Hloc(ispin,ispin,iorb,iorb))
+       enddo
     enddo
+
     !
     do i=first_state,last_state
        m=Hmap(i)
@@ -378,7 +388,10 @@ contains
        enddo
        !
        !LOCAL HAMILTONIAN PART:
-       htmp = -xmu*(sum(nup)+sum(ndw))  + dot_product(eloc,nup+ndw) !+ heff*(sum(nup)-sum(ndw))
+       !local energies
+       htmp = -xmu*(sum(nup)+sum(ndw))  + &
+            dot_product(eloc(1,:),nup)  + &
+            dot_product(eloc(Nspin,:),ndw)
        !Density-density interaction: same orbital, opposite spins
        htmp = htmp + dot_product(uloc,nup*ndw)!=\sum=i U_i*(n_u*n_d)_i
        if(hfmode)htmp=htmp - 0.5d0*dot_product(uloc,nup+ndw) + 0.25d0*sum(uloc)
@@ -498,7 +511,7 @@ contains
                 call c(jorb,m,k1,sg1)
                 call cdg(iorb,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                htmp = Hloc(iorb,jorb)*sg1*sg2
+                htmp = Hloc(1,1,iorb,jorb)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
@@ -514,7 +527,7 @@ contains
                 call c(jorb+Ns,m,k1,sg1)
                 call cdg(iorb+Ns,k1,k2,sg2)
                 j=binary_search(Hmap,k2)
-                htmp = Hloc(iorb,jorb)*sg1*sg2
+                htmp = Hloc(Nspin,Nspin,iorb,jorb)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
                    call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)

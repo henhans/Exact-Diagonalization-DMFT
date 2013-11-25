@@ -9,8 +9,11 @@ MODULE ED_AUX_FUNX
   private
 
   public :: ed_read_input
+  public :: print_Hloc
+#ifdef _MPI
   public :: ed_init_mpi
   public :: ed_finalize_mpi
+#endif
   !
   public :: init_ed_structure
   public :: search_chemical_potential
@@ -21,26 +24,27 @@ MODULE ED_AUX_FUNX
   public :: c,cdg
   public :: binary_search
 
+
 contains
 
 
   !+-------------------------------------------------------------------+
   !PURPOSE  : READ THE INPUT FILE AND SETUP GLOBAL VARIABLES
   !+-------------------------------------------------------------------+
-  subroutine ed_read_input(INPUTunit)
+  subroutine ed_read_input(INPUTunit,Hunit)
     character(len=*) :: INPUTunit
+    character(len=*) :: Hunit
     logical          :: control
+    integer          :: iorb,jorb,ispin,jspin
     if(mpiID==0)call version(revision)
     !DEFAULT VALUES OF THE PARAMETERS:
     !ModelConf
     Norb       = 1
     Nbath      = 4
     Nspin      = 1
-    Uloc       = [ 2.d0, 0.d0, 0.d0 ]
+    Uloc       = 0.d0;Uloc(1)=2.d0
     Ust        = 0.d0
     Jh         = 0.d0
-    reHloc = 0.d0
-    imHloc = 0.d0
     xmu        = 0.d0
     beta       = 500.d0
     !Loops
@@ -75,9 +79,6 @@ contains
     bath_type='normal' !hybrid,superc
     !ReadUnits
     Hfile  ="hamiltonian.restart"
-    GFfile ="impG"
-    CHIfile ="Chi"
-    Ofile  ="observables"
     LOGfile=6
 
     inquire(file=INPUTunit,exist=control)    
@@ -104,8 +105,6 @@ contains
     call parse_cmd_variable(uloc,"ULOC")
     call parse_cmd_variable(ust,"UST")
     call parse_cmd_variable(Jh,"JH")
-    call parse_cmd_variable(reHloc,"reHloc")
-    call parse_cmd_variable(imHloc,"imHloc")
     call parse_cmd_variable(nloop,"NLOOP")
     call parse_cmd_variable(dmft_error,"DMFT_ERROR")
     call parse_cmd_variable(nsuccess,"NSUCCESS")
@@ -134,10 +133,8 @@ contains
     call parse_cmd_variable(ed_Method,"ED_METHOD")
     call parse_cmd_variable(bath_type,"BATH_TYPE")
     call parse_cmd_variable(Hfile,"HFILE")
-    call parse_cmd_variable(Ofile,"OFILE")
-    call parse_cmd_variable(GFfile,"GFFILE")
-    call parse_cmd_variable(CHIfile,"CHIFILE")
     call parse_cmd_variable(LOGfile,"LOGFILE")
+    Ltau=max(int(beta),100)
     !
     if(mpiID==0)then
        open(50,file="used."//INPUTunit)
@@ -146,9 +143,78 @@ contains
        write(*,*)"CONTROL PARAMETERS"
        write(*,nml=EDvars)
     endif
+
+
+    write(LOGfile,"(A)")"U_local:"
+    write(LOGfile,"(90F12.6,1x)")(Uloc(iorb),iorb=1,Norb)
+
+
+    allocate(reHloc(Nspin,Nspin,Norb,Norb))
+    allocate(imHloc(Nspin,Nspin,Norb,Norb))
+    allocate(Hloc(Nspin,Nspin,Norb,Norb))
+    reHloc = 0.d0
+    imHloc = 0.d0
+
+    inquire(file=Hunit,exist=control)    
+    if(control)then
+       open(50,file=Hunit,status='old')
+       do ispin=1,Nspin
+          do iorb=1,Norb
+             read(50,*)((reHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
+          enddo
+       enddo
+       do ispin=1,Nspin
+          do iorb=1,Norb
+             read(50,*)((imHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
+          enddo
+       enddo
+       close(50)
+    else
+       if(mpiID==0)then
+          print*,"Can not find Uloc/Hloc file"
+          print*,"Printing a default version in default."//Hunit
+          open(50,file="default."//Hunit)
+          do ispin=1,Nspin
+             do iorb=1,Norb
+                write(50,"(90F12.6)")((reHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
+             enddo
+          enddo
+          write(50,*)""
+          do ispin=1,Nspin
+             do iorb=1,Norb
+                write(50,"(90F12.6)")((imHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
+             enddo
+          enddo
+          write(50,*)""
+          close(50)
+       endif
+       stop
+    endif
+
+    hloc = dcmplx(reHloc,imHloc)
+
+    write(LOGfile,"(A)")"H_local:"
+    call print_Hloc(Hloc)
   end subroutine ed_read_input
 
 
+  subroutine print_Hloc(hloc)
+    integer                                     :: iorb,jorb,ispin,jspin
+    complex(8),dimension(Nspin,Nspin,Norb,Norb) :: hloc
+    do ispin=1,Nspin
+       do iorb=1,Norb
+          write(LOGfile,"(20(A1,F7.3,A1,F7.3,A1,2x))")&
+               (&
+               (&
+               '(',dreal(Hloc(ispin,jspin,iorb,jorb)),',',dimag(Hloc(ispin,jspin,iorb,jorb)),')',&
+               jorb =1,Norb),&
+               jspin=1,Nspin)
+       enddo
+    enddo
+  end subroutine print_Hloc
+
+
+#ifdef _MPI
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
@@ -163,14 +229,14 @@ contains
   subroutine ed_finalize_mpi
     call MPI_FINALIZE(mpiERR)
   end subroutine ed_finalize_mpi
-
+#endif
 
 
   !+------------------------------------------------------------------+
   !PURPOSE  : Init calculation
   !+------------------------------------------------------------------+
   subroutine init_ed_structure
-    integer          :: i,NP,nup,ndw
+    integer          :: i,NP,nup,ndw,iorb,jorb,ispin,jspin
     !Norb=# of impurity orbitals
     !Nbath=# of bath sites (per orbital or not depending on bath_type)
     !Ns=total number of sites
@@ -211,6 +277,7 @@ contains
     allocate(getCDGsector(2,Nsect))
     allocate(getBathStride(Norb,Nbath))
     allocate(neigen_sector(Nsect))
+
 
     !check finiteT
     finiteT=.true.              !assume doing finite T per default
@@ -259,17 +326,12 @@ contains
        write(LOGfile,"(A,I10)")"Increased Nloop to:",nloop
     endif
 
-    !set up Hybridizations
-    !hybrd = dcmplx(reHybrd,imHybrd)
-    hloc = dcmplx(reHloc,imHloc)
-
     !allocate functions
-    allocate(impSmats(Nspin,Norb,Norb,NL))
-    allocate(impSreal(Nspin,Norb,Norb,Nw))
+    allocate(impSmats(Nspin,Nspin,Norb,Norb,NL))
+    allocate(impSreal(Nspin,Nspin,Norb,Norb,Nw))
 
     !allocate observables
-    allocate(nimp(Norb),dimp(Norb),nupimp(Norb),ndwimp(Norb),magimp(Norb))
-    allocate(m2imp(Norb,Norb))
+    allocate(nimp(Norb),dimp(Norb))
   end subroutine init_ed_structure
 
 
