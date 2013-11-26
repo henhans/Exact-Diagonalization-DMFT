@@ -156,12 +156,12 @@ contains
           read(unit,*)
           select case(bath_type)
           case default
-             do i=1,flen!Nbath
+             do i=1,min(flen,Nbath)
                 read(unit,*)((dmft_bath%e(ispin,iorb,i),&
                      dmft_bath%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
              enddo
           case ('hybrid')
-             do i=1,flen!Nbath
+             do i=1,min(flen,Nbath)
                 read(unit,*)( dmft_bath%e(ispin,1,i),&
                      (dmft_bath%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
 

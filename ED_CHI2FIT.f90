@@ -59,6 +59,8 @@ contains
     logical                              :: iverbose
     complex(8)                           :: fgand
     real(8)                              :: w
+    character(len=20)                  :: suffix
+    integer                            :: unit
     if(mpiID==0)then
        if(cg_scheme=='weiss')then
           write(LOGfile,"(A)")"CHI2FIT: Weiss field function:"
@@ -101,6 +103,11 @@ contains
              call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
           endif
           write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
+          suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//".ed"
+          unit=free_unit()
+          open(unit,file="chi2fit_results"//reg(suffix),position="append")
+          write(unit,"(ES18.9,1x,I5)") chi,iter
+          close(unit)
           dmft_bath%e(ispin,iorb,1:Nbath) = a(1:Nbath)
           dmft_bath%v(ispin,iorb,1:Nbath) = a(Nbath+1:2*Nbath)
        enddo
@@ -108,7 +115,6 @@ contains
        call write_fit_result(ispin)
        call copy_bath(dmft_bath,bath_)
        call deallocate_bath(dmft_bath)
-       !
        print*," "
        deallocate(Fdelta,Xdelta,Wdelta)
     endif
@@ -119,13 +125,12 @@ contains
   contains
     !
     subroutine write_fit_result(ispin)
-      complex(8)                   :: fgand
-      integer                      :: i,j,iorb,ispin
-      real(8)                      :: w
-      character(len=20)            :: suffix
-      integer :: unit
+      complex(8)        :: fgand
+      integer           :: i,j,iorb,ispin
+      real(8)           :: w
       do iorb=1,Norb
-         suffix="_orb"//reg(txtfy(iorb))//"_"//reg(txtfy(ispin))//".ed"
+         suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//".ed"
+         Fdelta(1,1:Ldelta) = fg(iorb,iorb,1:Ldelta)
          fgand=zero
          unit=free_unit()
          open(unit,file="fit_delta"//reg(suffix))
@@ -137,8 +142,7 @@ contains
             else
                fgand = delta_bath(ispin,iorb,xi*w,dmft_bath)
             endif
-            write(unit,"(5F24.15)")Xdelta(i),dimag(Fdelta(1,i)),dimag(fgand),&
-                 dreal(Fdelta(1,i)),dreal(fgand)
+            write(unit,"(5F24.15)")Xdelta(i),dimag(Fdelta(1,i)),dimag(fgand),dreal(Fdelta(1,i)),dreal(fgand)
          enddo
          close(unit)
       enddo
@@ -169,6 +173,8 @@ contains
     logical                              :: iverbose
     complex(8)                           :: fgand
     real(8)                              :: w
+    character(len=20)                    :: suffix
+    integer                              :: unit
     !
     if(mpiID==0)then
        if(cg_scheme=='weiss')then
@@ -223,8 +229,12 @@ contains
        if(iverbose)call write_bath(dmft_bath,LOGfile)
        call write_fit_result(ispin)
        call deallocate_bath(dmft_bath)
-       write(*,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
-       print*," "
+       write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
+       suffix="_ALLorb_s"//reg(txtfy(ispin))//".ed"
+       unit=free_unit()
+       open(unit,file="chi2fit_results"//reg(suffix),position="append")
+       write(unit,"(ES18.9,1x,I5)") chi,iter
+       close(unit)
        deallocate(Fdelta,Xdelta,Wdelta)
        deallocate(getIorb,getJorb)
     endif
@@ -374,6 +384,64 @@ contains
 
 
 
+
+  !*****************************************************************************
+  !*****************************************************************************
+  !*****************************************************************************
+  !*****************************************************************************
+
+
+
+
+
+
+  !+-------------------------------------------------------------+
+  !PURPOSE: Evaluate the \chi^2 distanec of G_0  function 
+  ! The Gradient is not evaluated, so the minimization requires 
+  ! a numerical estimate of the gradient. 
+  ! G_0 is evaluated in a function below
+  ! NORMAL bath.
+  ! SPIN & ORBITAL DIAGONAL
+  !+-------------------------------------------------------------+
+  function chi2_weiss(a) result(chi2)
+    real(8),dimension(:)         ::  a
+    complex(8),dimension(Ldelta) ::  g0
+    real(8)                      ::  chi2
+    integer                      ::  i,iorb
+    chi2 = 0.d0 
+    iorb=Orb_indx
+    do i=1,Ldelta   !Number of freq. in common to the module
+       g0(i)   = fg_weiss(xdelta(i),iorb,a)
+    enddo
+    chi2=sum(abs(Fdelta(1,:)-g0(:))**2/Wdelta(:))
+  end function chi2_weiss
+
+  ! the inverse non-interacting GF (~inverse Weiss Field) 
+  ! used in \chi^2(\caG_0 - G_0) 
+  ! \G_0 = [iw_n + xmu - H_loc - \Delta]^-1
+  !+-------------------------------------------------------------+
+  function fg_weiss(w,iorb,a) result(gg)
+    real(8)                      :: w
+    real(8),dimension(:)         :: a
+    real(8),dimension(size(a)/2) :: eps,vps
+    complex(8)                   :: gg,delta
+    integer                      :: i,iorb,ispin,Nb
+    Nb=size(a)/2
+    ispin=Spin_indx
+    eps=a(1:Nb)
+    vps=a(Nb+1:2*Nb)
+    delta=zero
+    do i=1,Nb
+       delta=delta + vps(i)**2/(xi*w-eps(i))
+    enddo
+    gg = one/(xi*w+xmu-hloc(ispin,ispin,iorb,iorb)-delta)
+  end function fg_weiss
+
+
+
+
+
+
   !*****************************************************************************
   !*****************************************************************************
   !*****************************************************************************
@@ -488,58 +556,10 @@ contains
 
 
 
-
   !*****************************************************************************
   !*****************************************************************************
   !*****************************************************************************
   !*****************************************************************************
-
-
-
-
-
-
-  !+-------------------------------------------------------------+
-  !PURPOSE: Evaluate the \chi^2 distanec of G_0  function 
-  ! The Gradient is not evaluated, so the minimization requires 
-  ! a numerical estimate of the gradient. 
-  ! G_0 is evaluated in a function below
-  ! NORMAL bath.
-  ! SPIN & ORBITAL DIAGONAL
-  !+-------------------------------------------------------------+
-  function chi2_weiss(a) result(chi2)
-    real(8),dimension(:)         ::  a
-    complex(8),dimension(Ldelta) ::  g0
-    real(8)                      ::  chi2
-    integer                      ::  i,iorb
-    chi2 = 0.d0 
-    iorb=Orb_indx
-    do i=1,Ldelta   !Number of freq. in common to the module
-       g0(i)   = fg_weiss(xdelta(i),iorb,a)
-    enddo
-    chi2=sum(abs(Fdelta(1,:)-g0(:))**2/Wdelta(:))
-  end function chi2_weiss
-
-  ! the inverse non-interacting GF (~inverse Weiss Field) 
-  ! used in \chi^2(\caG_0 - G_0) 
-  ! \G_0 = [iw_n + xmu - H_loc - \Delta]^-1
-  !+-------------------------------------------------------------+
-  function fg_weiss(w,iorb,a) result(gg)
-    real(8)                      :: w
-    real(8),dimension(:)         :: a
-    real(8),dimension(size(a)/2) :: eps,vps
-    complex(8)                   :: gg,delta
-    integer                      :: i,iorb,ispin,Nb
-    Nb=size(a)/2
-    ispin=Spin_indx
-    eps=a(1:Nb)
-    vps=a(Nb+1:2*Nb)
-    delta=zero
-    do i=1,Nb
-       delta=delta + vps(i)**2/(xi*w-eps(i))
-    enddo
-    gg = one/(xi*w+xmu-hloc(ispin,ispin,iorb,iorb)-delta)
-  end function fg_weiss
 
 
 

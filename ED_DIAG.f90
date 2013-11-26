@@ -122,13 +122,13 @@ contains
     if(mpiID==0)then
        unit=free_unit()
        open(unit,file="state_list.ed")
-       write(unit,"(A)")"#i       E_i                nup ndw"
+       write(unit,"(A)")"#i       E_i                 nup ndw Sect"
        do i=1,state_list%size
           Ei     = es_return_energy(state_list,i)
           isect0 = es_return_sector(state_list,i)
           nup0   = getnup(isect0)
           ndw0   = getndw(isect0)
-          write(unit,"(i3,f25.18,3i3)"),i,Ei,nup0,ndw0,isect0
+          write(unit,"(i3,f25.18,2i3,3x,i3)"),i,Ei,nup0,ndw0,isect0
        enddo
        close(unit)
        write(LOGfile,"(A)")"Get Z_function:"
