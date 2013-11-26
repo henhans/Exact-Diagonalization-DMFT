@@ -74,14 +74,16 @@ contains
              do i=1,dim0
                 m=Hmap(i)
                 call bdecomp(m,ib)
+                do iorb=1,Norb
+                   nup(iorb)=dble(ib(iorb))
+                   ndw(iorb)=dble(ib(iorb+Ns))
+                enddo
                 if(ed_type=='d')then
                    gs_weight=gsvec(i)**2
                 elseif(ed_type=='c')then
                    gs_weight=abs(gscvec(i))**2
                 endif
                 do iorb=1,Norb
-                   nup(iorb)=dble(ib(iorb))
-                   ndw(iorb)=dble(ib(iorb+Ns))
                    nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*gs_weight*peso
                    nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*gs_weight*peso
                    ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*gs_weight*peso
@@ -90,7 +92,7 @@ contains
                    m2imp(iorb,iorb) = m2imp(iorb,iorb)  +  (nup(iorb)-ndw(iorb))*(nup(iorb)-ndw(iorb))*gs_weight*peso
                    do jorb=iorb+1,Norb
                       m2imp(iorb,jorb) = m2imp(iorb,jorb)  +  (nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*gs_weight*peso
-                      m2imp(jorb,iorb) = m2imp(jorb,iorb)  +  (nup(iorb)-ndw(iorb))*(nup(jorb)-ndw(jorb))*gs_weight*peso
+                      m2imp(jorb,iorb) = m2imp(jorb,iorb)  +  (nup(jorb)-ndw(jorb))*(nup(iorb)-ndw(iorb))*gs_weight*peso
                    enddo
                 enddo
              enddo
@@ -120,6 +122,8 @@ contains
                    do iorb=1,Norb
                       nup(iorb)=real(ib(iorb),8)
                       ndw(iorb)=real(ib(iorb+Ns),8)
+                   enddo
+                   do iorb=1,Norb
                       nimp(iorb)   = nimp(iorb)    +  (nup(iorb)+ndw(iorb))*peso*gs_weight
                       nupimp(iorb) = nupimp(iorb)  +  (nup(iorb))*peso*gs_weight
                       ndwimp(iorb) = ndwimp(iorb)  +  (ndw(iorb))*peso*gs_weight
