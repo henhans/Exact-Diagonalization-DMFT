@@ -72,11 +72,11 @@ subroutine full_ed_buildgf(iorb,ispin)
            matcdg=peso*cdgmat**2
            do m=1,NL
               iw=xi*wm(m)
-              impGmats(ispin,iorb,iorb,m)=impGmats(ispin,iorb,iorb,m)+matcdg/(iw+de)
+              impGmats(ispin,ispin,iorb,iorb,m)=impGmats(ispin,ispin,iorb,iorb,m)+matcdg/(iw+de)
            enddo
            do m=1,Nw 
               w0=wr(m);iw=cmplx(w0,eps)
-              impGreal(ispin,iorb,iorb,m)=impGreal(ispin,iorb,iorb,m)+matcdg/(iw+de)
+              impGreal(ispin,ispin,iorb,iorb,m)=impGreal(ispin,ispin,iorb,iorb,m)+matcdg/(iw+de)
            enddo
         enddo
      enddo

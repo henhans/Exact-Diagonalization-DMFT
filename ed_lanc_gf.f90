@@ -7,8 +7,8 @@ subroutine lanc_ed_getgf()
   real(8) :: norm0
   call allocate_grids
 
-  if(.not.allocated(impGmats))allocate(impGmats(Nspin,Norb,Norb,NL))
-  if(.not.allocated(impGreal))allocate(impGreal(Nspin,Norb,Norb,Nw))
+  if(.not.allocated(impGmats))allocate(impGmats(Nspin,Nspin,Norb,Norb,NL))
+  if(.not.allocated(impGreal))allocate(impGreal(Nspin,Nspin,Norb,Norb,Nw))
   impGmats=zero
   impGreal=zero
 
@@ -19,7 +19,7 @@ subroutine lanc_ed_getgf()
         case default
            call lanc_ed_buildgf_d(iorb,ispin,.false.)
         case ('c')
-           call lanc_ed_buildgf_c(iorb,ispin,.false.)              
+           call lanc_ed_buildgf_c(iorb,ispin,.false.)
         end select
      enddo
   enddo
@@ -42,12 +42,12 @@ subroutine lanc_ed_getgf()
      !Put here off-diagonal manipulation by symmetry:
      do iorb=1,Norb
         do jorb=iorb+1,Norb
-           impGmats(:,iorb,jorb,:) = 0.5d0*(impGmats(:,iorb,jorb,:) &
-                - (one-xi)*impGmats(:,iorb,iorb,:) - (one-xi)*impGmats(:,jorb,jorb,:))
-           impGreal(:,iorb,jorb,:) = 0.5d0*(impGreal(:,iorb,jorb,:) &
-                - (one-xi)*impGreal(:,iorb,iorb,:) - (one-xi)*impGreal(:,jorb,jorb,:))
-           impGmats(:,jorb,iorb,:) = impGmats(:,iorb,jorb,:)
-           impGreal(:,jorb,iorb,:) = impGreal(:,iorb,jorb,:)
+           impGmats(:,:,iorb,jorb,:) = 0.5d0*(impGmats(:,:,iorb,jorb,:) &
+                - (one-xi)*impGmats(:,:,iorb,iorb,:) - (one-xi)*impGmats(:,:,jorb,jorb,:))
+           impGreal(:,:,iorb,jorb,:) = 0.5d0*(impGreal(:,:,iorb,jorb,:) &
+                - (one-xi)*impGreal(:,:,iorb,iorb,:) - (one-xi)*impGreal(:,:,jorb,jorb,:))
+           impGmats(:,:,jorb,iorb,:) = impGmats(:,:,iorb,jorb,:)
+           impGreal(:,:,jorb,iorb,:) = impGreal(:,:,iorb,jorb,:)
         enddo
      enddo
   endif
@@ -786,11 +786,11 @@ subroutine add_to_lanczos_gf(vnorm2,Ei,nlanc,alanc,blanc,isign,iorb,jorb,ispin)
      peso = pesoBZ*Z(1,j)*Z(1,j)
      do i=1,NL
         iw=xi*wm(i)
-        impGmats(ispin,iorb,jorb,i)=impGmats(ispin,iorb,jorb,i) + peso/(iw-isign*de)
+        impGmats(ispin,ispin,iorb,jorb,i)=impGmats(ispin,ispin,iorb,jorb,i) + peso/(iw-isign*de)
      enddo
      do i=1,Nw
         iw=dcmplx(wr(i),eps)
-        impGreal(ispin,iorb,jorb,i)=impGreal(ispin,iorb,jorb,i) + peso/(iw-isign*de)
+        impGreal(ispin,ispin,iorb,jorb,i)=impGreal(ispin,ispin,iorb,jorb,i) + peso/(iw-isign*de)
      enddo
   enddo
 end subroutine add_to_lanczos_gf

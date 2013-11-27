@@ -111,44 +111,77 @@ contains
   !+------------------------------------------------------------------+
   subroutine init_bath_ed(dmft_bath,hwband_)
     type(effective_bath) :: dmft_bath
-    real(8)              :: hwband_
-    integer              :: i,iorb,ispin,unit
+    real(8)              :: hwband_,wband_
+    integer              :: i,iorb,ispin,unit,flen
     logical              :: IOfile
-    real(8)              :: N2,di
+    real(8)              :: Nh,de !N2,di, 
     if(.not.dmft_bath%status)stop "init_bath: bath not allocated"
     if(mpiID==0)then
+       !Generating the bath anyway, then you may want to read it to 
+       !update some entries. This way you can restart even 
+       !from different Ns calculation, this is better than 
+       !start from a complete guess
+       write(LOGfile,"(A)")"Generating bath:"
+       dmft_bath%e(:,:,1)    =-hwband_ 
+       dmft_bath%e(:,:,Nbath)= hwband_ 
+       Nh=Nbath/2
+       if(mod(Nbath,2)==0)then
+          de=hwband_/dble(Nh-1)
+          dmft_bath%e(:,:,Nh)  = -1.d-2
+          dmft_bath%e(:,:,Nh+1)=  1.d-2
+          do i=2,Nh-1
+             dmft_bath%e(:,:,i)   =-hwband_ + (i-1)*de
+             dmft_bath%e(:,:,Nh+i)= hwband_ - (i-1)*de
+          enddo
+       else
+          de=hwband_/dble(Nh)
+          dmft_bath%e(:,:,Nh+1)= 0.d0
+          do i=2,Nh
+             dmft_bath%e(:,:,i)   =-hwband_ + (i-1)*de
+             dmft_bath%e(:,:,Nh+i)= hwband_ - (i-1)*de
+          enddo
+       endif
+       do i=1,Nbath
+          dmft_bath%v(:,:,i)=1.d-1/sqrt(dble(Nbath))
+       enddo
+
+       !Read from file if exist:
        inquire(file=trim(Hfile),exist=IOfile)
        if(IOfile)then
           write(LOGfile,"(A)")'Reading bath from file'
           unit = free_unit()
+          flen = file_length(trim(Hfile))
+          print*,flen
           open(unit,file=trim(Hfile))
           read(unit,*)
           select case(bath_type)
           case default
-             do i=1,Nbath
-                read(unit,"(90(F21.12,1X))")((dmft_bath%e(ispin,iorb,i),&
+             do i=1,min(flen,Nbath)
+                read(unit,*)((dmft_bath%e(ispin,iorb,i),&
                      dmft_bath%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
              enddo
           case ('hybrid')
-             do i=1,Nbath
-                read(unit,"(90(F21.12,1X))")( dmft_bath%e(ispin,1,i),&
+             do i=1,min(flen,Nbath)
+                read(unit,*)( dmft_bath%e(ispin,1,i),&
                      (dmft_bath%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
+
              enddo
           end select
           close(unit)
-       else
-          write(LOGfile,"(A)")"Generating bath from scratch"
-          di = 2.d0*hwband_/dble(Nbath) !/dble(Nbath-1)
-          do i=1,Nbath
-             dmft_bath%e(:,:,i)=-hwband_ + dble(i-1)*di
-             dmft_bath%v(:,:,i)=1.d-1/sqrt(dble(Nbath))
-          enddo
+          ! else
+          !    write(LOGfile,"(A)")"Generating bath from scratch"
+          !    di = 2.d0*hwband_/dble(Nbath) !/dble(Nbath-1)
+          !    do i=1,Nbath
+          !       dmft_bath%e(:,:,i)=-hwband_ + dble(i-1)*di
+          !       dmft_bath%v(:,:,i)=1.d-1/sqrt(dble(Nbath))
+          !    enddo
        endif
     endif
 #ifdef _MPI
     call MPI_BCAST(dmft_bath%e,size(dmft_bath%e),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
     call MPI_BCAST(dmft_bath%v,size(dmft_bath%v),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
 #endif
+
   end subroutine init_bath_ed
 
 
