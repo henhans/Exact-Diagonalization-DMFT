@@ -2,11 +2,12 @@
 !PURPOSE  : Perform the \Chi^2 fit procedure on the Delta function
 !########################################################################
 MODULE ED_CHI2FIT
-  USE ED_VARS_GLOBAL
-  USE ED_BATH
-  !
   USE OPTIMIZE, only:fmin_cg
   USE MATRIX,   only:matrix_inverse
+  USE IOTOOLS,  only:reg,free_unit 
+  USE ED_INPUT_VARS
+  USE ED_VARS_GLOBAL
+  USE ED_BATH
 
   implicit none
   private
@@ -251,14 +252,24 @@ contains
       complex(8),dimension(totNorb,Ldelta) :: fgand
       do i=1,Ldelta
          w=Xdelta(i)
-         do l=1,Norb
-            gwf(l,l)=xi*w + xmu - hloc(ispin,ispin,l,l) - delta_bath(ispin,l,l,xi*w,dmft_bath)
-            do m=l+1,Norb
-               gwf(l,m) = - hloc(ispin,ispin,l,m) - delta_bath(ispin,l,m,xi*w,dmft_bath)
-               gwf(m,l) = - hloc(ispin,ispin,m,l) - delta_bath(ispin,m,l,xi*w,dmft_bath)
+         if(cg_scheme=='weiss')then
+            do l=1,Norb
+               gwf(l,l)=xi*w + xmu - hloc(ispin,ispin,l,l) - delta_bath(ispin,l,l,xi*w,dmft_bath)
+               do m=l+1,Norb
+                  gwf(l,m) = - hloc(ispin,ispin,l,m) - delta_bath(ispin,l,m,xi*w,dmft_bath)
+                  gwf(m,l) = - hloc(ispin,ispin,m,l) - delta_bath(ispin,m,l,xi*w,dmft_bath)
+               enddo
             enddo
-         enddo
-         call matrix_inverse(gwf)
+            call matrix_inverse(gwf)
+         else
+            do l=1,Norb
+               gwf(l,l)= delta_bath(ispin,l,l,xi*w,dmft_bath)
+               do m=l+1,Norb
+                  gwf(l,m) = delta_bath(ispin,l,m,xi*w,dmft_bath)
+                  gwf(m,l) = delta_bath(ispin,m,l,xi*w,dmft_bath)
+               enddo
+            enddo
+         endif
          do l=1,totNorb
             iorb=getIorb(l)
             jorb=getJorb(l)

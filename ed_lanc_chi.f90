@@ -128,7 +128,7 @@ subroutine lanc_ed_buildchi_c(iorb,iverbose)
      do m=1,idim0                     !loop over |gs> components m
         i=HImap(m)
         call bdecomp(i,ib)
-        sgn = real(ib(iorb),8)-real(ib(iorb+Ns),8)
+        sgn = dble(ib(iorb))-dble(ib(iorb+Ns))
         vvinit(m) = sgn*state_cvec(m)   !build the cdg_up|gs> state
      enddo
      deallocate(HImap)
@@ -167,9 +167,9 @@ subroutine add_to_lanczos_chi(vnorm,Ei,nlanc,alanc,blanc,iorb)
   integer                                    :: i,j,ierr
   complex(8)                                 :: iw,chisp
   !
-  Egs = state_list%emin       !get the gs energy
-  pesoBZ = vnorm**2/zeta_function
-  if(finiteT)pesoBZ = vnorm**2*exp(-beta*(Ei-Egs))/zeta_function
+  Egs = state_list%emin
+  pesoBZ = vnorm**2/zeta_function 
+  if(finiteT)pesoBZ = pesoBZ*exp(-beta*(Ei-Egs))
   diag=0.d0 ; subdiag=0.d0 ; Z=0.d0
   forall(i=1:Nlanc)Z(i,i)=1.d0
   diag(1:Nlanc)    = alanc(1:Nlanc)
@@ -178,22 +178,19 @@ subroutine add_to_lanczos_chi(vnorm,Ei,nlanc,alanc,blanc,iorb)
   !
   do j=1,nlanc
      de = diag(j)-Ei
-     if(de>0.d0)then
-        peso = pesoBZ*Z(1,j)**2
-        if(de>cutoff)chiiw(iorb,0)=chiiw(iorb,0) - peso*(exp(-beta*de)-1.d0)/de
-        do i=1,NL
-           iw=xi*vm(i)
-           chiiw(iorb,i)=chiiw(iorb,i) + peso*(exp(-beta*de)-1.d0)/(iw-de)
-        enddo
-        !
-        do i=1,Nw
-           iw=cmplx(wr(i),eps,8)
-           chiw(iorb,i)=chiw(iorb,i) + peso*(exp(-beta*de)-1.d0)/(iw-de)
-        enddo
-        !
-        do i=0,Ltau 
-           chitau(iorb,i)=chitau(iorb,i) + peso*exp(-tau(i)*de)
-        enddo
-     endif
+     peso = pesoBZ*Z(1,j)*Z(1,j)
+     if(de>cutoff)chiiw(iorb,0)=chiiw(iorb,0) - peso*(exp(-beta*de)-1.d0)/de
+     do i=1,NL
+        iw=xi*vm(i)
+        chiiw(iorb,i)=chiiw(iorb,i) + peso*(exp(-beta*de)-1.d0)/(iw-de)
+     enddo
+     do i=1,Nw
+        iw=dcmplx(wr(i),eps)
+        chiw(iorb,i)=chiw(iorb,i) + peso*(exp(-beta*de)-1.d0)/(iw-de)
+     enddo
+     !
+     do i=0,Ltau 
+        chitau(iorb,i)=chitau(iorb,i) + peso*exp(-tau(i)*de)
+     enddo
   enddo
 end subroutine add_to_lanczos_chi

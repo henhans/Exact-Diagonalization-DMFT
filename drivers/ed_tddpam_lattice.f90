@@ -1,26 +1,20 @@
-!This program solves the DMFT equations
-!using complete ED at finite (high) T 
-!reading the Hamiltonian model H(k)
-!from a file with the standard
-!wannier90 form.
-!IMPORTANT: The ED solver uses HFmode=.true. 
-!by default this means that chemical potential 
-!SHOULD NOT include the U/2 shift.
-program ed_lda1b
+program ed_tddpam
   USE DMFT_ED
   USE FFTGF
   USE TOOLS
   USE FUNCTIONS
   USE ERROR
   USE ARRAYS
+  USE MATRIX
+  USE IOTOOLS
+  USE PARSE_CMD
   implicit none
-  integer                :: iloop,Lk
+  integer                :: iloop
   logical                :: converged
-  integer                :: Norb_d,Norb_p,Nopd
+  integer                :: Npd
   !Bath:
-  integer,dimension(2)   :: Nb
+  integer                :: Nb(2)
   real(8),allocatable    :: Bath(:,:)
-  !The local hybridization function:
   complex(8),allocatable :: Delta(:,:,:)
   !Hamiltonian input:
   complex(8),allocatable :: Hk(:,:,:)
@@ -28,43 +22,42 @@ program ed_lda1b
   real(8),allocatable    :: dos_wt(:)
   !variables for the model:
   character(len=32)      :: hkfile,finput,fhloc
-  integer                :: ntype
+  integer                :: Nx,Lk,ntype
   real(8)                :: nobj
-  logical                :: rerun,bool
-  logical                :: fbethe
-
+  real(8)                :: alpha,tpp,ep0,tpd,v0,gzero,gzerop,gzerom,gmu
+  logical                :: bool
 
   !parse additional variables
-  call parse_cmd_variable(rerun,"RERUN",default=.false.)
-  call parse_cmd_variable(ntype,"NTYPE",default=0)
-  call parse_cmd_variable(fbethe,"FBETHE",default=.false.)
-  call parse_cmd_variable(hkfile,"HKFILE",default="hkfile.in")
   call parse_cmd_variable(finput,"FINPUT",default='inputED.in')
   call parse_cmd_variable(fhloc,"FHLOC",default='inputHLOC.in')
-  !+++++++++++++++++RERUN MODE+++++++++++++++++++++++++++++++++++++++
-  if(rerun)then
-     write(*,*)"+RERUN-mode: solve one and exit"
-     call ed_read_input("used."//trim(finput),trim(fhloc))
-     print*,"mu=",xmu
-     inquire(file=trim(hkfile),exist=BOOL)
-     if(.not.BOOL)then
-        print*,"can't find ",trim(hkfile),". Exiting.."
-        stop
-     endif
-     call read_hk(trim(hkfile))
-     Nb=get_bath_size()
-     allocate(bath(Nb(1),Nb(2)))
-     call init_ed_solver(bath)
-     call ed_solver(bath) 
-     allocate(delta(Norb,Norb,NL))
-     call get_delta
-     stop
-  endif
-  !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  call parse_cmd_variable(ntype,"NTYPE",default=0)
+  call parse_cmd_variable(Nx,"NX",default=100)
+  call parse_cmd_variable(tpp,"TPP",default=0.25d0)
+  call parse_cmd_variable(alpha,"ALPHA",default=0.d0)
+  call parse_cmd_variable(tpd,"TPD",default=0.d0)
+  call parse_cmd_variable(v0,"V0",default=0.d0)
+  call parse_cmd_variable(ep0,"EP0",default=0.d0)
   call ed_read_input(trim(finput),trim(fhloc))
   !
-  call read_hk(trim(hkfile))
+  call build_hk()
+  inquire(file="last_mu.restart",exist=bool)
+  if(bool.AND.nread/=0.d0)then
+     open(100,file="last_mu.restart")
+     read(100,*)xmu
+     close(100)
+     print*,"UPDATE XMU:",xmu
+  endif
 
+  !this shift contain |ep0-ed0|
+  gmu=xmu
+  gzerop=0.5d0*(ep0 + sqrt(ep0**2 + 4.d0*tpd**2))
+  gzerom=0.5d0*(ep0 - sqrt(ep0**2 + 4.d0*tpd**2))
+  gzero=0.d0
+  if(ep0 < 0.d0)gzero=gzerop
+  if(ep0 > 0.d0)gzero=gzerom
+  if(ep0/= 0.d0)xmu=gmu+gzero
+  write(*,*)'shift mu to (from) = ',xmu,'(',gmu,')'
+  write(*,*)'shift is           = ',gzero
 
   !Allocate Weiss Field:
   allocate(delta(Norb,Norb,NL))
@@ -92,41 +85,77 @@ program ed_lda1b
 
      !Check convergence (if required change chemical potential)
      converged = check_convergence(delta(1,1,:),dmft_error,nsuccess,nloop)
-     if(nread/=0.d0)call search_chemical_potential(nobj,niter,converged)
+     if(nread/=0.d0)call search_chemical_potential(nobj,converged)
      call end_loop
   enddo
 
+  open(100,file='last_mu.restart')
+  write(100,*)xmu-gzero
+  close(100)
 
 contains
 
 
-  subroutine read_hk(file)
-    character(len=*) :: file
-    integer          :: i,j,ik,iorb,jorb,Norb_d,Norb_p
-    real(8)          :: de,e,kx,ky,kz,foo,whband
-    open(50,file=file,status='old')
-    read(50,*)Lk,Norb_d,Norb_p,foo,foo
-    Nopd=Norb_d+Norb_p
-    allocate(Hk(Nopd,Nopd,Lk))
+  subroutine build_hk()
+    integer                :: ix,iy,i,j,ik,iorb,jorb,unit
+    real(8)                :: kx,ky
+    real(8),allocatable    :: peloc(:)
+    complex(8),allocatable :: pHloc(:,:)
+    Npd=2
+    Lk=Nx*Nx
+    allocate(Hk(Npd,Npd,Lk),pHloc(Npd,Npd),peloc(Npd))
     allocate(dos_wt(Lk))
-    do ik=1,Lk
-       read(50,"(3(F10.7,1x))")kx,ky,foo
-       do iorb=1,Nopd
-          read(50,"(10(2F10.7,1x))")(Hk(iorb,jorb,ik),jorb=1,Nopd)
+    unit=free_unit()
+    open(unit,file="Eigenbands.ed")
+    ik=0
+    do ix=1,Nx
+       kx=-pi + 2.d0*pi*dble(ix-1)/dble(nx)
+       do iy=1,Nx
+          ky=-pi + 2.d0*pi*dble(iy-1)/dble(Nx)
+          ik=ik+1
+          Hk(:,:,ik)=Hk_model(kx,ky)
        enddo
     enddo
-    dos_wt=1.d0/dble(Lk)
-    if(fbethe)then
-       whband=abs(Hk(1,1,1))
-       print*,whband
-       de=2.d0*WHband/dble(Lk)
-       do ik=1,Lk
-          e = -WHband + dfloat(ik-1)*de
-          dos_wt(ik)=dens_bethe(e,WHband)*de
-       enddo
-    endif
-  end subroutine read_hk
-
+    dos_wt = 1.d0/dble(Lk)
+    ik=0
+    do ix=1,100
+       ik=ik+1
+       kx = 0.d0 + pi*real(ix-1,8)/100.d0
+       ky = 0.d0
+       pHloc=Hk_model(kx,ky) 
+       call matrix_diagonalize(pHloc,peloc)
+       write(unit,*)ik,peloc(1),peloc(2)
+    enddo
+    !From X=(pi,0) to M=(pi,pi): 100 steps
+    do iy=1,100
+       ik=ik+1
+       kx = pi
+       ky = 0.d0 + pi*real(iy-1,8)/100.d0
+       pHloc=Hk_model(kx,ky) 
+       call matrix_diagonalize(pHloc,peloc)
+       write(unit,*)ik,peloc(1),peloc(2)
+    enddo
+    !From M=(pi,pi) to \Gamma=(0,0): 100 steps
+    do ix=1,100
+       ik=ik+1
+       iy=ix
+       kx = pi - pi*real(ix-1,8)/100.d0
+       ky = pi - pi*real(iy-1,8)/100.d0
+       pHloc=Hk_model(kx,ky) 
+       call matrix_diagonalize(pHloc,peloc)
+       write(unit,*)ik,peloc(1),peloc(2)
+    enddo
+  end subroutine build_hk
+  function Hk_model(kx,ky) result(Hk)
+    real(8)                   :: kx,ky,epsik,vpsik
+    complex(8),dimension(2,2) :: Hk
+    epsik = cos(kx)+cos(ky)
+    vpsik = sin(kx)*sin(ky)
+    Hk(1,1) = Hloc(1,1,1,1) - 2.d0*alpha*tpp*epsik
+    Hk(2,2) = ep0           - 2.d0*tpp*epsik
+    Hk(1,2) = tpd - 4.d0*v0*vpsik
+    Hk(2,1) = tpd - 4.d0*v0*vpsik
+  end function Hk_model
 
 
   !+----------------------------------------+
@@ -135,7 +164,7 @@ contains
 
   subroutine get_delta
     integer                                 :: i,j,ik,iorb,jorb
-    complex(8)                              :: iw,zita(2),fg(Nopd,Nopd)
+    complex(8)                              :: iw,zita(2),fg(Npd,Npd)
     complex(8),dimension(:,:,:),allocatable :: gloc
     real(8)                                 :: wm(NL),wr(Nw),npimp,ntotal
     !
@@ -143,11 +172,10 @@ contains
     wr = linspace(wini,wfin,Nw)
     !
     delta=zero
-    allocate(gloc(Nopd,Nopd,NL))
+    allocate(gloc(Npd,Npd,NL))
     do i=1,NL
-       iw     = xi*wm(i)+xmu
-       zita(1)= iw  - impSmats(1,1,1,1,i)
-       zita(2)= iw  
+       zita(1)= xi*wm(i)+xmu  - impSmats(1,1,1,1,i)
+       zita(2)= xi*wm(i)+xmu
        fg=zero
        do ik=1,Lk
           fg=fg+inverse_gk(zita,Hk(:,:,ik))*dos_wt(ik)
@@ -159,8 +187,8 @@ contains
     enddo
     !Print:
     call splot("Delta_iw.ed",wm,delta(1,1,:))
-    do iorb=1,Nopd
-       do jorb=1,Nopd
+    do iorb=1,Npd
+       do jorb=1,Npd
           call splot("Gloc_l"//reg(txtfy(iorb))//"m"//reg(txtfy(jorb))//"_iw.ed",wm,gloc(iorb,jorb,:))
        enddo
     enddo
@@ -173,11 +201,10 @@ contains
     deallocate(gloc)
 
 
-    allocate(gloc(Nopd,Nopd,Nw))
+    allocate(gloc(Npd,Npd,Nw))
     do i=1,Nw
-       iw=dcmplx(wr(i),eps)+xmu
-       zita(1) = iw - impSreal(1,1,1,1,i)
-       zita(2) = iw 
+       zita(1) = dcmplx(wr(i),eps)+xmu - impSreal(1,1,1,1,i)
+       zita(2) = dcmplx(wr(i),eps)+xmu
        fg=zero
        do ik=1,Lk
           fg=fg+inverse_gk(zita,Hk(:,:,ik))*dos_wt(ik)
@@ -185,8 +212,8 @@ contains
        gloc(:,:,i)  = fg
     enddo
     !Print:
-    do iorb=1,Nopd
-       do jorb=1,Nopd
+    do iorb=1,Npd
+       do jorb=1,Npd
           call splot("Gloc_l"//reg(txtfy(iorb))//"m"//reg(txtfy(jorb))//"_realw.ed",wr,gloc(iorb,jorb,:))
           call splot("DOS_l"//reg(txtfy(iorb))//"m"//reg(txtfy(jorb))//"_realw.ed",wr,-dimag(gloc(iorb,jorb,:))/pi)
        enddo
@@ -247,7 +274,21 @@ contains
     n = -2.d0*gtau(size(giw))
   end function get_density_fromFFT
 
-end program ed_lda1b
+  function eplus(hk)
+    complex(8),dimension(2,2) :: hk
+    real(8)                   :: eplus
+    eplus = hk(1,1)+hk(2,2) + sqrt(abs(hk(1,1)-hk(2,2))**2 + 4.d0*hk(1,2)*hk(2,1) )
+    eplus = eplus/2.d0
+  end function eplus
+
+  function eminus(hk)
+    complex(8),dimension(2,2) :: hk
+    real(8)                   :: eminus
+    eminus = hk(1,1)+hk(2,2) -sqrt(abs(hk(1,1)-hk(2,2))**2 + 4.d0*hk(1,2)*hk(2,1) )
+    eminus = eminus/2.d0
+  end function eminus
+
+end program ed_tddpam
 
 
 

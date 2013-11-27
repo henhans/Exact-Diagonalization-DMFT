@@ -6,7 +6,9 @@ module ED_DIAG
   USE STATISTICS
   USE MATRIX, only: matrix_diagonalize
   USE TIMER
+  USE IOTOOLS, only:reg,free_unit
   USE ARPACK_LANCZOS
+  USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_BATH
   USE ED_AUX_FUNX
@@ -31,12 +33,11 @@ contains
     case default
        call lanc_ed_diag_d
     case('c')
-       !<DEBUG
-       print*,"DOING COMPLEX"
-       !>DEBUG
        call lanc_ed_diag_c
     end select
   end subroutine lanc_ed_diag
+
+
 
 
   !+-------------------------------------------------------------------+
@@ -45,7 +46,7 @@ contains
   !+------------------------------------------------------------------+
   subroutine lanc_ed_diag_d
     integer             :: nup,ndw,isector,dim
-    integer             :: nup0,ndw0,isect0,dim0,izero
+    integer             :: nup0,ndw0,isect0,dim0,izero,sz0
     integer             :: i,j,unit
     integer             :: Nitermax,Neigen,Nblock
     real(8)             :: oldzero,enemin,Egs,Ei,Ec
@@ -118,17 +119,18 @@ contains
        !
     enddo sector
     if(mpiID==0)call stop_progress
+
     !POST PROCESSING:
     if(mpiID==0)then
        unit=free_unit()
        open(unit,file="state_list.ed")
-       write(unit,"(A)")"#i       E_i                 nup ndw Sect"
+       write(unit,"(A)")"#i       E_i             DE_i             nup ndw Sect     Dim"
        do i=1,state_list%size
           Ei     = es_return_energy(state_list,i)
           isect0 = es_return_sector(state_list,i)
           nup0   = getnup(isect0)
           ndw0   = getndw(isect0)
-          write(unit,"(i3,f25.18,2i3,3x,i3)"),i,Ei,nup0,ndw0,isect0
+          write(unit,"(i3,f18.12,E18.9,1x,2i3,3x,i3,i10)"),i,Ei,exp(-beta*(Ei-state_list%emin)),nup0,ndw0,isect0,getdim(isect0)
        enddo
        close(unit)
        write(LOGfile,"(A)")"Get Z_function:"
@@ -185,6 +187,7 @@ contains
           write(unit,*)""
           close(unit)
        endif
+       !
        allocate(list_sector(state_list%size),count_sector(Nsect))
        !get the list of actual sectors contributing to the list
        do i=1,state_list%size
@@ -227,7 +230,7 @@ contains
   !+------------------------------------------------------------------+
   subroutine lanc_ed_diag_c
     integer                :: nup,ndw,isector,dim
-    integer                :: nup0,ndw0,isect0,dim0,izero
+    integer                :: nup0,ndw0,isect0,dim0,izero,sz0
     integer                :: i,j,unit
     integer                :: Nitermax,Neigen,Nblock
     real(8)                :: oldzero,enemin,Egs,Ei,Ec

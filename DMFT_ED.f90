@@ -1,4 +1,6 @@
 module DMFT_ED
+  USE IOTOOLS, only:free_unit
+  USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_BATH
   USE ED_AUX_FUNX
