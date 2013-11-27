@@ -577,12 +577,15 @@ contains
     integer,save          :: count=0
     integer,save          :: nindex=0
     integer               :: nindex1
-    real(8)               :: ndelta1
+    real(8)               :: ndelta1,nratio
     integer,save          :: nth_magnitude=-1,nth_magnitude_old=-1
     real(8),save          :: nth=1.d-1
     logical,save          :: ireduce=.true.
+    integer :: unit
     !
     ndiff=ntmp-nread
+    !nratio = 0.5d0
+    nratio = 1.d0/(6.d0/11.d0*pi)
     !
     !check actual value of the density *ntmp* with respect to goal value *nread*
     count=count+1
@@ -596,7 +599,7 @@ contains
        nindex=0
     endif
     if(nindex1+nindex==0.AND.nindex/=0)then !avoid loop forth and back
-       ndelta=ndelta1/2.d0 !decreasing the step       
+       ndelta=ndelta1*nratio !decreasing the step
     else
        ndelta=ndelta1
     endif
@@ -615,6 +618,10 @@ contains
     endif
     write(LOGfile,"(A,f15.9)")"xmu  = ",xmu
     write(LOGfile,"(A,ES16.9,A,ES16.9)")"dn   = ",ndiff,"/",nth
+    unit=free_unit()
+    open(unit,file="search_mu_iteration.ed",position="append")
+    write(unit,*)xmu,ntmp,ndiff
+    close(unit)
     !
     !check convergence within actual threshold
     !if reduce is activetd
@@ -629,7 +636,7 @@ contains
        count=0                                !reset the counter
        converged=.false.                      !reset convergence
        !experimental
-       ndelta=ndelta/2.d0
+       ndelta=ndelta1*nratio
        !
     endif
     !
