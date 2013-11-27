@@ -13,10 +13,11 @@ FC=$(SFMPI)/mpif90
 #EXE=ed_pam_2b
 #EXE=ed_lda1b
 #EXE=ed_lda
+EXE=ed_tddpam_bethe
 
 #--> B-H-Z MODELS
 #EXE=ed_2x2bhz
-EXE=ed_bhz
+#EXE=ed_bhz
 
 DIR =drivers
 DIREXE=$(HOME)/.bin

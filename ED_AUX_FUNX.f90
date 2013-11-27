@@ -83,9 +83,11 @@ contains
 
     inquire(file=INPUTunit,exist=control)    
     if(control)then
-       open(50,file=INPUTunit,status='old')
-       read(50,nml=EDvars)
-       close(50)
+       if(mpiID==0)then
+          open(50,file=INPUTunit,status='old')
+          read(50,nml=EDvars)
+          close(50)
+       endif
     else
        if(mpiID==0)then
           print*,"Can not find INPUT file"
@@ -103,6 +105,7 @@ contains
     call parse_cmd_variable(beta,"BETA")
     call parse_cmd_variable(xmu,"XMU")
     call parse_cmd_variable(uloc,"ULOC")
+    call parse_cmd_variable(uloc(1),"U")
     call parse_cmd_variable(ust,"UST")
     call parse_cmd_variable(Jh,"JH")
     call parse_cmd_variable(nloop,"NLOOP")
@@ -134,7 +137,7 @@ contains
     call parse_cmd_variable(bath_type,"BATH_TYPE")
     call parse_cmd_variable(Hfile,"HFILE")
     call parse_cmd_variable(LOGfile,"LOGFILE")
-    Ltau=max(int(beta),100)
+    Ltau=max(int(beta),500)
     !
     if(mpiID==0)then
        open(50,file="used."//INPUTunit)
@@ -144,10 +147,10 @@ contains
        write(*,nml=EDvars)
     endif
 
-
-    write(LOGfile,"(A)")"U_local:"
-    write(LOGfile,"(90F12.6,1x)")(Uloc(iorb),iorb=1,Norb)
-
+    if(mpiID==0)then
+       write(LOGfile,"(A)")"U_local:"
+       write(LOGfile,"(90F12.6,1x)")(Uloc(iorb),iorb=1,Norb)
+    endif
 
     allocate(reHloc(Nspin,Nspin,Norb,Norb))
     allocate(imHloc(Nspin,Nspin,Norb,Norb))
@@ -193,8 +196,10 @@ contains
 
     hloc = dcmplx(reHloc,imHloc)
 
-    write(LOGfile,"(A)")"H_local:"
-    call print_Hloc(Hloc)
+    if(mpiID==0)then
+       write(LOGfile,"(A)")"H_local:"
+       call print_Hloc(Hloc)
+    endif
   end subroutine ed_read_input
 
 
@@ -414,9 +419,10 @@ contains
 
 
 
+
   !+------------------------------------------------------------------+
-  !PURPOSE  : constructs the sectors by storing the map from the 
-  !states i\in Hilbert_space to the states count in H_sector.
+  !PURPOSE  : constructs the sectors by storing the map to the 
+  !states i\in Hilbert_space from the states count in H_sector.
   !+------------------------------------------------------------------+
   !|ImpUP,BathUP>|ImpDW,BathDW >
   subroutine build_sector(isector,map)
@@ -426,6 +432,7 @@ contains
     integer,dimension(:) :: map
     nup = getnup(isector)
     ndw = getndw(isector)
+    !if(size(map)/=getdim(isector)stop "error in build_sector: wrong dimension of map"
     count=0
     do i=1,NN
        call bdecomp(i,ivec)
@@ -568,24 +575,27 @@ contains
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine search_chemical_potential(ntmp,niter,converged)
+  subroutine search_chemical_potential(ntmp,converged)
     real(8),intent(in)    :: ntmp
-    integer,intent(in)    :: niter
     logical,intent(inout) :: converged
     logical               :: bool
     real(8)               :: ndiff
-    integer,save          :: count=0
+    integer,save          :: count=0,totcount=0
     integer,save          :: nindex=0
     integer               :: nindex1
-    real(8)               :: ndelta1
-    integer,save          :: nth_magnitude=-1,nth_magnitude_old=-1
-    real(8),save          :: nth=1.d-1
+    real(8)               :: ndelta1,nratio
+    integer,save          :: nth_magnitude=-2,nth_magnitude_old=-2
+    real(8),save          :: nth=1.d-2
     logical,save          :: ireduce=.true.
+    integer :: unit
     !
     ndiff=ntmp-nread
+    nratio = 0.5d0
+    !nratio = 1.d0/(6.d0/11.d0*pi)
     !
     !check actual value of the density *ntmp* with respect to goal value *nread*
     count=count+1
+    totcount=totcount+1
     nindex1=nindex
     ndelta1=ndelta
     if(ndiff >= nth)then      !if((ntmp >= nread+nth))then
@@ -596,11 +606,15 @@ contains
        nindex=0
     endif
     if(nindex1+nindex==0.AND.nindex/=0)then !avoid loop forth and back
-       ndelta=ndelta1/2.d0 !decreasing the step       
+       ndelta=ndelta1*nratio !decreasing the step
     else
        ndelta=ndelta1
     endif
     !
+    if(ndelta1<1.d-9)then
+       ndelta1=0.d0
+       nindex=0
+    endif
     !update chemical potential
     xmu=xmu+dble(nindex)*ndelta
     !
@@ -615,6 +629,10 @@ contains
     endif
     write(LOGfile,"(A,f15.9)")"xmu  = ",xmu
     write(LOGfile,"(A,ES16.9,A,ES16.9)")"dn   = ",ndiff,"/",nth
+    unit=free_unit()
+    open(unit,file="search_mu_iteration.ed",position="append")
+    write(unit,*)xmu,ntmp,ndiff
+    close(unit)
     !
     !check convergence within actual threshold
     !if reduce is activetd
@@ -628,21 +646,21 @@ contains
        nth=max(nerr,10.d0**(nth_magnitude))   !set the new threshold 
        count=0                                !reset the counter
        converged=.false.                      !reset convergence
-       !experimental
-       ndelta=ndelta/2.d0
+       ndelta=ndelta1*nratio                  !reduce the delta step
        !
     endif
     !
     !if density is not converged set convergence to .false.
     if(abs(ntmp-nread)>nth)converged=.false.
     !
-    !check convergence for the smallest threshold
-    !if smallest threshold
-    !if reduce is active
+    !check convergence for this threshold
+    !!---if smallest threshold-- NO MORE
+    !if reduce is active (you reduced the treshold at least once)
     !if # iterations > max number
     !if not yet converged
     !set threshold back to the previous larger one.
-    bool=(nth==nerr).AND.ireduce.AND.(count>niter).AND.(.not.converged)
+    !bool=(nth==nerr).AND.ireduce.AND.(count>niter).AND.(.not.converged)
+    bool=ireduce.AND.(count>niter).AND.(.not.converged)
     if(bool)then
        ireduce=.false.
        nth=10.d0**(nth_magnitude_old)

@@ -129,7 +129,7 @@ contains
     integer, intent(in)               :: column
     type(sparse_element),pointer      :: p,c
     integer                           :: i
-    logical :: iadd
+    logical                           :: iadd
     p => row%root
     c => p%next
     iadd = .false.                !check if column already exist
