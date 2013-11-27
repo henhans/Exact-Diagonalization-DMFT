@@ -48,8 +48,9 @@ subroutine full_ed_getchi()
            Ei=espace(isector)%e(i)
            Ej=espace(isector)%e(j)
            de=Ei-Ej
-           peso=chij**2/zeta_function
-           pesotot=chitot**2/zeta_function
+           !ACTHUNG!! chij should not be squared 'cause is <j|Sz|i> and not <i|c+|j><j|c|i>
+           peso=chij/zeta_function !chij**2/zeta_function
+           pesotot=chitot/zeta_function !chitot**2/zeta_function
            do iorb=1,Norb
               !Matsubara (bosonic) frequency
               if(de>cutoff)chiiw(iorb,0)=chiiw(iorb,0)-peso(iorb)*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/de
@@ -57,22 +58,22 @@ subroutine full_ed_getchi()
                  iw=xi*vm(m)
                  chiiw(iorb,m)=chiiw(iorb,m)+peso(iorb)*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/(iw-de)
               enddo
+              !Real-frequency
+              do m=1,Nw
+                 w0=wr(m);iw=cmplx(w0,eps,8)
+                 !Retarded = Commutator = response function
+                 chiw(iorb,m)=chiw(iorb,m)+peso(iorb)*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/(iw-de)
+                 !Time-ordered
+                 ! chiw(iorb,m)=chiw(iorb,m)-exp(-beta*espace(isector)%e(j))*&
+                 !      (one/(w0+xi*eps+de) + one/(w0-xi*eps-de))*peso(iorb)
+              enddo
+
               !Imaginary time:
               do m=0,Ltau 
                  it=tau(m)
                  chitau(iorb,m)=chitau(iorb,m) + exp(-it*espace(isector)%e(i))*&
                       exp(-(beta-it)*espace(isector)%e(j))*peso(iorb)
                  ! chitau(iorb,m)=chitau(iorb,m) + peso(iorb)*exp(-beta*Ej)*exp(-it*de)
-              enddo
-              !Real-frequency
-              do m=1,Nw
-                 w0=wr(m);iw=cmplx(w0,eps,8)
-                 !Time-ordered
-                 ! chiw(iorb,m)=chiw(iorb,m)-exp(-beta*espace(isector)%e(j))*&
-                 !      (one/(w0+xi*eps+de) + one/(w0-xi*eps-de))*peso(iorb)
-                 !Retarded = Commutator = response function
-                 chiw(iorb,m)=chiw(iorb,m)+&
-                      exp(-beta*Ej)*peso(iorb)*(exp(-beta*de)-1.d0)/(iw-de)
               enddo
            enddo
            ! !Matsubara (bosonic) frequency

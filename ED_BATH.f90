@@ -127,8 +127,8 @@ contains
        Nh=Nbath/2
        if(mod(Nbath,2)==0)then
           de=hwband_/dble(Nh-1)
-          dmft_bath%e(:,:,Nh)  = -1.d-2
-          dmft_bath%e(:,:,Nh+1)=  1.d-2
+          dmft_bath%e(:,:,Nh)  = -1.d-4
+          dmft_bath%e(:,:,Nh+1)=  1.d-4
           do i=2,Nh-1
              dmft_bath%e(:,:,i)   =-hwband_ + (i-1)*de
              dmft_bath%e(:,:,Nh+i)= hwband_ - (i-1)*de
@@ -151,7 +151,6 @@ contains
           write(LOGfile,"(A)")'Reading bath from file'
           unit = free_unit()
           flen = file_length(trim(Hfile))
-          print*,flen
           open(unit,file=trim(Hfile))
           read(unit,*)
           select case(bath_type)
