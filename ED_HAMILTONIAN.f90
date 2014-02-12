@@ -32,6 +32,23 @@ MODULE ED_HAMILTONIAN
 contains
 
 
+  !+------------------------------------------------------------------+
+  !PURPOSE : 
+  !+------------------------------------------------------------------+
+  subroutine setup_Hv_sector(isector)
+    integer                              :: isector
+    integer                              :: dim
+    Hsector=isector
+    dim = getdim(Hsector)
+    allocate(Hmap(dim))
+    call build_sector(isector,Hmap)
+  end subroutine setup_Hv_sector
+
+  subroutine delete_Hv_sector()
+    deallocate(Hmap)
+  end subroutine delete_Hv_sector
+
+
 
   !+------------------------------------------------------------------+
   !PURPOSE  : Build Hamiltonian sparse matrix DOUBLE PRECISION
@@ -50,7 +67,8 @@ contains
     real(8),dimension(Nspin,Norb)    :: eloc
     logical                          :: Jcondition,flanc
     integer                          :: first_state,last_state
-
+    !
+    call setup_Hv_sector(isector)
     !
     dim=getdim(isector)
     flanc=.true. ; if(present(h))flanc=.false.
@@ -131,8 +149,6 @@ contains
        !Hbath: +energy of the bath=\sum_a=1,Norb\sum_{l=1,Nbath}\e^a_l n^a_l
        do iorb=1,size(dmft_bath%e,2)
           do kp=1,Nbath
-             ! ms=Norb+(iorb-1)*Nbath + kp
-             ! if(bath_type=='hybrid')ms=Norb+kp
              ms=getBathStride(iorb,kp)
              htmp =htmp + dmft_bath%e(1,iorb,kp)*real(ib(ms),8) + &
                   dmft_bath%e(Nspin,iorb,kp)*real(ib(ms+Ns),8)
@@ -327,7 +343,57 @@ contains
              endif
           enddo
        enddo
+
+
+
+       if(ed_supercond)then
+          !Anomalous pair-creation/destruction
+          do iorb=1,size(dmft_bath%e,2)
+             do kp=1,Nbath
+                ms=getBathStride(iorb,kp)
+                !\Delta_l c_{\up,ms} c_{\dw,ms}
+                if(ib(ms)==1 .AND. ib(ms+Ns)==1)then
+                   call c(ms,m,k1,sg1)
+                   call c(ms+Ns,k1,k2,sg2)
+                   j=binary_search(Hmap,k2)
+                   htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2
+                   if(flanc)then
+#ifdef _MPI
+                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+#else
+                      call sp_insert_element(spH0,htmp,i,j)
+#endif
+                   else
+                      h(i,j)=h(i,j)+htmp
+                   endif
+                endif
+                !\Delta_l cdg_{\up,ms} cdg_{\dw,ms}
+                if(ib(ms)==0 .AND. ib(ms+Ns)==0)then
+                   call cdg(ms,m,k1,sg1)
+                   call cdg(ms+Ns,k1,k2,sg2)
+                   j=binary_search(Hmap,k2)
+                   htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2 !
+                   if(flanc)then
+#ifdef _MPI
+                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+#else
+                      call sp_insert_element(spH0,htmp,i,j)
+#endif
+                   else
+                      h(i,j)=h(i,j)+htmp
+                   endif
+                endif
+             enddo
+          enddo
+       endif
+
+
     enddo
+
+    !
+    call delete_Hv_sector()
+    !
+
   end subroutine ed_buildH_d
 
 
@@ -358,6 +424,8 @@ contains
     real(8),dimension(Nspin,Norb)      :: eloc
     logical                            :: Jcondition,flanc
     integer                            :: first_state,last_state
+    !
+    call setup_Hv_sector(isector)
     !
     dim=getdim(isector)
     flanc=.true. ; if(present(h))flanc=.false.
@@ -623,7 +691,55 @@ contains
              endif
           enddo
        enddo
+
+
+       if(ed_supercond)then
+          !Anomalous pair-creation/destruction
+          do iorb=1,size(dmft_bath%e,2)
+             do kp=1,Nbath
+                ms=getBathStride(iorb,kp)
+                !\Delta_l c_{\up,ms} c_{\dw,ms}
+                if(ib(ms)==1 .AND. ib(ms+Ns)==1)then
+                   call c(ms,m,k1,sg1)
+                   call c(ms+Ns,k1,k2,sg2)
+                   j=binary_search(Hmap,k2)
+                   htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2
+                   if(flanc)then
+#ifdef _MPI
+                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+#else
+                      call sp_insert_element(spH0,htmp,i,j)
+#endif
+                   else
+                      h(i,j)=h(i,j)+htmp
+                   endif
+                endif
+                !\Delta_l cdg_{\up,ms} cdg_{\dw,ms}
+                if(ib(ms)==0 .AND. ib(ms+Ns)==0)then
+                   call cdg(ms,m,k1,sg1)
+                   call cdg(ms+Ns,k1,k2,sg2)
+                   j=binary_search(Hmap,k2)
+                   htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2 !
+                   if(flanc)then
+#ifdef _MPI
+                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+#else
+                      call sp_insert_element(spH0,htmp,i,j)
+#endif
+                   else
+                      h(i,j)=h(i,j)+htmp
+                   endif
+                endif
+             enddo
+          enddo
+       endif
+
     enddo
+
+    !
+    call delete_Hv_sector()
+    !
+
   end subroutine ed_buildH_c
 
 
@@ -791,24 +907,6 @@ contains
 #ifdef _MPI
   !include "ed_htimesv_direct_mpi.f90"
 #endif
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE : 
-  !+------------------------------------------------------------------+
-  subroutine setup_Hv_sector(isector)
-    integer                              :: isector
-    integer                              :: dim
-    Hsector=isector
-    dim = getdim(Hsector)
-    allocate(Hmap(dim))
-    call build_sector(isector,Hmap)
-  end subroutine setup_Hv_sector
-
-  subroutine delete_Hv_sector()
-    deallocate(Hmap)
-  end subroutine delete_Hv_sector
-
 
 
 end MODULE ED_HAMILTONIAN

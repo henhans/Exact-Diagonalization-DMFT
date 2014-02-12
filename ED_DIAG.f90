@@ -39,13 +39,15 @@ contains
   end subroutine lanc_ed_diag
 
 
+
+
   !+-------------------------------------------------------------------+
   !PURPOSE  : diagonalize the Hamiltonian in each sector and find the 
   ! spectrum DOUBLE PRECISION
   !+------------------------------------------------------------------+
   subroutine lanc_ed_diag_d
     integer             :: nup,ndw,isector,dim
-    integer             :: nup0,ndw0,isect0,dim0,izero
+    integer             :: nup0,ndw0,isect0,dim0,izero,sz0
     integer             :: i,j,unit
     integer             :: Nitermax,Neigen,Nblock
     real(8)             :: oldzero,enemin,Egs,Ei,Ec
@@ -75,20 +77,20 @@ contains
        if(lanc_solve)then
           allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
           eig_values=0.d0 ; eig_basis=0.d0
-          call setup_Hv_sector(isector)
+          !call setup_Hv_sector(isector)
           call ed_buildH_d(isector)
 #ifdef _MPI
           call lanczos_parpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_dd,.false.)
 #else
           call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_dd,.false.)
 #endif
-          call delete_Hv_sector()
+          !call delete_Hv_sector()
        else
           allocate(eig_values(Dim),eig_basis(Dim,dim))
           eig_values=0.d0 ; eig_basis=0.d0 
-          call setup_Hv_sector(isector)
+          !call setup_Hv_sector(isector)
           call ed_buildH_d(isector,eig_basis)
-          call delete_Hv_sector()
+          !call delete_Hv_sector()
           call matrix_diagonalize(eig_basis,eig_values,'V','U')
           if(dim==1)eig_basis(dim,dim)=1.d0
        endif
@@ -123,13 +125,22 @@ contains
     if(mpiID==0)then
        unit=free_unit()
        open(unit,file="state_list.ed")
-       write(unit,"(A)")"#i       E_i                 nup ndw Sect"
+       if(.not.ed_supercond)then
+          write(unit,"(A)")"#i       E_i                 nup ndw Sect"
+       else
+          write(unit,"(A)")"#i       E_i                 Sz Sect"
+       endif
        do i=1,state_list%size
           Ei     = es_return_energy(state_list,i)
           isect0 = es_return_sector(state_list,i)
-          nup0   = getnup(isect0)
-          ndw0   = getndw(isect0)
-          write(unit,"(i3,f25.18,2i3,3x,i3)"),i,Ei,nup0,ndw0,isect0
+          if(.not.ed_supercond)then
+             nup0   = getnup(isect0)
+             ndw0   = getndw(isect0)
+             write(unit,"(i3,f25.18,2i3,3x,i3)"),i,Ei,nup0,ndw0,isect0
+          else
+             sz0   = getsz(isect0)
+             write(unit,"(i3,f25.18,i3,3x,i3)"),i,Ei,sz0,isect0
+          endif
        enddo
        close(unit)
        write(LOGfile,"(A)")"Get Z_function:"
@@ -154,10 +165,15 @@ contains
     do izero=1,numgs
        isect0= es_return_sector(state_list,izero)
        Egs   = es_return_energy(state_list,izero)
-       nup0  = getnup(isect0)
-       ndw0  = getndw(isect0)
        dim0  = getdim(isect0)
-       if(mpiID==0)write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
+       if(.not.ed_supercond)then
+          nup0  = getnup(isect0)
+          ndw0  = getndw(isect0)
+          if(mpiID==0)write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
+       else
+          sz0  = getsz(isect0)
+          if(mpiID==0)write(LOGfile,"(1A6,f20.12,I4)")'egs =',egs,sz0
+       endif
     enddo
     if(mpiID==0)then
        write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function
@@ -166,6 +182,7 @@ contains
        write(3,*)egs
        close(3)
     endif
+
     !Get histogram distribution of the sector contributing to the evaluated spectrum:
     !Go thru states list and update the neigen_sector(isector) sector-by-sector
     if(finiteT)then
@@ -229,7 +246,7 @@ contains
   !+------------------------------------------------------------------+
   subroutine lanc_ed_diag_c
     integer                :: nup,ndw,isector,dim
-    integer                :: nup0,ndw0,isect0,dim0,izero
+    integer                :: nup0,ndw0,isect0,dim0,izero,sz0
     integer                :: i,j,unit
     integer                :: Nitermax,Neigen,Nblock
     real(8)                :: oldzero,enemin,Egs,Ei,Ec
@@ -262,20 +279,20 @@ contains
        if(lanc_solve)then
           allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
           eig_values=0.d0 ; eig_basis=zero
-          call setup_Hv_sector(isector)
+          !call setup_Hv_sector(isector)
           call ed_buildH_c(isector)
 #ifdef _MPI
           call lanczos_parpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_cc,.false.)
 #else
           call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_cc,.false.)
 #endif
-          call delete_Hv_sector()
+          !call delete_Hv_sector()
        else
           allocate(eig_values(Dim),eig_basis(Dim,dim))
           eig_values=0.d0 ; eig_basis=zero
-          call setup_Hv_sector(isector)
+          !call setup_Hv_sector(isector)
           call ed_buildH_c(isector,eig_basis)
-          call delete_Hv_sector()
+          !call delete_Hv_sector()
           call matrix_diagonalize(eig_basis,eig_values,'V','U')
           if(dim==1)eig_basis(dim,dim)=one
        endif
@@ -313,9 +330,14 @@ contains
        do i=1,state_list%size
           Ei     = es_return_energy(state_list,i)
           isect0 = es_return_sector(state_list,i)
-          nup0   = getnup(isect0)
-          ndw0   = getndw(isect0)
-          write(unit,"(i3,f25.18,3i3)"),i,Ei,nup0,ndw0,isect0
+          if(.not.ed_supercond)then
+             nup0   = getnup(isect0)
+             ndw0   = getndw(isect0)
+             write(unit,"(i3,f25.18,2i3,3x,i3)"),i,Ei,nup0,ndw0,isect0
+          else
+             sz0   = getsz(isect0)
+             write(unit,"(i3,f25.18,i3,3x,i3)"),i,Ei,sz0,isect0
+          endif
        enddo
        close(unit)
        write(LOGfile,"(A)")"Get Z_function:"
@@ -340,10 +362,15 @@ contains
     do izero=1,numgs
        isect0= es_return_sector(state_list,izero)
        Egs   = es_return_energy(state_list,izero)
-       nup0  = getnup(isect0)
-       ndw0  = getndw(isect0)
        dim0  = getdim(isect0)
-       if(mpiID==0)write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
+       if(.not.ed_supercond)then
+          nup0  = getnup(isect0)
+          ndw0  = getndw(isect0)
+          if(mpiID==0)write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
+       else
+          sz0  = getsz(isect0)
+          if(mpiID==0)write(LOGfile,"(1A6,f20.12,I4)")'egs =',egs,sz0
+       endif
     enddo
     if(mpiID==0)then
        write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function
@@ -425,9 +452,9 @@ contains
     do isector=1,Nsect
        if(mpiID==0)call progress(isector,Nsect)
        dim=getdim(isector)
-       call setup_Hv_sector(isector)
+       !call setup_Hv_sector(isector)
        call ed_buildH_d(isector,espace(isector)%M(:,:))
-       call delete_Hv_sector()
+       !call delete_Hv_sector()
        call matrix_diagonalize(espace(isector)%M,espace(isector)%e,'V','U')
        e0(isector)=minval(espace(isector)%e)
     enddo

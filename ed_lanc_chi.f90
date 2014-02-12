@@ -74,11 +74,9 @@ subroutine lanc_ed_buildchi_d(iorb,iverbose)
      norm0=sqrt(dot_product(vvinit,vvinit))
      vvinit=vvinit/norm0
      alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
-     call setup_Hv_sector(isect0)
      call ed_buildH_d(isect0)
      call lanczos_plain_set_htimesv_d(lanc_spHtimesV_dd)
      call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nitermax)
-     call delete_Hv_sector()
      call lanczos_plain_delete_htimesv
      call add_to_lanczos_chi(norm0,state_e,nitermax,alfa_,beta_,iorb)
      deallocate(vvinit)
@@ -136,10 +134,8 @@ subroutine lanc_ed_buildchi_c(iorb,iverbose)
      vvinit=vvinit/norm0
      alfa_=0.d0 ; beta_=0.d0 ; nlanc=0
      call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-     call setup_Hv_sector(isect0)
      call ed_buildH_c(isect0)
      call lanczos_plain_tridiag_c(vvinit,alfa_,beta_,nitermax)
-     call delete_Hv_sector()
      call lanczos_plain_delete_htimesv
      call add_to_lanczos_chi(norm0,state_e,nitermax,alfa_,beta_,iorb)
      deallocate(vvinit)

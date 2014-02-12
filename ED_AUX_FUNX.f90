@@ -46,6 +46,7 @@ contains
     Ust        = 0.d0
     Jh         = 0.d0
     xmu        = 0.d0
+    deltasc    = 2.d-2
     beta       = 500.d0
     !Loops
     nloop      = 100
@@ -76,6 +77,7 @@ contains
     cg_scheme     = 'delta'
     ed_method    = 'lanc'
     ed_type = 'd'
+    ed_supercond = .false.
     bath_type='normal' !hybrid,superc
     !ReadUnits
     Hfile  ="hamiltonian.restart"
@@ -109,6 +111,7 @@ contains
     call parse_cmd_variable(ust,"UST")
     call parse_cmd_variable(Jh,"JH")
     call parse_cmd_variable(nloop,"NLOOP")
+    call parse_cmd_variable(deltasc,"DELTASC")
     call parse_cmd_variable(dmft_error,"DMFT_ERROR")
     call parse_cmd_variable(nsuccess,"NSUCCESS")
     call parse_cmd_variable(NL,"NL")
@@ -133,6 +136,7 @@ contains
     call parse_cmd_variable(cg_ftol,"CG_FTOL")
     call parse_cmd_variable(cg_weight,"CG_WEIGHT")
     call parse_cmd_variable(ed_Type,"ED_TYPE")
+    call parse_cmd_variable(ed_Supercond,"ED_SUPERCOND")
     call parse_cmd_variable(ed_Method,"ED_METHOD")
     call parse_cmd_variable(bath_type,"BATH_TYPE")
     call parse_cmd_variable(Hfile,"HFILE")
@@ -255,12 +259,18 @@ contains
     Nbo   = Ns-Norb
     Ntot  = 2*Ns
     NN    = 2**Ntot
-    Nsect = (Ns+1)*(Ns+1)
+
     !
     nup=Ns/2
     ndw=Ns-nup
-    NP=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
-    NP=NP*(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
+    if(.not.ed_supercond)then
+       Nsect = (Ns+1)*(Ns+1)
+       NP=get_sector_dimension(nup,ndw)
+    else
+       Nsect = Ntot+1
+       NP=get_sc_sector_dimension(0)
+    endif
+
     if(mpiID==0)then
        write(*,*)"Summary:"
        write(*,*)"--------------------------------------------"
@@ -276,8 +286,12 @@ contains
     endif
 
     allocate(impIndex(Norb,2))
-    allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect))
-    allocate(getsector(0:Ns,0:Ns))
+    allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect),getsz(Nsect))
+    if(.not.ed_supercond)then
+       allocate(getsector(0:Ns,0:Ns))
+    else
+       allocate(getsector(-Ns:Ns,1))
+    endif
     allocate(getCsector(2,Nsect))
     allocate(getCDGsector(2,Nsect))
     allocate(getBathStride(Norb,Nbath))
@@ -324,6 +338,12 @@ contains
     if(Norb>3)stop "Norb > 3 ERROR. ask developer or develop your own on separate branch" 
     if(nerr < dmft_error) nerr=dmft_error
     if(ed_method=='full'.AND.bath_type=='hybrid')stop "FULL ED & HYBRID not implemented yet:ask developer..."
+    if(ed_supercond)then
+       if(Nspin>1)stop "SC+AFM ERROR. ask developer or develop your own on separate branch" 
+       if(ed_method=='full')stop "FULL ED & SUPERC is not implemented yet:ask developer..."
+       if(Norb>1)stop "SC Multi-Band not yet implemented. Wait for the developer to understand what to do..."
+       if(ed_type=='c')stop "SC with Hermitian H not yet implemented. Wait for the developer to code it..."
+    endif
     if(nread/=0.d0)then
        i=abs(floor(log10(abs(nerr)))) !modulus of the order of magnitude of nerror
        niter=nloop
@@ -334,10 +354,17 @@ contains
     !allocate functions
     allocate(impSmats(Nspin,Nspin,Norb,Norb,NL))
     allocate(impSreal(Nspin,Nspin,Norb,Norb,Nw))
+    if(ed_supercond)then
+       allocate(impSAmats(Nspin,Nspin,Norb,Norb,NL))
+       allocate(impSAreal(Nspin,Nspin,Norb,Norb,Nw))
+    endif
 
     !allocate observables
     allocate(nimp(Norb),dimp(Norb))
   end subroutine init_ed_structure
+
+
+
 
 
 
@@ -359,9 +386,7 @@ contains
           getsector(nup,ndw)=isector
           getnup(isector)=nup
           getndw(isector)=ndw
-          dimup=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
-          dimdw=(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
-          dim=dimup*dimdw
+          dim = get_sector_dimension(nup,ndw)
           getdim(isector)=dim
           neigen_sector(isector) = min(dim,lanc_neigen)   !init every sector to required eigenstates
        enddo
@@ -418,6 +443,94 @@ contains
   end subroutine setup_pointers
 
 
+  subroutine setup_pointers_sc
+    integer                          :: i,isz,in,dim,isector,jsector
+    integer                          :: sz,iorb,dim2
+    integer,dimension(:),allocatable :: imap
+    integer,dimension(:),allocatable :: invmap
+    if(mpiID==0)write(LOGfile,"(A)")"Setting up pointers:"
+    call start_timer
+    isector=0
+    do isz=-Ns,Ns
+       sz=abs(isz)
+       isector=isector+1
+       getsector(isz,1)=isector
+       getsz(isector)=isz
+       dim = get_sc_sector_dimension(isz)
+       getdim(isector)=dim
+       neigen_sector(isector) = min(dim,lanc_neigen)   !init every sector to required eigenstates
+       !<DEBUG
+       allocate(Hmap(dim))
+       call build_sector(isector,Hmap,dim2)
+       print*,isz,dim,dim2
+       deallocate(Hmap)
+       !>DEBUG
+    enddo
+    call stop_timer
+
+    do in=1,Norb
+       impIndex(in,1)=in
+       impIndex(in,2)=in+Ns
+    enddo
+
+    select case(bath_type)
+    case default
+       do i=1,Nbath
+          do iorb=1,Norb
+             getBathStride(iorb,i) = Norb + (iorb-1)*Nbath + i
+          enddo
+       enddo
+    case ('hybrid')
+       do i=1,Nbath
+          getBathStride(:,i)      = Norb + i
+       enddo
+    end select
+
+    getCsector=0
+    !c_up
+    do isector=1,Nsect
+       isz=getsz(isector);if(isz==-Ns)cycle
+       jsz=isz-1
+       jsector=getsector(jsz,1)
+       getCsector(1,isector)=jsector
+    enddo
+    !c_dw
+    do isector=1,Nsect
+       isz=getsz(isector);if(isz==Ns)cycle
+       jsz=isz+1
+       jsector=getsector(jsz,1)
+       getCsector(2,isector)=jsector
+    enddo
+
+    getCDGsector=0
+    !cdg_up
+    do isector=1,Nsect
+       isz=getsz(isector);if(isz==Ns)cycle
+       jsz=isz+1
+       jsector=getsector(jsz,1)
+       getCDGsector(1,isector)=jsector
+    enddo
+    !cdg_dw
+    do isector=1,Nsect
+       isz=getsz(isector);if(isz==-Ns)cycle
+       jsz=isz-1
+       jsector=getsector(jsz,1)
+       getCDGsector(2,isector)=jsector
+    enddo
+  end subroutine setup_pointers_sc
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
   !+------------------------------------------------------------------+
@@ -425,25 +538,44 @@ contains
   !states i\in Hilbert_space from the states count in H_sector.
   !+------------------------------------------------------------------+
   !|ImpUP,BathUP>|ImpDW,BathDW >
-  subroutine build_sector(isector,map)
-    integer              :: i,j,isector,iup,idw,count
-    integer              :: nup,ndw
+  subroutine build_sector(isector,map,dim2)
+    integer              :: i,j,isector,iup,idw,mz,dim
+    integer,optional     :: dim2
+    integer              :: nup,ndw,sz
     integer              :: ivec(Ntot)
     integer,dimension(:) :: map
-    nup = getnup(isector)
-    ndw = getndw(isector)
     !if(size(map)/=getdim(isector)stop "error in build_sector: wrong dimension of map"
-    count=0
-    do i=1,NN
-       call bdecomp(i,ivec)
-       iup = sum(ivec(1:Ns))
-       idw = sum(ivec(Ns+1:2*Ns))
-       if(iup==nup.AND.idw==ndw)then
-          count             = count+1 !count the states in the sector (n_up,n_dw)
-          map(count)        = i       !build the map to full space states
-       endif
-    enddo
+    dim=0
+    if(.not.ed_supercond)then
+       nup = getnup(isector)
+       ndw = getndw(isector)
+       do i=1,NN
+          call bdecomp(i,ivec)
+          iup = sum(ivec(1:Ns))
+          idw = sum(ivec(Ns+1:2*Ns))
+          if(iup==nup.AND.idw==ndw)then
+             dim           = dim+1 !count the states in the sector (n_up,n_dw)
+             map(dim)      = i       !build the map to full space states
+          endif
+       enddo
+    else
+       sz = getsz(isector)
+       do i=1,NN
+          call bdecomp(i,ivec)
+          mz = sum(ivec(1:Ns)) - sum(ivec(Ns+1:2*Ns))
+          if(mz==sz)then
+             dim             = dim+1 !count the states in the sector (n_up,n_dw)
+             map(dim)        = i       !build the map to full space states
+          endif
+       enddo
+    endif
+    if(present(dim2))dim2=dim
   end subroutine build_sector
+
+
+
+
+
 
 
   !+------------------------------------------------------------------+
@@ -532,6 +664,34 @@ contains
 
 
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : calculate the factorial
+  !+------------------------------------------------------------------+
+  function get_sector_dimension(nup,ndw) result(dim)
+    integer :: nup,ndw,dim,dimup,dimdw
+    dimup=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
+    dimdw=(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
+    dim=dimup*dimdw
+  end function get_sector_dimension
+
+
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : calculate the factorial
+  !+------------------------------------------------------------------+
+  function get_sc_sector_dimension(mz) result(dim)
+    integer :: mz
+    integer :: i,dim,Nb
+    dim=0
+    Nb=Ns-mz
+    do i=0,Nb/2 
+       dim=dim + 2**(Nb-2*i)*nchoos(ns,Nb-2*i)*nchoos(ns-Nb+2*i,i)
+    enddo
+  end function get_sc_sector_dimension
+
+
   !+------------------------------------------------------------------+
   !PURPOSE  : calculate the factorial of an integer N!=1.2.3...(N-1).N
   !+------------------------------------------------------------------+
@@ -544,6 +704,29 @@ contains
        f=n*factorial(n-1)
     end if
   end function factorial
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : calculate the binomial factor
+  !+------------------------------------------------------------------+
+  function nchoos(n1,n2)
+    real(8) :: xh
+    integer :: n1,n2,i
+    integer nchoos
+    xh = 1.d0
+    if(n2<0) then
+       nchoos = 0
+       return
+    endif
+    if(n2==0) then
+       nchoos = 1
+       return
+    endif
+    do i = 1,n2
+       xh = xh*real(n1+1-i,8)/real(i,8)
+    enddo
+    nchoos = int(xh + 0.5d0)
+  end function nchoos
 
 
 

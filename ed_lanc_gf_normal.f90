@@ -1,7 +1,7 @@
 !+------------------------------------------------------------------+
 !PURPOSE  : Evaluate Green's functions using Lanczos algorithm
 !+------------------------------------------------------------------+
-subroutine lanc_ed_getgf()
+subroutine lanc_ed_getgf_normal()
   integer :: izero,iorb,jorb,ispin,i
   integer :: isect0,numstates
   real(8) :: norm0
@@ -56,7 +56,7 @@ subroutine lanc_ed_getgf()
   if(mpiID==0)call print_imp_gf
   deallocate(wm,wr,tau,vm)
   deallocate(impGmats,impGreal)
-end subroutine lanc_ed_getgf
+end subroutine lanc_ed_getgf_normal
 
 
 
@@ -126,11 +126,11 @@ subroutine lanc_ed_buildgf_d(iorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_d(lanc_spHtimesV_dd)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_d(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,1,iorb,iorb,ispin)
@@ -160,11 +160,11 @@ subroutine lanc_ed_buildgf_d(iorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_d(lanc_spHtimesV_dd)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_d(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,-1,iorb,iorb,ispin)
@@ -243,11 +243,11 @@ subroutine lanc_ed_buildgf_c(iorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_c(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,1,iorb,iorb,ispin)
@@ -277,11 +277,11 @@ subroutine lanc_ed_buildgf_c(iorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_c(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,-1,iorb,iorb,ispin)
@@ -376,11 +376,11 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_d(lanc_spHtimesV_dd)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_d(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,1,iorb,jorb,ispin)
@@ -419,11 +419,11 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_d(lanc_spHtimesV_dd)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_d(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,-1,iorb,jorb,ispin)
@@ -462,11 +462,11 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
         norm2=dot_product(cvinit,cvinit)
         cvinit=cvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_dc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_d(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(cvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=-xi*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,1,iorb,jorb,ispin)
@@ -505,11 +505,11 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
         norm2=dot_product(cvinit,cvinit)
         cvinit=cvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_dc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_d(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(cvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=-xi*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,-1,iorb,jorb,ispin)
@@ -601,11 +601,11 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_c(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,1,iorb,jorb,ispin)
@@ -644,11 +644,11 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_c(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,-1,iorb,jorb,ispin)
@@ -687,11 +687,11 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
         norm2=dot_product(cvinit,cvinit)
         cvinit=cvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_c(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(cvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=-xi*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,1,iorb,jorb,ispin)
@@ -730,11 +730,11 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
         norm2=dot_product(cvinit,cvinit)
         cvinit=cvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_c(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(cvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=-xi*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,-1,iorb,jorb,ispin)
