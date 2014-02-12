@@ -83,9 +83,11 @@ contains
 
     inquire(file=INPUTunit,exist=control)    
     if(control)then
-       open(50,file=INPUTunit,status='old')
-       read(50,nml=EDvars)
-       close(50)
+       if(mpiID==0)then
+          open(50,file=INPUTunit,status='old')
+          read(50,nml=EDvars)
+          close(50)
+       endif
     else
        if(mpiID==0)then
           print*,"Can not find INPUT file"
@@ -103,6 +105,7 @@ contains
     call parse_cmd_variable(beta,"BETA")
     call parse_cmd_variable(xmu,"XMU")
     call parse_cmd_variable(uloc,"ULOC")
+    call parse_cmd_variable(uloc(1),"U")
     call parse_cmd_variable(ust,"UST")
     call parse_cmd_variable(Jh,"JH")
     call parse_cmd_variable(nloop,"NLOOP")
@@ -134,7 +137,7 @@ contains
     call parse_cmd_variable(bath_type,"BATH_TYPE")
     call parse_cmd_variable(Hfile,"HFILE")
     call parse_cmd_variable(LOGfile,"LOGFILE")
-    Ltau=max(int(beta),100)
+    Ltau=max(int(beta),500)
     !
     if(mpiID==0)then
        open(50,file="used."//INPUTunit)
@@ -144,10 +147,10 @@ contains
        write(*,nml=EDvars)
     endif
 
-
-    write(LOGfile,"(A)")"U_local:"
-    write(LOGfile,"(90F12.6,1x)")(Uloc(iorb),iorb=1,Norb)
-
+    if(mpiID==0)then
+       write(LOGfile,"(A)")"U_local:"
+       write(LOGfile,"(90F12.6,1x)")(Uloc(iorb),iorb=1,Norb)
+    endif
 
     allocate(reHloc(Nspin,Nspin,Norb,Norb))
     allocate(imHloc(Nspin,Nspin,Norb,Norb))
@@ -193,8 +196,10 @@ contains
 
     hloc = dcmplx(reHloc,imHloc)
 
-    write(LOGfile,"(A)")"H_local:"
-    call print_Hloc(Hloc)
+    if(mpiID==0)then
+       write(LOGfile,"(A)")"H_local:"
+       call print_Hloc(Hloc)
+    endif
   end subroutine ed_read_input
 
 
@@ -414,9 +419,10 @@ contains
 
 
 
+
   !+------------------------------------------------------------------+
-  !PURPOSE  : constructs the sectors by storing the map from the 
-  !states i\in Hilbert_space to the states count in H_sector.
+  !PURPOSE  : constructs the sectors by storing the map to the 
+  !states i\in Hilbert_space from the states count in H_sector.
   !+------------------------------------------------------------------+
   !|ImpUP,BathUP>|ImpDW,BathDW >
   subroutine build_sector(isector,map)
@@ -426,6 +432,7 @@ contains
     integer,dimension(:) :: map
     nup = getnup(isector)
     ndw = getndw(isector)
+    !if(size(map)/=getdim(isector)stop "error in build_sector: wrong dimension of map"
     count=0
     do i=1,NN
        call bdecomp(i,ivec)
@@ -578,7 +585,7 @@ contains
     integer,save          :: nindex=0
     integer               :: nindex1
     real(8)               :: ndelta1,nratio
-    integer,save          :: nth_magnitude=-1,nth_magnitude_old=-1
+    integer,save          :: nth_magnitude=-2,nth_magnitude_old=-2
     real(8),save          :: nth=1.d-1
     logical,save          :: ireduce=.true.
     integer :: unit

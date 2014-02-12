@@ -151,7 +151,6 @@ contains
           write(LOGfile,"(A)")'Reading bath from file'
           unit = free_unit()
           flen = file_length(trim(Hfile))
-          print*,flen
           open(unit,file=trim(Hfile))
           read(unit,*)
           select case(bath_type)

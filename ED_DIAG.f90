@@ -118,6 +118,7 @@ contains
        !
     enddo sector
     if(mpiID==0)call stop_progress
+
     !POST PROCESSING:
     if(mpiID==0)then
        unit=free_unit()
@@ -186,6 +187,7 @@ contains
           write(unit,*)""
           close(unit)
        endif
+       !
        allocate(list_sector(state_list%size),count_sector(Nsect))
        !get the list of actual sectors contributing to the list
        do i=1,state_list%size

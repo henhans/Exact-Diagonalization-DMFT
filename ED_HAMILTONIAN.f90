@@ -17,7 +17,8 @@ MODULE ED_HAMILTONIAN
   public :: spHtimesV_dd,spHtimesV_dc,spHtimesV_cc
   public :: lanc_spHtimesV_dd,lanc_spHtimesV_dc,lanc_spHtimesV_cc
 
-  !Direct Matrix-vector product (no allocation of H)
+  !WRONG!! !Direct Matrix-vector product (no allocation of H)
+  !ALLOCATE AND SET REQUIRED INFO
   public :: setup_Hv_sector
   public :: delete_Hv_sector
   !   public :: HtimesV
@@ -789,7 +790,7 @@ contains
   !+------------------------------------------------------------------+
   !PURPOSE : 
   !+------------------------------------------------------------------+
-  subroutine  setup_Hv_sector(isector)
+  subroutine setup_Hv_sector(isector)
     integer                              :: isector
     integer                              :: dim
     Hsector=isector

@@ -81,15 +81,15 @@ contains
   subroutine read_hk(file)
     character(len=*) :: file
     integer          :: i,j,ik,iorb,jorb,Norb_d,Norb_p
-    real(8)          :: de,e,kx,ky,kz,foo,D=1.d0
+    real(8)          :: de,e,kx,ky,kz,foo
 
     if(fbethe)then
        !
        allocate(Hk(Norb,Norb,Lk))
        allocate(dos_wt(Lk))
-       de=2.d0*D/dble(Lk)
+       de=2.d0/dble(Lk)
        do ik=1,Lk
-          e = -D + dble(ik-1)*de
+          e = -1.d0 + dble(ik-1)*de
           Hk(:,:,ik) = Hloc(1,1,:,:) !set local part
           do iorb=1,Norb
              Hk(iorb,iorb,ik) = Hk(iorb,iorb,ik) - 2.d0*ts(iorb)*e
