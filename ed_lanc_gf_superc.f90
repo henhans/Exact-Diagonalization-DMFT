@@ -16,11 +16,14 @@ subroutine lanc_ed_getgf_superc()
   impGreal=zero
   impFmats=zero
   impFreal=zero
+  
+  Gaux_mats=zero
+  Gaux_real=zero
 
   do ispin=1,Nspin
      do iorb=1,Norb
         if(mpiID==0)write(LOGfile,"(A)")" Get G&F_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))
-        call lanc_ed_buildgf_sc_d(iorb,ispin,.false.)
+        call lanc_ed_buildgf_sc_d(iorb,ispin,.true.)
      enddo
   enddo
   !
@@ -55,7 +58,7 @@ subroutine lanc_ed_buildgf_sc_d(iorb,ispin,iverbose)
   real(8),allocatable              :: alfa_(:),beta_(:)  
   integer                          :: iorb,ispin,isite,isect0,izero
   integer                          :: idim0,jsect0
-  integer                          :: jdim0
+  integer                          :: jdim0,isz0,jsz0
   integer                          :: ib(Ntot)
   integer                          :: m,i,j,r,numstates
   real(8)                          :: sgn,norm2,norm0
@@ -150,7 +153,7 @@ subroutine lanc_ed_buildgf_sc_d(iorb,ispin,iverbose)
         deallocate(vvinit)
         if(spH0%status)call sp_delete_matrix(spH0)
      endif
-
+     
      !APPLY CDG_UP + C_DW
      isz0 = getsz(isect0)
      if(isz0<Ns)then
@@ -193,11 +196,7 @@ subroutine lanc_ed_buildgf_sc_d(iorb,ispin,iverbose)
         deallocate(vvinit)
         if(spH0%status)call sp_delete_matrix(spH0)
      endif
-
-
-
-
-
+     
      !APPLY C_UP
      jsect0 = getCsector(1,isect0)
      if(jsect0/=0)then 

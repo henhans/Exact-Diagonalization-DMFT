@@ -104,6 +104,12 @@ contains
     do i=first_state,last_state
        m=Hmap(i)
        call bdecomp(m,ib)
+       !DEBGU
+       ! if(dim==1) then
+       !    write(*,*) m,i
+       !    write(*,*) ib
+       ! end if
+       !DEBUG
        htmp=0.d0
        do iorb=1,Norb
           nup(iorb)=real(ib(iorb),8)
@@ -116,7 +122,12 @@ contains
             dot_product(eloc(1,:),nup)  + &
             dot_product(eloc(Nspin,:),ndw)
        !Density-density interaction: same orbital, opposite spins
-       htmp = htmp + dot_product(uloc,nup*ndw)!=\sum=i U_i*(n_u*n_d)_i
+       if(.not.ed_supercond) then
+          htmp = htmp + dot_product(uloc,nup*ndw)!=\sum=i U_i*(n_u*n_d)_i
+       else
+          !htmp = htmp - dot_product(uloc,nup*ndw)!=\sum=i U_i*(n_u*n_d)_i
+          htmp = htmp - uloc(1)*(nup(1)-0.5d0)*(ndw(1)-0.5d0)
+       end if
        if(Norb>1)then
           !density-density interaction: different orbitals, opposite spins
           do iorb=1,Norb         ! n_up_i*n_dn_j +  n_up_j*n_dn_i
@@ -134,8 +145,12 @@ contains
        endif
        !if using the Hartree-shifted chemical potential: mu=0 for half-filling
        !sum up the contributions of hartree terms:
-       if(hfmode)then
+       if(hfmode.and..not.ed_supercond)then
+          !          if(.not.ed_supercond) then
           htmp=htmp - 0.5d0*dot_product(uloc,nup+ndw) + 0.25d0*sum(uloc)
+          ! else
+          !    htmp=htmp + 0.5d0*dot_product(uloc,nup+ndw) - 0.25d0*sum(uloc) 
+          ! end if
           if(Norb>1)then
              do iorb=1,Norb
                 do jorb=iorb+1,Norb
@@ -347,10 +362,15 @@ contains
 
 
        if(ed_supercond)then
+          
           !Anomalous pair-creation/destruction
+          !write(*,*) getsz(isector)
           do iorb=1,size(dmft_bath%e,2)
              do kp=1,Nbath
                 ms=getBathStride(iorb,kp)
+                !<DEBUG
+                !write(*,*) iorb,kp,ms
+                !DEBUG>
                 !\Delta_l c_{\up,ms} c_{\dw,ms}
                 if(ib(ms)==1 .AND. ib(ms+Ns)==1)then
                    call c(ms,m,k1,sg1)
@@ -367,10 +387,12 @@ contains
                       h(i,j)=h(i,j)+htmp
                    endif
                 endif
-                !\Delta_l cdg_{\up,ms} cdg_{\dw,ms}
+                !\Delta_l cdg_{\dw,ms} cdg_{\up,ms}
                 if(ib(ms)==0 .AND. ib(ms+Ns)==0)then
-                   call cdg(ms,m,k1,sg1)
-                   call cdg(ms+Ns,k1,k2,sg2)
+                   call cdg(ms+Ns,m,k1,sg1)
+                   call cdg(ms,k1,k2,sg2)
+                   ! call cdg(ms,m,k1,sg1)
+                   ! call cdg(ms+Ns,k1,k2,sg2)
                    j=binary_search(Hmap,k2)
                    htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2 !
                    if(flanc)then

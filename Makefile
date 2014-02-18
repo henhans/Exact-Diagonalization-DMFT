@@ -1,10 +1,11 @@
 #=========================================================================
 include sfmake.inc
-FC=$(SFMPI)/mpif90
+FC=ifort
+#$(SFMPI)/mpif90
 #FPP=MPI
 #=========================================================================
 #--> HUBBARD MODELS:
-EXE=ed_hm_bethe
+EXE=ed_ahm_bethe
 #EXE=ed_hm_2dsquare
 #EXE=ed_hm_bethe_mixgf
 
@@ -19,7 +20,7 @@ EXE=ed_hm_bethe
 #EXE=ed_bhz
 
 DIR =drivers
-DIREXE=$(HOME)/.bin
+DIREXE=$(HOME_G)/.project_bin
 
 
 
