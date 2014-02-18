@@ -8,7 +8,7 @@
 !###################################################################
 MODULE ED_GREENS_FUNCTIONS
   USE TIMER
-  USE IOTOOLS, only: free_unit,reg
+  USE IOTOOLS, only: free_unit,reg,free_units
   USE ARRAYS,   only: arange,linspace
   USE MATRIX,  only: matrix_inverse
   USE PLAIN_LANCZOS
@@ -63,7 +63,7 @@ contains
   !+------------------------------------------------------------------+
   include 'ed_lanc_gf_normal.f90'
   include 'ed_lanc_gf_superc.f90'
-
+  
 
   !                    LANC SUSCPTIBILITY
   !+------------------------------------------------------------------+
@@ -188,7 +188,7 @@ contains
           do i=1,NL
              iw = xi*wm(i)
              fg0(1,i) = iw+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath(ispin,iorb,iw,dmft_bath)
-             fg0(2,i) = fdelta_bath(ispin,iorb,iw,dmft_bath)
+             fg0(2,i) = -fdelta_bath(ispin,iorb,iw,dmft_bath)
           enddo
           impSmats(ispin,ispin,iorb,iorb,:)= fg0(1,:) - fg(1,:)
           impSAmats(ispin,ispin,iorb,iorb,:)= fg0(2,:) - fg(2,:)
@@ -199,7 +199,7 @@ contains
     enddo
     deallocate(fg0,fg,sigma,det)
 
-
+    
     allocate(fg0(2,Nw),fg(2,Nw),sigma(2,Nw),det(Nw))
     do ispin=1,Nspin
        do iorb=1,Norb
@@ -210,12 +210,13 @@ contains
              fg(1,i) =  conjg(impGreal(ispin,ispin,iorb,iorb,Nw+1-i))/det(i)
              fg(2,i) =  conjg(impFreal(ispin,ispin,iorb,iorb,Nw+1-i))/det(i)
              fg0(1,i) = iw+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath(ispin,iorb,wr(i),eps,dmft_bath)
-             fg0(2,i) = fdelta_bath(ispin,iorb,wr(i),eps,dmft_bath)
+             fg0(2,i) = -fdelta_bath(ispin,iorb,wr(i),eps,dmft_bath)
           enddo
           impSreal(ispin,ispin,iorb,iorb,:)= fg0(1,:) - fg(1,:)
           impSAreal(ispin,ispin,iorb,iorb,:)= fg0(2,:) - fg(2,:)
+          ! surely wrong...
           do i=1,Nw          
-             det(i)     =  fg0(1,i)*conjg(fg0(2,Nw+1-i)) + fg0(2,:)*conjg(fg0(2,Nw+1-i))
+             det(i)     =  fg0(1,i)*conjg(fg0(2,Nw+1-i)) + fg0(2,i)*conjg(fg0(2,Nw+1-i))
              impG0real(ispin,ispin,iorb,iorb,i) = conjg(fg0(1,Nw+1-i))/det(i)
              impF0real(ispin,ispin,iorb,iorb,i) = conjg(fg0(2,Nw+1-i))/det(i)
           enddo
@@ -242,17 +243,17 @@ contains
                (dimag(impF0mats(ispin,ispin,iorb,iorb,i)),dreal(impF0mats(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
        enddo
        do i=1,Nw
-          write(unit(1),"(F26.15,6(F26.15))")wr(i),&
+          write(unit(7),"(F26.15,6(F26.15))")wr(i),&
                (dimag(impGreal(ispin,ispin,iorb,iorb,i)),dreal(impGreal(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
-          write(unit(2),"(F26.15,6(F26.15))")wr(i),&
+          write(unit(8),"(F26.15,6(F26.15))")wr(i),&
                (dimag(impFreal(ispin,ispin,iorb,iorb,i)),dreal(impFreal(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
-          write(unit(3),"(F26.15,6(F26.15))")wr(i),&
+          write(unit(9),"(F26.15,6(F26.15))")wr(i),&
                (dimag(impSreal(ispin,ispin,iorb,iorb,i)),dreal(impSreal(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
-          write(unit(4),"(F26.15,6(F26.15))")wr(i),&
+          write(unit(10),"(F26.15,6(F26.15))")wr(i),&
                (dimag(impSAreal(ispin,ispin,iorb,iorb,i)),dreal(impSAreal(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
-          write(unit(5),"(F26.15,6(F26.15))")wr(i),&
+          write(unit(11),"(F26.15,6(F26.15))")wr(i),&
                (dimag(impG0real(ispin,ispin,iorb,iorb,i)),dreal(impG0real(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
-          write(unit(6),"(F26.15,6(F26.15))")wr(i),&
+          write(unit(12),"(F26.15,6(F26.15))")wr(i),&
                (dimag(impF0real(ispin,ispin,iorb,iorb,i)),dreal(impF0real(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
        enddo
        call close_units

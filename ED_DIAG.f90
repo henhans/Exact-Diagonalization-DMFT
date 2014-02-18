@@ -63,9 +63,9 @@ contains
     oldzero=1000.d0
     numgs=0
     if(mpiID==0)write(LOGfile,"(A)")"Get Hamiltonian:"
-    if(mpiID==0)call start_progress(LOGfile)
+    !if(mpiID==0)call start_progress(LOGfile)
     sector: do isector=1,Nsect
-       if(mpiID==0)call progress(isector,Nsect)
+!       if(mpiID==0)call progress(isector,Nsect)
        dim     = getdim(isector)
        Neigen  = min(dim,neigen_sector(isector))
        Nitermax= min(dim,lanc_niter)
@@ -113,13 +113,18 @@ contains
              call es_insert_state(state_list,enemin,eig_basis(1:dim,1),isector)
           endif
        endif
+       
+       !<+DEBUG
+       write(*,*) getsz(isector),eig_values(1)
+       !DEBUG+>
+
        !
        if(allocated(eig_values))deallocate(eig_values)
        if(allocated(eig_basis))deallocate(eig_basis)
        if(spH0%status)call sp_delete_matrix(spH0)
        !
     enddo sector
-    if(mpiID==0)call stop_progress
+!    if(mpiID==0)call stop_progress
 
     !POST PROCESSING:
     if(mpiID==0)then

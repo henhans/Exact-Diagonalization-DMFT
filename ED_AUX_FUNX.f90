@@ -19,6 +19,7 @@ MODULE ED_AUX_FUNX
   public :: search_chemical_potential
   !
   public :: setup_pointers
+  public :: setup_pointers_sc
   public :: build_sector
   public :: bdecomp
   public :: c,cdg
@@ -445,7 +446,7 @@ contains
 
   subroutine setup_pointers_sc
     integer                          :: i,isz,in,dim,isector,jsector
-    integer                          :: sz,iorb,dim2
+    integer                          :: sz,iorb,dim2,jsz
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
     if(mpiID==0)write(LOGfile,"(A)")"Setting up pointers:"
@@ -460,10 +461,10 @@ contains
        getdim(isector)=dim
        neigen_sector(isector) = min(dim,lanc_neigen)   !init every sector to required eigenstates
        !<DEBUG
-       allocate(Hmap(dim))
-       call build_sector(isector,Hmap,dim2)
+       allocate(imap(dim))
+       call build_sector(isector,imap,dim2)
        print*,isz,dim,dim2
-       deallocate(Hmap)
+       deallocate(imap)
        !>DEBUG
     enddo
     call stop_timer
