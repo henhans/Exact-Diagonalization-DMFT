@@ -31,9 +31,6 @@ contains
     case default
        call lanc_ed_diag_d
     case('c')
-       !<DEBUG
-       print*,"DOING COMPLEX"
-       !>DEBUG
        call lanc_ed_diag_c
     end select
   end subroutine lanc_ed_diag
@@ -63,9 +60,9 @@ contains
     oldzero=1000.d0
     numgs=0
     if(mpiID==0)write(LOGfile,"(A)")"Get Hamiltonian:"
-    !if(mpiID==0)call start_progress(LOGfile)
+    if(mpiID==0)call start_progress(LOGfile)
     sector: do isector=1,Nsect
-!       if(mpiID==0)call progress(isector,Nsect)
+       if(mpiID==0)call progress(isector,Nsect)
        dim     = getdim(isector)
        Neigen  = min(dim,neigen_sector(isector))
        Nitermax= min(dim,lanc_niter)
@@ -77,20 +74,16 @@ contains
        if(lanc_solve)then
           allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
           eig_values=0.d0 ; eig_basis=0.d0
-          !call setup_Hv_sector(isector)
           call ed_buildH_d(isector)
 #ifdef _MPI
           call lanczos_parpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_dd,.false.)
 #else
           call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_dd,.false.)
 #endif
-          !call delete_Hv_sector()
        else
           allocate(eig_values(Dim),eig_basis(Dim,dim))
           eig_values=0.d0 ; eig_basis=0.d0 
-          !call setup_Hv_sector(isector)
           call ed_buildH_d(isector,eig_basis)
-          !call delete_Hv_sector()
           call matrix_diagonalize(eig_basis,eig_values,'V','U')
           if(dim==1)eig_basis(dim,dim)=1.d0
        endif
@@ -113,27 +106,22 @@ contains
              call es_insert_state(state_list,enemin,eig_basis(1:dim,1),isector)
           endif
        endif
-       
-       !<+DEBUG
-       write(*,*) getsz(isector),eig_values(1)
-       !DEBUG+>
-
        !
        if(allocated(eig_values))deallocate(eig_values)
        if(allocated(eig_basis))deallocate(eig_basis)
        if(spH0%status)call sp_delete_matrix(spH0)
        !
     enddo sector
-!    if(mpiID==0)call stop_progress
+    if(mpiID==0)call stop_progress
 
     !POST PROCESSING:
     if(mpiID==0)then
        unit=free_unit()
        open(unit,file="state_list.ed")
        if(.not.ed_supercond)then
-          write(unit,"(A)")"#i       E_i                 nup ndw Sect"
+          write(unit,"(A)")"#i       E_i             DE_i             nup ndw Sect  Dim"
        else
-          write(unit,"(A)")"#i       E_i                 Sz Sect"
+          write(unit,"(A)")"#i       E_i             DE_i             Sz    Sect    Dim"
        endif
        do i=1,state_list%size
           Ei     = es_return_energy(state_list,i)
@@ -141,10 +129,10 @@ contains
           if(.not.ed_supercond)then
              nup0   = getnup(isect0)
              ndw0   = getndw(isect0)
-             write(unit,"(i3,f25.18,2i3,3x,i3)"),i,Ei,nup0,ndw0,isect0
+             write(unit,"(i3,f18.12,E18.9,1x,2i3,3x,i3,i10)"),i,Ei,exp(-beta*(Ei-state_list%emin)),nup0,ndw0,isect0,getdim(isect0)
           else
              sz0   = getsz(isect0)
-             write(unit,"(i3,f25.18,i3,3x,i3)"),i,Ei,sz0,isect0
+             write(unit,"(i3,f18.12,E18.9,1x,i3,3x,i3,i10)"),i,Ei,exp(-beta*(Ei-state_list%emin)),sz0,isect0,getdim(isect0)
           endif
        enddo
        close(unit)
@@ -338,10 +326,10 @@ contains
           if(.not.ed_supercond)then
              nup0   = getnup(isect0)
              ndw0   = getndw(isect0)
-             write(unit,"(i3,f25.18,2i3,3x,i3)"),i,Ei,nup0,ndw0,isect0
+             write(unit,"(i3,f25.18,2i3,3x,2i3)"),i,Ei,nup0,ndw0,isect0,getdim(isect0)
           else
              sz0   = getsz(isect0)
-             write(unit,"(i3,f25.18,i3,3x,i3)"),i,Ei,sz0,isect0
+             write(unit,"(i3,f25.18,i3,3x,2i3)"),i,Ei,sz0,isect0,getdim(isect0)
           endif
        enddo
        close(unit)

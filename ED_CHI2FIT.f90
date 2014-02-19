@@ -13,7 +13,7 @@ MODULE ED_CHI2FIT
 
   interface chi2_fitgf
      module procedure chi2_fitgf_,chi2_fitgf__
-  end interface
+  end interface chi2_fitgf
 
   public :: chi2_fitgf
 
@@ -29,7 +29,7 @@ contains
 
 
   !+-------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : Chi^2 fit of the G0/Delta general interface
   !+-------------------------------------------------------------+
   subroutine chi2_fitgf_(fg,bath,ispin,iverbose)
     complex(8),dimension(:,:,:)          :: fg
@@ -57,15 +57,21 @@ contains
     case default
        call chi2_fitgf_irred_sc(fg,bath,ispin,iverbose_)
     case ('hybrid')
-       stop 'ask the developer...'
+       stop 'Error: Hybrid bath + SC is not implemented yet: ask the developer...'
     end select
   end subroutine chi2_fitgf__
 
 
 
 
+
+
+
+
+
+
   !+-------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : Chi^2 interface for Irreducible bath normal phase
   !+-------------------------------------------------------------+
   subroutine chi2_fitgf_irred(fg,bath_,ispin,iverbose)
     complex(8),dimension(:,:,:)          :: fg
@@ -157,10 +163,10 @@ contains
          do i=1,Ldelta
             w = Xdelta(i)
             if(cg_scheme=='weiss')then
-               fgand = xi*w + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath(ispin,iorb,xi*w,dmft_bath)
+               fgand = xi*w + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath_mats(ispin,iorb,xi*w,dmft_bath)
                fgand = one/fgand
             else
-               fgand = delta_bath(ispin,iorb,xi*w,dmft_bath)
+               fgand = delta_bath_mats(ispin,iorb,xi*w,dmft_bath)
             endif
             write(unit,"(5F24.15)")Xdelta(i),dimag(Fdelta(1,i)),dimag(fgand),dreal(Fdelta(1,i)),dreal(fgand)
          enddo
@@ -172,6 +178,14 @@ contains
 
 
 
+
+
+
+
+
+  !+-------------------------------------------------------------+
+  !PURPOSE  : Chi^2 interface for Irreducible bath Superconducting phase
+  !+-------------------------------------------------------------+
   subroutine chi2_fitgf_irred_sc(fg,bath_,ispin,iverbose)
     complex(8),dimension(:,:,:,:)        :: fg
     real(8),dimension(:,:),intent(inout) :: bath_
@@ -268,14 +282,14 @@ contains
          do i=1,Ldelta
             w = Xdelta(i)
             if(cg_scheme=='weiss')then
-               fgand(1) = xi*w + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath(ispin,iorb,xi*w,dmft_bath)
-               fgand(2) = fdelta_bath(ispin,iorb,xi*w,dmft_bath)
+               fgand(1) = xi*w + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath_mats(ispin,iorb,xi*w,dmft_bath)
+               fgand(2) = fdelta_bath_mats(ispin,iorb,xi*w,dmft_bath)
                det     =  abs(fgand(1))**2 + (fgand(2))**2
                fgand(1) = conjg(fgand(1))/det
                fgand(2) = fgand(2)/det
             else
-               fgand(1) = delta_bath(ispin,iorb,xi*w,dmft_bath)
-               fgand(2) = fdelta_bath(ispin,iorb,xi*w,dmft_bath)
+               fgand(1) = delta_bath_mats(ispin,iorb,xi*w,dmft_bath)
+               fgand(2) = fdelta_bath_mats(ispin,iorb,xi*w,dmft_bath)
             endif
             write(unit,"(10F24.15)")Xdelta(i),dimag(Fdelta(1,i)),dimag(fgand(1)),dreal(Fdelta(1,i)),dreal(fgand(1)), &
                  dimag(Fdelta(2,i)),dimag(fgand(2)),dreal(Fdelta(2,i)),dreal(fgand(2))
@@ -292,7 +306,7 @@ contains
 
 
   !+-------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : Chi^2 interface for Hybrid bath normal phase
   !+-------------------------------------------------------------+
   subroutine chi2_fitgf_hybrd(fg,bath_,ispin,iverbose)
     complex(8),dimension(:,:,:)          :: fg
@@ -388,19 +402,19 @@ contains
          w=Xdelta(i)
          if(cg_scheme=='weiss')then
             do l=1,Norb
-               gwf(l,l)=xi*w + xmu - hloc(ispin,ispin,l,l) - delta_bath(ispin,l,l,xi*w,dmft_bath)
+               gwf(l,l)=xi*w + xmu - hloc(ispin,ispin,l,l) - delta_bath_mats(ispin,l,l,xi*w,dmft_bath)
                do m=l+1,Norb
-                  gwf(l,m) = - hloc(ispin,ispin,l,m) - delta_bath(ispin,l,m,xi*w,dmft_bath)
-                  gwf(m,l) = - hloc(ispin,ispin,m,l) - delta_bath(ispin,m,l,xi*w,dmft_bath)
+                  gwf(l,m) = - hloc(ispin,ispin,l,m) - delta_bath_mats(ispin,l,m,xi*w,dmft_bath)
+                  gwf(m,l) = - hloc(ispin,ispin,m,l) - delta_bath_mats(ispin,m,l,xi*w,dmft_bath)
                enddo
             enddo
             call matrix_inverse(gwf)
          else
             do l=1,Norb
-               gwf(l,l)= delta_bath(ispin,l,l,xi*w,dmft_bath)
+               gwf(l,l)= delta_bath_mats(ispin,l,l,xi*w,dmft_bath)
                do m=l+1,Norb
-                  gwf(l,m) = delta_bath(ispin,l,m,xi*w,dmft_bath)
-                  gwf(m,l) = delta_bath(ispin,m,l,xi*w,dmft_bath)
+                  gwf(l,m) = delta_bath_mats(ispin,l,m,xi*w,dmft_bath)
+                  gwf(m,l) = delta_bath_mats(ispin,m,l,xi*w,dmft_bath)
                enddo
             enddo
          endif

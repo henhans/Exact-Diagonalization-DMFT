@@ -23,7 +23,7 @@ subroutine lanc_ed_getgf_superc()
   do ispin=1,Nspin
      do iorb=1,Norb
         if(mpiID==0)write(LOGfile,"(A)")" Get G&F_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))
-        call lanc_ed_buildgf_sc_d(iorb,ispin,.true.)
+        call lanc_ed_buildgf_sc_d(iorb,ispin,.false.)
      enddo
   enddo
   !

@@ -20,7 +20,7 @@ EXE=ed_ahm_bethe
 #EXE=ed_bhz
 
 DIR =drivers
-DIREXE=$(HOME_G)/.project_bin
+DIREXE=$(HOME)/.bin
 
 
 

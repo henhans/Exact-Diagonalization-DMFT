@@ -34,7 +34,7 @@ MODULE ED_GREENS_FUNCTIONS
   !=========================================================
   complex(8),allocatable,dimension(:,:,:,:,:) :: impGmats,impFmats
   complex(8),allocatable,dimension(:,:,:,:,:) :: impGreal,impFreal
-  complex(8),allocatable,dimension(:,:) :: Gaux_mats,Gaux_real
+  complex(8),allocatable,dimension(:,:)       :: Gaux_mats,Gaux_real
 
   !Spin Susceptibilities
   !=========================================================
@@ -48,7 +48,9 @@ MODULE ED_GREENS_FUNCTIONS
 
 contains
 
-
+  !+------------------------------------------------------------------+
+  !PURPOSE  : Interface routine for Green's function calculation
+  !+------------------------------------------------------------------+
   subroutine lanc_ed_getgf()
     if(.not.ed_supercond)then
        call lanc_ed_getgf_normal()
@@ -61,13 +63,16 @@ contains
 
   !                    LANCZOS DIAGONALIZATION 
   !+------------------------------------------------------------------+
+  !NORMAL PHASE ROUTINES:
   include 'ed_lanc_gf_normal.f90'
+  !SUPERCONDUCTING PHASE ROUTINES:
   include 'ed_lanc_gf_superc.f90'
-  
+
 
   !                    LANC SUSCPTIBILITY
   !+------------------------------------------------------------------+
   include 'ed_lanc_chi.f90'
+
 
 
   !                    FULL DIAGONALIZATION
@@ -75,14 +80,15 @@ contains
   include 'ed_full_gf.f90'
 
 
+
   !                    FULL SUSCEPTIBILITY
   !+------------------------------------------------------------------+
   include 'ed_full_chi.f90'
 
 
-  !                    COMPUTATIONAL ROUTINES
+
   !+------------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : Allocate and setup arrays with frequencies and times
   !+------------------------------------------------------------------+
   subroutine allocate_grids
     integer :: i
@@ -100,14 +106,16 @@ contains
 
 
 
+
+
   !+------------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : Print normal Green's functions
   !+------------------------------------------------------------------+
   subroutine print_imp_gf
     integer                                        :: i,j,ispin,unit(6),iorb,jorb
-    complex(8)                                     :: iw,fg0
-    complex(8),dimension(Nspin,Nspin,Norb,Norb,NL) :: impG0iw
-    complex(8),dimension(Nspin,Nspin,Norb,Norb,Nw) :: impG0wr
+    complex(8)                                     :: fg0
+    complex(8),dimension(Nspin,Nspin,Norb,Norb,NL) :: impG0mats
+    complex(8),dimension(Nspin,Nspin,Norb,Norb,Nw) :: impG0real
     complex(8),dimension(Norb,Norb)                :: invGimp,impG0
     character(len=20)                              :: suffix
     !
@@ -119,29 +127,127 @@ contains
     case default                !Diagonal in both spin and orbital
        !                        !this is ensured by the special *per impurity" bath structure
        !                        !no intra-orbital hoopings
-       include 'ed_print_gf_normal.f90'
+       do ispin=1,Nspin
+          do iorb=1,Norb
+             do i=1,NL
+                fg0 = xi*wm(i) + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath_mats(ispin,iorb,xi*wm(i),dmft_bath)
+                impSmats(ispin,ispin,iorb,iorb,i)= fg0 - one/impGmats(ispin,ispin,iorb,iorb,i)
+                impG0mats(ispin,ispin,iorb,iorb,i) = one/fg0
+             enddo
+             do i=1,Nw
+                fg0 = wr(i) + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath_real(ispin,iorb,wr(i)+xi*eps,dmft_bath)
+                impSreal(ispin,ispin,iorb,iorb,i)= fg0 - one/impGreal(ispin,ispin,iorb,iorb,i)
+                impG0real(ispin,ispin,iorb,iorb,i) = one/fg0
+             enddo
+          enddo
+       enddo
+       !
+       do iorb=1,Norb
+          suffix="_l"//reg(txtfy(iorb))//"_m"//reg(txtfy(iorb))
+          call open_units(reg(suffix))
+          do i=1,NL
+             write(unit(1),"(F26.15,6(F26.15))")wm(i),&
+                  (dimag(impGmats(ispin,ispin,iorb,iorb,i)),dreal(impGmats(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
+             write(unit(3),"(F26.15,6(F26.15))")wm(i),&
+                  (dimag(impSmats(ispin,ispin,iorb,iorb,i)),dreal(impSmats(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
+             write(unit(5),"(F26.15,6(F26.15))")wm(i),&
+                  (dimag(impG0mats(ispin,ispin,iorb,iorb,i)),dreal(impG0mats(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
+          enddo
+          do i=1,Nw
+             write(unit(2),"(F26.15,6(F26.15))")wr(i),&
+                  (dimag(impGreal(ispin,ispin,iorb,iorb,i)),dreal(impGreal(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
+             write(unit(4),"(F26.15,6(F26.15))")wr(i),&
+                  (dimag(impSreal(ispin,ispin,iorb,iorb,i)),dreal(impSreal(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
+             write(unit(6),"(F26.15,6(F26.15))")wr(i),&
+                  (dimag(impG0real(ispin,ispin,iorb,iorb,i)),dreal(impG0real(ispin,ispin,iorb,iorb,i)),ispin=1,Nspin)
+          enddo
+          call close_units
+       enddo
 
     case ('hybrid')             !Diagonal in spin only. Full Orbital structure
        !                        !intra-orbital hopping allow for mixed _ab GF
-       include 'ed_print_gf_hybrid.f90'
-
+       do ispin=1,Nspin         !Spin diagona
+          do iorb=1,Norb        !Orbital diagonal part GF_0=(iw+mu)_aa-hloc_aa-Delta_aa
+             do i=1,NL
+                impG0mats(ispin,ispin,iorb,iorb,i)= xi*wm(i)+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath_mats(ispin,iorb,iorb,xi*wm(i),dmft_bath)
+             enddo
+             do i=1,Nw
+                impG0real(ispin,ispin,iorb,iorb,i)= wr(i)+xi*eps+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath_real(ispin,iorb,iorb,wr(i)+xi*eps,dmft_bath)
+             enddo
+          enddo
+          do iorb=1,Norb         !Orbital non-diagonal part
+             do jorb=iorb+1,Norb !GF_0=-hloc_ab-Delta_ab
+                do i=1,NL
+                   impG0mats(ispin,ispin,iorb,jorb,i)= -hloc(ispin,ispin,iorb,jorb)-delta_bath_mats(ispin,iorb,jorb,xi*wm(i),dmft_bath)
+                   impG0mats(ispin,ispin,jorb,iorb,i)= -hloc(ispin,ispin,jorb,iorb)-delta_bath_mats(ispin,jorb,iorb,xi*wm(i),dmft_bath)
+                enddo
+                do i=1,Nw
+                   impG0real(ispin,ispin,iorb,jorb,i)= -hloc(ispin,ispin,iorb,jorb)-delta_bath_real(ispin,iorb,jorb,wr(i)+xi*eps,dmft_bath)
+                   impG0real(ispin,ispin,jorb,iorb,i)= -hloc(ispin,ispin,jorb,iorb)-delta_bath_real(ispin,jorb,iorb,wr(i)+xi*eps,dmft_bath)
+                enddo
+             enddo
+          enddo
+       enddo
+       !
+       !                         !Get Sigma and G_0 by matrix inversions:
+       do ispin=1,Nspin
+          do i=1,NL
+             invGimp = impGmats(ispin,ispin,:,:,i)
+             impG0   = impG0mats(ispin,ispin,:,:,i)
+             call matrix_inverse(invGimp)
+             impSmats(ispin,ispin,:,:,i) = impG0 - invGimp
+             call matrix_inverse(impG0)
+             impG0mats(ispin,ispin,:,:,i)=impG0
+          enddo
+          do i=1,Nw
+             invGimp = impGreal(ispin,ispin,:,:,i)
+             impG0   = impG0real(ispin,ispin,:,:,i)
+             call matrix_inverse(invGimp)
+             impSreal(ispin,ispin,:,:,i) = impG0 - invGimp
+             call matrix_inverse(impG0)
+             impG0real(ispin,ispin,:,:,i)=impG0
+          enddo
+       enddo
+       !
+       !Print the impurity functions:
+       do iorb=1,Norb
+          do jorb=1,Norb
+             suffix="_l"//reg(txtfy(iorb))//"_m"//reg(txtfy(jorb))
+             call open_units(reg(suffix))
+             do i=1,NL
+                write(unit(1),"(F26.15,6(F26.15))")wm(i),&
+                     (dimag(impGmats(ispin,ispin,iorb,jorb,i)),dreal(impGmats(ispin,ispin,iorb,jorb,i)),ispin=1,Nspin)
+                write(unit(3),"(F26.15,6(F26.15))")wm(i),&
+                     (dimag(impSmats(ispin,ispin,iorb,jorb,i)),dreal(impSmats(ispin,ispin,iorb,jorb,i)),ispin=1,Nspin)
+                write(unit(5),"(F26.15,6(F26.15))")wm(i),&
+                     (dimag(impG0mats(ispin,ispin,iorb,jorb,i)),dreal(impG0mats(ispin,ispin,iorb,jorb,i)),ispin=1,Nspin)
+             enddo
+             do i=1,Nw
+                write(unit(2),"(F26.15,6(F26.15))")wr(i),&
+                     (dimag(impGreal(ispin,ispin,iorb,jorb,i)),dreal(impGreal(ispin,ispin,iorb,jorb,i)),ispin=1,Nspin)
+                write(unit(4),"(F26.15,6(F26.15))")wr(i),&
+                     (dimag(impSreal(ispin,ispin,iorb,jorb,i)),dreal(impSreal(ispin,ispin,iorb,jorb,i)),ispin=1,Nspin)
+                write(unit(6),"(F26.15,6(F26.15))")wr(i),&
+                     (dimag(impG0real(ispin,ispin,iorb,jorb,i)),dreal(impG0real(ispin,ispin,iorb,jorb,i)),ispin=1,Nspin)
+             enddo
+             call close_units()
+          enddo
+       enddo
+       write(LOGfile,*)""
     end select
+
 
   contains
 
+
     subroutine open_units(string)
       character(len=*) :: string
-      unit(1)=free_unit()
+      unit=free_units(size(unit))
       open(unit(1),file="impG"//string//"_iw.ed")
-      unit(2)=free_unit()
       open(unit(2),file="impG"//string//"_realw.ed")
-      unit(3)=free_unit()
       open(unit(3),file="impSigma"//string//"_iw.ed")
-      unit(4)=free_unit()
       open(unit(4),file="impSigma"//string//"_realw.ed")
-      unit(5)=free_unit()
       open(unit(5),file="impG0"//string//"_iw.ed")
-      unit(6)=free_unit()
       open(unit(6),file="impG0"//string//"_realw.ed")
     end subroutine open_units
 
@@ -156,12 +262,24 @@ contains
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
   !+------------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : Print Superconducting Green's functions
   !+------------------------------------------------------------------+
   subroutine print_imp_gf_sc
     integer                                        :: i,j,ispin,unit(12),iorb,jorb
-    complex(8)                                     :: iw
     complex(8),allocatable,dimension(:)            :: det
     complex(8),allocatable,dimension(:,:)          :: fg0,fg,sigma
     complex(8),dimension(Nspin,Nspin,Norb,Norb,NL) :: impG0mats,impF0mats
@@ -178,7 +296,6 @@ contains
     !this is ensured by the special *per impurity" bath structure
     !no intra-orbital hoopings
     !THIS IS SUPERCONDUCTING CASE
-
     allocate(fg0(2,NL),fg(2,NL),sigma(2,NL),det(NL))
     do ispin=1,Nspin
        do iorb=1,Norb
@@ -186,35 +303,33 @@ contains
           fg(1,:) =  conjg(impGmats(ispin,ispin,iorb,iorb,:))/det
           fg(2,:) =  impFmats(ispin,ispin,iorb,iorb,:)/det
           do i=1,NL
-             iw = xi*wm(i)
-             fg0(1,i) = iw+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath(ispin,iorb,iw,dmft_bath)
-             fg0(2,i) = -fdelta_bath(ispin,iorb,iw,dmft_bath)
+             fg0(1,i) =  xi*wm(i)+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath_mats(ispin,iorb,xi*wm(i),dmft_bath)
+             fg0(2,i) = -fdelta_bath_mats(ispin,iorb,xi*wm(i),dmft_bath)
           enddo
           impSmats(ispin,ispin,iorb,iorb,:)= fg0(1,:) - fg(1,:)
           impSAmats(ispin,ispin,iorb,iorb,:)= fg0(2,:) - fg(2,:)
-          det     =  abs(fg0(1,:))**2 + (fg0(2,:))**2
+          det  =  abs(fg0(1,:))**2 + (fg0(2,:))**2
           impG0mats(ispin,ispin,iorb,iorb,:) = conjg(fg0(1,:))/det
           impF0mats(ispin,ispin,iorb,iorb,:) = fg0(2,:)/det
        enddo
     enddo
     deallocate(fg0,fg,sigma,det)
 
-    
+
     allocate(fg0(2,Nw),fg(2,Nw),sigma(2,Nw),det(Nw))
     do ispin=1,Nspin
        do iorb=1,Norb
           do i=1,Nw
-             iw=cmplx(wr(i),eps)
              det(i)  = impGreal(ispin,ispin,iorb,iorb,i)*conjg(impGreal(ispin,ispin,iorb,iorb,Nw+1-i)) + &
                   impFreal(ispin,ispin,iorb,iorb,i)*conjg(impFreal(ispin,ispin,iorb,iorb,Nw+1-i))
              fg(1,i) =  conjg(impGreal(ispin,ispin,iorb,iorb,Nw+1-i))/det(i)
              fg(2,i) =  conjg(impFreal(ispin,ispin,iorb,iorb,Nw+1-i))/det(i)
-             fg0(1,i) = iw+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath(ispin,iorb,wr(i),eps,dmft_bath)
-             fg0(2,i) = -fdelta_bath(ispin,iorb,wr(i),eps,dmft_bath)
+             fg0(1,i) = wr(i)+xi*eps + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath_real(ispin,iorb,wr(i)+xi*eps,dmft_bath)
+             fg0(2,i) = -fdelta_bath_real(ispin,iorb,wr(i)+xi*eps,dmft_bath)
           enddo
           impSreal(ispin,ispin,iorb,iorb,:)= fg0(1,:) - fg(1,:)
           impSAreal(ispin,ispin,iorb,iorb,:)= fg0(2,:) - fg(2,:)
-          ! surely wrong...
+          ! something looks fishy here, the G0/F0_real are very bad behaved, can not figure out the bug yet.
           do i=1,Nw          
              det(i)     =  fg0(1,i)*conjg(fg0(2,Nw+1-i)) + fg0(2,i)*conjg(fg0(2,Nw+1-i))
              impG0real(ispin,ispin,iorb,iorb,i) = conjg(fg0(1,Nw+1-i))/det(i)
@@ -265,7 +380,7 @@ contains
 
     subroutine open_units(string)
       character(len=*) :: string
-      unit=free_units(12)
+      unit=free_units(size(unit))
       open(unit(1),file="impG"//string//"_iw.ed")
       open(unit(2),file="impF"//string//"_iw.ed")
       open(unit(3),file="impSigma"//string//"_iw.ed")

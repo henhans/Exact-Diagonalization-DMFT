@@ -169,13 +169,13 @@ contains
                          deltascimp(iorb) = deltascimp(iorb) + dot_product(vvinit,vvinit)*peso
                          deallocate(vvinit)
                       endif
-                      !
-                      deltascimp(iorb) = deltascimp(iorb) - nupimp(iorb) - (1.d0-ndwimp(iorb))
-                      !
                       if(associated(gsvec)) nullify(gsvec)
                       deallocate(Hmap)
                       !
                    enddo
+                   !
+                   deltascimp(iorb) = deltascimp(iorb) - nupimp(iorb) - (1.d0-ndwimp(iorb))
+                   !
                 enddo
              enddo
           end if
