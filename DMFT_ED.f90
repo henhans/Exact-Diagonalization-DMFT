@@ -29,8 +29,11 @@ contains
     call allocate_bath(dmft_bath)
     call init_bath_ed(dmft_bath,hwband_)
     call copy_bath(dmft_bath,bath_)
-    !call write_bath(dmft_bath,LOGfile)
-    call setup_pointers
+    if(.not.ed_supercond)then
+       call setup_pointers
+    else
+       call setup_pointers_sc
+    endif
     if(ed_method=='full')call setup_eigenspace
     call deallocate_bath(dmft_bath)
   end subroutine init_ed_solver

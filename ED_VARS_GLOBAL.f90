@@ -3,6 +3,7 @@ MODULE ED_BATH_TYPE
   type effective_bath
      real(8),dimension(:,:,:),allocatable :: e
      real(8),dimension(:,:,:),allocatable :: v
+     real(8),dimension(:,:,:),allocatable :: d
      logical                              :: status=.false.
   end type effective_bath
 END MODULE ED_BATH_TYPE
@@ -49,6 +50,7 @@ MODULE ED_VARS_GLOBAL
   real(8),dimension(:,:,:,:),allocatable      :: imHloc         !local hamiltonian, imag part
   complex(8),dimension(:,:,:,:),allocatable   :: Hloc           !local hamiltonian
   real(8)                                     :: xmu            !chemical potential
+  real(8)                                     :: deltasc        !breaking symmetry field
   real(8)                                     :: beta           !inverse temperature
   real(8)                                     :: eps            !broadening
   real(8)                                     :: wini,wfin      !
@@ -69,6 +71,7 @@ MODULE ED_VARS_GLOBAL
   logical                                     :: finiteT        !flag for finite temperature calculation
   character(len=4)                            :: ed_method      !flag to set ed method solution: lanc=lanczos method, full=full diagonalization
   character(len=1)                            :: ed_type        !flag to set real or complex Ham: d=symmetric H (real), c=hermitian H (cmplx)
+  logical                                     :: ed_supercond   !flag to set ed symmetry type: F=normal (default), T=superc=superconductive
   character(len=7)                            :: bath_type      !flag to set bath type: irreducible (1bath/imp), reducible(1bath)
   real(8)                                     :: nread          !fixed density. if 0.d0 fixed chemical potential calculation.
   real(8)                                     :: nerr           !fix density threshold. a loop over from 1.d-1 to required nerr is performed
@@ -88,7 +91,7 @@ MODULE ED_VARS_GLOBAL
   integer,allocatable,dimension(:,:)          :: getCDGsector
   integer,allocatable,dimension(:,:)          :: getBathStride
   integer,allocatable,dimension(:,:)          :: impIndex
-  integer,allocatable,dimension(:)            :: getdim,getnup,getndw
+  integer,allocatable,dimension(:)            :: getdim,getnup,getndw,getsz
 
 
   !Effective Bath used in the ED code (this is opaque to user)
@@ -114,8 +117,8 @@ MODULE ED_VARS_GLOBAL
 
   !Local Self-Energies: (Nspin,Nspin,Norb,Norb,:)
   !=========================================================
-  complex(8),allocatable,dimension(:,:,:,:,:) :: impSmats
-  complex(8),allocatable,dimension(:,:,:,:,:) :: impSreal
+  complex(8),allocatable,dimension(:,:,:,:,:) :: impSmats,impSAmats
+  complex(8),allocatable,dimension(:,:,:,:,:) :: impSreal,impSAreal
 
 
   !Global observables
@@ -130,13 +133,13 @@ MODULE ED_VARS_GLOBAL
 
 
   namelist/EDvars/Norb,Nbath,Nspin,&       
-       beta,xmu,nloop,Uloc,Ust,Jh,& 
-       eps,wini,wfin,      &
-       NL,Nw,Nfit,         &
-       nread,nerr,ndelta,       &
-       chiflag,Jhflag,cutoff,HFmode,   &
-       dmft_error,Nsuccess,      &
-       ed_method,ed_type,bath_type,&
+       beta,xmu,nloop,Uloc,Ust,Jh, &  
+       eps,wini,wfin,deltasc,      &
+       NL,Nw,Nfit,                 &
+       nread,nerr,ndelta,          &
+       chiflag,Jhflag,cutoff,HFmode,&
+       dmft_error,Nsuccess,         &
+       ed_method,ed_type,ed_supercond,bath_type, &
        lanc_neigen,lanc_niter,lanc_ngfiter,lanc_nstates,&
        cg_niter,cg_ftol,cg_weight,cg_scheme,  &
        Hfile,LOGfile
