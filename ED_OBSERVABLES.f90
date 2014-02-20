@@ -6,12 +6,12 @@ MODULE ED_OBSERVABLES
   USE ED_AUX_FUNX
   implicit none
   private
-  
+
   public                             :: ed_getobs
 
   logical,save                       :: iolegend=.true.
   integer,save                       :: loop=0
-  real(8),dimension(:),allocatable   :: nupimp,ndwimp,magimp,deltascimp
+  real(8),dimension(:),allocatable   :: nupimp,ndwimp,magimp,phiscimp
   real(8),dimension(:,:),allocatable :: sz2imp,n2imp
   real(8),dimensioN(:,:),allocatable :: zimp,simp
   real(8)                            :: s2tot
@@ -115,8 +115,8 @@ contains
           enddo
 
           if(ed_supercond) then
-             if(.not.allocated(deltascimp)) allocate(deltascimp(Norb))
-             deltascimp = 0.d0
+             if(.not.allocated(phiscimp)) allocate(phiscimp(Norb))
+             phiscimp = 0.d0
              do ispin=1,Nspin
                 do iorb=1,Norb
                    !
@@ -166,7 +166,7 @@ contains
                             endif
                          enddo
                          deallocate(HJmap)
-                         deltascimp(iorb) = deltascimp(iorb) + dot_product(vvinit,vvinit)*peso
+                         phiscimp(iorb) = phiscimp(iorb) + dot_product(vvinit,vvinit)*peso
                          deallocate(vvinit)
                       endif
                       if(associated(gsvec)) nullify(gsvec)
@@ -174,7 +174,7 @@ contains
                       !
                    enddo
                    !
-                   deltascimp(iorb) = deltascimp(iorb) - nupimp(iorb) - (1.d0-ndwimp(iorb))
+                   phiscimp(iorb) = 0.5d0*(phiscimp(iorb) - nupimp(iorb) - (1.d0-ndwimp(iorb)))
                    !
                 enddo
              enddo
@@ -232,7 +232,7 @@ contains
        call write_to_unit_column()
        write(LOGfile,"(A,10f18.12,f18.12)")"nimp=  ",(nimp(iorb),iorb=1,Norb),sum(nimp)
        if(ed_supercond)then
-          write(LOGfile,"(A,20f18.12)")"delta=  ",(deltascimp(iorb),iorb=1,Norb)
+          write(LOGfile,"(A,20f18.12)")"phi =   ",(phiscimp(iorb),iorb=1,Norb),(uloc(iorb)*phiscimp(iorb),iorb=1,Norb)
        endif
        write(LOGfile,"(A,10f18.12)")"docc=  ",(dimp(iorb),iorb=1,Norb)
        write(LOGfile,"(A,20f18.12)")"sz2 =  ",((sz2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb)
@@ -242,7 +242,7 @@ contains
        write(LOGfile,*)""
        deallocate(nupimp,ndwimp,magimp,sz2imp,n2imp)
        deallocate(simp,zimp)
-       if(ed_supercond)deallocate(deltascimp)
+       if(ed_supercond)deallocate(phiscimp)
     endif
 
 #ifdef _MPI
@@ -296,7 +296,7 @@ contains
     else
        write(unit,"(A1,1A7,90(A10,5X))")"#","loop","xmu",&
             (reg(txtfy(2+iorb))//"nimp_"//reg(txtfy(iorb)),iorb=1,Norb),&
-            (reg(txtfy(Norb+2+iorb))//"delta_"//reg(txtfy(iorb)),iorb=1,Norb),&
+            (reg(txtfy(Norb+2+iorb))//"phi_"//reg(txtfy(iorb)),iorb=1,Norb),&
             (reg(txtfy(2*Norb+2+iorb))//"docc_"//reg(txtfy(iorb)),iorb=1,Norb),&
             (reg(txtfy(3*Norb+2+iorb))//"nup_"//reg(txtfy(iorb)),iorb=1,Norb),&
             (reg(txtfy(4*Norb+2+iorb))//"ndw_"//reg(txtfy(iorb)),iorb=1,Norb),&
@@ -337,7 +337,7 @@ contains
     else
        write(unit,"(I7,90F15.9)")loop,xmu,&
             (nimp(iorb),iorb=1,Norb),&
-            (deltascimp(iorb),iorb=1,Norb),&
+            (phiscimp(iorb),iorb=1,Norb),&
             (dimp(iorb),iorb=1,Norb),&
             (nupimp(iorb),iorb=1,Norb),&
             (ndwimp(iorb),iorb=1,Norb),&
@@ -367,7 +367,7 @@ contains
     else
        write(unit,"(I7,90F15.9)")loop,xmu,&
             (nimp(iorb),iorb=1,Norb),&
-            (deltascimp(iorb),iorb=1,Norb),&
+            (phiscimp(iorb),iorb=1,Norb),&
             (dimp(iorb),iorb=1,Norb),&
             (nupimp(iorb),iorb=1,Norb),&
             (ndwimp(iorb),iorb=1,Norb),&

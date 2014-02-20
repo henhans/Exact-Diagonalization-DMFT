@@ -324,14 +324,14 @@ contains
                   impFreal(ispin,ispin,iorb,iorb,i)*conjg(impFreal(ispin,ispin,iorb,iorb,Nw+1-i))
              fg(1,i) =  conjg(impGreal(ispin,ispin,iorb,iorb,Nw+1-i))/det(i)
              fg(2,i) =  conjg(impFreal(ispin,ispin,iorb,iorb,Nw+1-i))/det(i)
-             fg0(1,i) = wr(i)+xi*eps + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath_real(ispin,iorb,wr(i)+xi*eps,dmft_bath)
-             fg0(2,i) = -fdelta_bath_real(ispin,iorb,wr(i)+xi*eps,dmft_bath)
+             fg0(1,i) = wr(i) + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath_real(ispin,iorb,wr(i)+xi*eps,dmft_bath)
+             fg0(2,i) = fdelta_bath_real(ispin,iorb,wr(i)+xi*eps,dmft_bath)
           enddo
-          impSreal(ispin,ispin,iorb,iorb,:)= fg0(1,:) - fg(1,:)
+          impSreal(ispin,ispin,iorb,iorb,:) = fg0(1,:) - fg(1,:)
           impSAreal(ispin,ispin,iorb,iorb,:)= fg0(2,:) - fg(2,:)
-          ! something looks fishy here, the G0/F0_real are very bad behaved, can not figure out the bug yet.
+          ! something wrong here, Im(impG0(w)) has the wrong sign
           do i=1,Nw          
-             det(i)     =  fg0(1,i)*conjg(fg0(2,Nw+1-i)) + fg0(2,i)*conjg(fg0(2,Nw+1-i))
+             det(i)     =  fg0(1,i)*conjg(fg0(1,Nw+1-i)) + fg0(2,i)*conjg(fg0(2,Nw+1-i))
              impG0real(ispin,ispin,iorb,iorb,i) = conjg(fg0(1,Nw+1-i))/det(i)
              impF0real(ispin,ispin,iorb,iorb,i) = conjg(fg0(2,Nw+1-i))/det(i)
           enddo
