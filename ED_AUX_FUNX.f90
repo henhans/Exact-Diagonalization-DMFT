@@ -3,12 +3,14 @@
 !AUTHORS  : Adriano Amaricci
 !########################################################################
 MODULE ED_AUX_FUNX
+  USE COMMON_VARS, only:mpiID
   USE TIMER
+  USE IOTOOLS, only:free_unit
+  USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   implicit none
   private
 
-  public :: ed_read_input
   public :: print_Hloc
 #ifdef _MPI
   public :: ed_init_mpi
@@ -29,132 +31,70 @@ MODULE ED_AUX_FUNX
 contains
 
 
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : READ THE INPUT FILE AND SETUP GLOBAL VARIABLES
-  !+-------------------------------------------------------------------+
-  subroutine ed_read_input(INPUTunit,Hunit)
-    character(len=*) :: INPUTunit
-    character(len=*) :: Hunit
-    logical          :: control
-    integer          :: iorb,jorb,ispin,jspin
-    if(mpiID==0)call version(revision)
-    !DEFAULT VALUES OF THE PARAMETERS:
-    !ModelConf
-    Norb       = 1
-    Nbath      = 4
-    Nspin      = 1
-    Uloc       = 0.d0;Uloc(1)=2.d0
-    Ust        = 0.d0
-    Jh         = 0.d0
-    xmu        = 0.d0
-    deltasc    = 2.d-2
-    beta       = 500.d0
-    !Loops
-    nloop      = 100
-    chiflag    =.true.
-    Jhflag     =.false.
-    hfmode     =.true.
-    !parameters
-    NL         = 2000
-    Nw         = 2000
-    Ltau       = 1000
-    Nfit       = 1000
-    eps        = 0.01d0
-    nread      = 0.d0
-    nerr       = 1.d-4
-    ndelta     = 0.1d0
-    wini       =-4.d0
-    wfin       = 4.d0
-    cutoff     = 1.d-9
-    dmft_error  = 1.d-5
-    nsuccess   = 2
-    lanc_niter = 512
-    lanc_neigen = 1
-    lanc_ngfiter = 100
-    lanc_nstates = 1            !set to T=0 calculation
-    cg_niter   = 200
-    cg_Ftol     = 1.d-9
-    cg_weight     = 0
-    cg_scheme     = 'delta'
-    ed_method    = 'lanc'
-    ed_type = 'd'
-    ed_supercond = .false.
-    bath_type='normal' !hybrid,superc
-    !ReadUnits
-    Hfile  ="hamiltonian.restart"
-    LOGfile=6
 
-    inquire(file=INPUTunit,exist=control)    
-    if(control)then
-       if(mpiID==0)then
-          open(50,file=INPUTunit,status='old')
-          read(50,nml=EDvars)
-          close(50)
-       endif
+
+#ifdef _MPI
+  !+------------------------------------------------------------------+
+  !PURPOSE  : 
+  !+------------------------------------------------------------------+
+  subroutine ed_init_mpi
+    call MPI_INIT(mpiERR)
+    call MPI_COMM_RANK(MPI_COMM_WORLD,mpiID,mpiERR)
+    call MPI_COMM_SIZE(MPI_COMM_WORLD,mpiSIZE,mpiERR)
+    write(*,"(A,I4,A,I4,A)")'Processor ',mpiID,' of ',mpiSIZE,' is alive'
+    call MPI_BARRIER(MPI_COMM_WORLD,mpiERR)
+  end subroutine ed_init_mpi
+
+  subroutine ed_finalize_mpi
+    call MPI_FINALIZE(mpiERR)
+  end subroutine ed_finalize_mpi
+#endif
+
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : Init calculation
+  !+------------------------------------------------------------------+
+  subroutine init_ed_structure(Hunit)
+    character(len=64)         :: Hunit
+    logical                   :: control
+    integer                   :: i,NP,nup,ndw,iorb,jorb,ispin,jspin
+    !
+    !Norb=# of impurity orbitals
+    !Nbath=# of bath sites (per orbital or not depending on bath_type)
+    !Ns=total number of sites
+    !Nbo=total number of bath sites (all sites - impurity sites)
+    select case(bath_type)
+    case default
+       Ns = (Nbath+1)*Norb
+    case ('hybrid')
+       Ns = Nbath+Norb
+    end select
+    Nbo   = Ns-Norb
+    Ntot  = 2*Ns
+    NN    = 2**Ntot
+    !
+    nup=Ns/2
+    ndw=Ns-nup
+    if(.not.ed_supercond)then
+       Nsect = (Ns+1)*(Ns+1)
+       NP=get_sector_dimension(nup,ndw)
     else
-       if(mpiID==0)then
-          print*,"Can not find INPUT file"
-          print*,"Printing a default version in default."//INPUTunit
-          open(50,file="default."//INPUTunit)
-          write(50,nml=EDvars)
-          write(50,*)""
-       endif
-       stop
+       Nsect = Ntot+1
+       NP=get_sc_sector_dimension(0)
     endif
-
-    call parse_cmd_variable(Norb,"NORB")    
-    call parse_cmd_variable(Nbath,"NBATH")
-    call parse_cmd_variable(Nspin,"NSPIN")
-    call parse_cmd_variable(beta,"BETA")
-    call parse_cmd_variable(xmu,"XMU")
-    call parse_cmd_variable(uloc,"ULOC")
-    call parse_cmd_variable(uloc(1),"U")
-    call parse_cmd_variable(ust,"UST")
-    call parse_cmd_variable(Jh,"JH")
-    call parse_cmd_variable(nloop,"NLOOP")
-    call parse_cmd_variable(deltasc,"DELTASC")
-    call parse_cmd_variable(dmft_error,"DMFT_ERROR")
-    call parse_cmd_variable(nsuccess,"NSUCCESS")
-    call parse_cmd_variable(NL,"NL")
-    call parse_cmd_variable(Nw,"NW")
-    call parse_cmd_variable(Ltau,"LTAU")
-    call parse_cmd_variable(Nfit,"NFIT")
-    call parse_cmd_variable(nread,"NREAD")
-    call parse_cmd_variable(nerr,"NERR")
-    call parse_cmd_variable(ndelta,"NDELTA")
-    call parse_cmd_variable(wini,"WINI")
-    call parse_cmd_variable(wfin,"WFIN")
-    call parse_cmd_variable(chiflag,"CHIFLAG")
-    call parse_cmd_variable(hfmode,"HFMODE")
-    call parse_cmd_variable(eps,"EPS")
-    call parse_cmd_variable(cutoff,"CUTOFF")
-    call parse_cmd_variable(lanc_neigen,"LANC_NEIGEN")
-    call parse_cmd_variable(lanc_niter,"LANC_NITER")
-    call parse_cmd_variable(lanc_nstates,"LANC_NSTATES")
-    call parse_cmd_variable(lanc_ngfiter,"LANC_NGFITER")
-    call parse_cmd_variable(cg_niter,"CG_NITER")
-    call parse_cmd_variable(cg_scheme,"CG_SCHEME")
-    call parse_cmd_variable(cg_ftol,"CG_FTOL")
-    call parse_cmd_variable(cg_weight,"CG_WEIGHT")
-    call parse_cmd_variable(ed_Type,"ED_TYPE")
-    call parse_cmd_variable(ed_Supercond,"ED_SUPERCOND")
-    call parse_cmd_variable(ed_Method,"ED_METHOD")
-    call parse_cmd_variable(bath_type,"BATH_TYPE")
-    call parse_cmd_variable(Hfile,"HFILE")
-    call parse_cmd_variable(LOGfile,"LOGFILE")
-    Ltau=max(int(beta),500)
     !
     if(mpiID==0)then
-       open(50,file="used."//INPUTunit)
-       write(50,nml=EDvars)
-       close(50)
-       write(*,*)"CONTROL PARAMETERS"
-       write(*,nml=EDvars)
-    endif
-
-    if(mpiID==0)then
-       write(LOGfile,"(A)")"U_local:"
-       write(LOGfile,"(90F12.6,1x)")(Uloc(iorb),iorb=1,Norb)
+       write(LOGfile,*)"Summary:"
+       write(LOGfile,*)"--------------------------------------------"
+       write(LOGfile,*)'Number of impurities         = ',Norb
+       write(LOGfile,*)'Number of bath/impurity      = ',Nbath
+       write(LOGfile,*)'Total # of Bath sites/spin   = ',Nbo
+       write(LOGfile,*)'Total # of sites/spin        = ',Ns
+       write(LOGfile,*)'Maximum dimension            = ',NP
+       write(LOGfile,*)'Total size, Hilber space dim.= ',Ntot,NN
+       write(LOGfile,*)'Number of sectors            = ',Nsect
+       write(LOGfile,*)"--------------------------------------------"
     endif
 
     allocate(reHloc(Nspin,Nspin,Norb,Norb))
@@ -205,86 +145,7 @@ contains
        write(LOGfile,"(A)")"H_local:"
        call print_Hloc(Hloc)
     endif
-  end subroutine ed_read_input
 
-
-  subroutine print_Hloc(hloc)
-    integer                                     :: iorb,jorb,ispin,jspin
-    complex(8),dimension(Nspin,Nspin,Norb,Norb) :: hloc
-    do ispin=1,Nspin
-       do iorb=1,Norb
-          write(LOGfile,"(20(A1,F7.3,A1,F7.3,A1,2x))")&
-               (&
-               (&
-               '(',dreal(Hloc(ispin,jspin,iorb,jorb)),',',dimag(Hloc(ispin,jspin,iorb,jorb)),')',&
-               jorb =1,Norb),&
-               jspin=1,Nspin)
-       enddo
-    enddo
-  end subroutine print_Hloc
-
-
-#ifdef _MPI
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine ed_init_mpi
-    call MPI_INIT(mpiERR)
-    call MPI_COMM_RANK(MPI_COMM_WORLD,mpiID,mpiERR)
-    call MPI_COMM_SIZE(MPI_COMM_WORLD,mpiSIZE,mpiERR)
-    write(*,"(A,I4,A,I4,A)")'Processor ',mpiID,' of ',mpiSIZE,' is alive'
-    call MPI_BARRIER(MPI_COMM_WORLD,mpiERR)
-  end subroutine ed_init_mpi
-
-  subroutine ed_finalize_mpi
-    call MPI_FINALIZE(mpiERR)
-  end subroutine ed_finalize_mpi
-#endif
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : Init calculation
-  !+------------------------------------------------------------------+
-  subroutine init_ed_structure
-    integer          :: i,NP,nup,ndw,iorb,jorb,ispin,jspin
-    !Norb=# of impurity orbitals
-    !Nbath=# of bath sites (per orbital or not depending on bath_type)
-    !Ns=total number of sites
-    !Nbo=total number of bath sites (all sites - impurity sites)
-    select case(bath_type)
-    case default
-       Ns = (Nbath+1)*Norb
-    case ('hybrid')
-       Ns = Nbath+Norb
-    end select
-    Nbo   = Ns-Norb
-    Ntot  = 2*Ns
-    NN    = 2**Ntot
-
-    !
-    nup=Ns/2
-    ndw=Ns-nup
-    if(.not.ed_supercond)then
-       Nsect = (Ns+1)*(Ns+1)
-       NP=get_sector_dimension(nup,ndw)
-    else
-       Nsect = Ntot+1
-       NP=get_sc_sector_dimension(0)
-    endif
-
-    if(mpiID==0)then
-       write(*,*)"Summary:"
-       write(*,*)"--------------------------------------------"
-       write(*,*)'Number of impurities         = ',Norb
-       write(*,*)'Number of bath/impurity      = ',Nbath
-       write(*,*)'Total # of Bath sites/spin   = ',Nbo
-       write(*,*)'Total # of sites/spin        = ',Ns
-       write(*,*)'Maximum dimension            = ',NP
-       write(*,*)'Total size, Hilber space dim.= ',Ntot,NN
-       write(*,*)'Number of sectors            = ',Nsect
-       write(*,*)"--------------------------------------------"
-       print*,''
-    endif
 
     allocate(impIndex(Norb,2))
     allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect),getsz(Nsect))
@@ -301,27 +162,27 @@ contains
 
     !check finiteT
     finiteT=.true.              !assume doing finite T per default
-    if(lanc_nstates==1)then     !is you only want to keep 1 state
-       lanc_neigen=1            !set the required eigen per sector to 1 see later for neigen_sector
+    if(lanc_nstates_total==1)then     !is you only want to keep 1 state
+       lanc_nstates_sector=1            !set the required eigen per sector to 1 see later for neigen_sector
        finiteT=.false.          !set to do zero temperature calculations
        if(mpiID==0)then
-          write(LOGfile,"(A)")"Required Lanc_Nstates=1 => set T=0 calculation"
+          write(LOGfile,"(A)")"Required Lanc_nstates_total=1 => set T=0 calculation"
        endif
     endif
 
 
-    !check whether lanc_neigen and lanc_states are even (we do want to keep doublet among states)
+    !check whether lanc_nstates_sector and lanc_states are even (we do want to keep doublet among states)
     if(finiteT)then
-       if(mod(lanc_neigen,2)/=0)then
-          lanc_neigen=lanc_neigen+1
+       if(mod(lanc_nstates_sector,2)/=0)then
+          lanc_nstates_sector=lanc_nstates_sector+1
           if(mpiID==0)then
-             write(LOGfile,"(A,I10)")"Increased Lanc_Neigen:",lanc_neigen
+             write(LOGfile,"(A,I10)")"Increased Lanc_nstates_sector:",lanc_nstates_sector
           endif
        endif
-       if(mod(lanc_nstates,2)/=0)then
-          lanc_nstates=lanc_nstates+1
+       if(mod(lanc_nstates_total,2)/=0)then
+          lanc_nstates_total=lanc_nstates_total+1
           if(mpiID==0)then
-             write(LOGfile,"(A,I10)")"Increased Lanc_Nstates:",lanc_nstates
+             write(LOGfile,"(A,I10)")"Increased Lanc_nstates_total:",lanc_nstates_total
           endif
        endif
 
@@ -334,7 +195,7 @@ contains
     endif
 
     !Some check:
-    if(Nfit>NL)Nfit=NL
+    if(Lfit>Lmats)Lfit=Lmats
     if(Nspin>2)stop "Nspin > 2 ERROR. ask developer or develop your own on separate branch"
     if(Norb>3)stop "Norb > 3 ERROR. ask developer or develop your own on separate branch" 
     if(nerr < dmft_error) nerr=dmft_error
@@ -353,17 +214,35 @@ contains
     endif
 
     !allocate functions
-    allocate(impSmats(Nspin,Nspin,Norb,Norb,NL))
-    allocate(impSreal(Nspin,Nspin,Norb,Norb,Nw))
+    allocate(impSmats(Nspin,Nspin,Norb,Norb,Lmats))
+    allocate(impSreal(Nspin,Nspin,Norb,Norb,Lreal))
     if(ed_supercond)then
-       allocate(impSAmats(Nspin,Nspin,Norb,Norb,NL))
-       allocate(impSAreal(Nspin,Nspin,Norb,Norb,Nw))
+       allocate(impSAmats(Nspin,Nspin,Norb,Norb,Lmats))
+       allocate(impSAreal(Nspin,Nspin,Norb,Norb,Lreal))
     endif
 
     !allocate observables
     allocate(nimp(Norb),dimp(Norb))
   end subroutine init_ed_structure
 
+
+
+
+
+  subroutine print_Hloc(hloc)
+    integer                                     :: iorb,jorb,ispin,jspin
+    complex(8),dimension(Nspin,Nspin,Norb,Norb) :: hloc
+    do ispin=1,Nspin
+       do iorb=1,Norb
+          write(LOGfile,"(20(A1,F7.3,A1,F7.3,A1,2x))")&
+               (&
+               (&
+               '(',dreal(Hloc(ispin,jspin,iorb,jorb)),',',dimag(Hloc(ispin,jspin,iorb,jorb)),')',&
+               jorb =1,Norb),&
+               jspin=1,Nspin)
+       enddo
+    enddo
+  end subroutine print_Hloc
 
 
 
@@ -389,7 +268,7 @@ contains
           getndw(isector)=ndw
           dim = get_sector_dimension(nup,ndw)
           getdim(isector)=dim
-          neigen_sector(isector) = min(dim,lanc_neigen)   !init every sector to required eigenstates
+          neigen_sector(isector) = min(dim,lanc_nstates_sector)   !init every sector to required eigenstates
        enddo
     enddo
     call stop_timer
@@ -459,7 +338,7 @@ contains
        getsz(isector)=isz
        dim = get_sc_sector_dimension(isz)
        getdim(isector)=dim
-       neigen_sector(isector) = min(dim,lanc_neigen)   !init every sector to required eigenstates
+       neigen_sector(isector) = min(dim,lanc_nstates_sector)   !init every sector to required eigenstates
        !<DEBUG
        allocate(imap(dim))
        call build_sector(isector,imap,dim2)
@@ -519,6 +398,7 @@ contains
        getCDGsector(2,isector)=jsector
     enddo
   end subroutine setup_pointers_sc
+
 
 
 

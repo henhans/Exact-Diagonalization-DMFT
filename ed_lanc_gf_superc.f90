@@ -6,12 +6,12 @@ subroutine lanc_ed_getgf_superc()
   integer :: isect0,numstates
   real(8) :: norm0
   call allocate_grids
-  allocate(Gaux_mats(3,NL),Gaux_real(3,Nw))
+  allocate(Gaux_mats(3,Lmats),Gaux_real(3,Lreal))
 
-  if(.not.allocated(impGmats))allocate(impGmats(Nspin,Nspin,Norb,Norb,NL))
-  if(.not.allocated(impGreal))allocate(impGreal(Nspin,Nspin,Norb,Norb,Nw))
-  if(.not.allocated(impFmats))allocate(impFmats(Nspin,Nspin,Norb,Norb,NL))
-  if(.not.allocated(impFreal))allocate(impFreal(Nspin,Nspin,Norb,Norb,Nw))
+  if(.not.allocated(impGmats))allocate(impGmats(Nspin,Nspin,Norb,Norb,Lmats))
+  if(.not.allocated(impGreal))allocate(impGreal(Nspin,Nspin,Norb,Norb,Lreal))
+  if(.not.allocated(impFmats))allocate(impFmats(Nspin,Nspin,Norb,Norb,Lmats))
+  if(.not.allocated(impFreal))allocate(impFreal(Nspin,Nspin,Norb,Norb,Lreal))
   impGmats=zero
   impGreal=zero
   impFmats=zero
@@ -348,11 +348,11 @@ subroutine add_to_lanczos_gf_sc(vnorm2,Ei,nlanc,alanc,blanc,isign,iorb,jorb,icha
   do j=1,nlanc
      de = diag(j)-Ei
      peso = pesoBZ*Z(1,j)*Z(1,j)
-     do i=1,NL
+     do i=1,Lmats
         iw=xi*wm(i)
         Gaux_mats(ichan,i)=Gaux_mats(ichan,i) + peso/(iw-isign*de)
      enddo
-     do i=1,Nw
+     do i=1,Lreal
         iw=dcmplx(wr(i),eps)
         Gaux_real(ichan,i)=Gaux_real(ichan,i) + peso/(iw-isign*de)
      enddo

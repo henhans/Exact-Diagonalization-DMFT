@@ -14,7 +14,8 @@ EXE=ed_ahm_bethe
 #EXE=ed_pam_2b
 #EXE=ed_lda1b
 #EXE=ed_lda
-EXE=ed_tddpam_bethe
+EXE=ed_tddpam_lattice
+#EXE=ed_tddpam_bethe
 
 #--> B-H-Z MODELS
 #EXE=ed_2x2bhz
@@ -23,12 +24,10 @@ EXE=ed_tddpam_bethe
 DIR =drivers
 DIREXE=$(HOME)/.bin
 
-
-
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
 #COMPILATION:
-OBJS= MATRIX_SPARSE.o ED_EIGENSPACE.o ED_VARS_GLOBAL.o ARPACK_LANCZOS.o PLAIN_LANCZOS.o ED_AUX_FUNX.o ED_BATH.o ED_HAMILTONIAN.o ED_GREENS_FUNCTIONS.o ED_OBSERVABLES.o ED_CHI2FIT.o ED_DIAG.o DMFT_ED.o
+OBJS= MATRIX_SPARSE.o ED_EIGENSPACE.o ED_BATH_TYPE.o ED_INPUT_VARS.o ED_VARS_GLOBAL.o ARPACK_LANCZOS.o PLAIN_LANCZOS.o ED_AUX_FUNX.o ED_BATH.o ED_HAMILTONIAN.o ED_GREENS_FUNCTIONS.o ED_OBSERVABLES.o ED_CHI2FIT.o ED_DIAG.o DMFT_ED.o
 
 #=================STANDARD COMPILATION====================================
 all: FLAG=$(STD) -fpp -D_$(FPP) #-openmp

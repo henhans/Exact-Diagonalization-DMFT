@@ -2,6 +2,9 @@
 !PURPOSE  : Obtain some physical quantities and print them out
 !########################################################################
 MODULE ED_OBSERVABLES
+  USE COMMON_VARS
+  USE IOTOOLS, only:free_unit,reg
+  USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_AUX_FUNX
   implicit none
@@ -15,7 +18,6 @@ MODULE ED_OBSERVABLES
   real(8),dimension(:,:),allocatable :: sz2imp,n2imp
   real(8),dimensioN(:,:),allocatable :: zimp,simp
   real(8)                            :: s2tot
-
 contains 
 
   !+-------------------------------------------------------------------+
@@ -179,7 +181,6 @@ contains
                 enddo
              enddo
           end if
-
 
        case ('full')
           do isector=1,Nsect

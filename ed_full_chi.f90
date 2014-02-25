@@ -12,14 +12,10 @@ subroutine full_ed_getchi()
   integer,allocatable,dimension(:)      :: HImap    !map of the Sector S to Hilbert space H
   if(mpiID==0)write(LOGfile,"(A)")"Evaluating Suceptibility:"
   call allocate_grids
-  allocate(Chitau(Norb,0:Ltau),Chiw(Norb,Nw),Chiiw(Norb,0:NL))
-  !allocate(Chitautot(0:Ltau),Chiwtot(Nw),Chiiwtot(0:NL))
+  allocate(Chitau(Norb,0:Ltau),Chiw(Norb,Lreal),Chiiw(Norb,0:Lmats))
   Chitau=0.d0
   Chiw=zero
   Chiiw=zero
-  !Chitautot=0.d0
-  !Chiwtot=zero
-  !Chiiwtot=zero
   !Spin susceptibility \X(tau). |<i|S_z|j>|^2
   if(mpiID==0)write(LOGfile,"(A)")"Evaluating Chi_Sz"
   if(mpiID==0)call start_progress(LOGfile)
@@ -54,12 +50,12 @@ subroutine full_ed_getchi()
            do iorb=1,Norb
               !Matsubara (bosonic) frequency
               if(de>cutoff)chiiw(iorb,0)=chiiw(iorb,0)-peso(iorb)*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/de
-              do m=1,NL
+              do m=1,Lmats
                  iw=xi*vm(m)
                  chiiw(iorb,m)=chiiw(iorb,m)+peso(iorb)*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/(iw-de)
               enddo
               !Real-frequency
-              do m=1,Nw
+              do m=1,Lreal
                  w0=wr(m);iw=cmplx(w0,eps,8)
                  !Retarded = Commutator = response function
                  chiw(iorb,m)=chiw(iorb,m)+peso(iorb)*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/(iw-de)
@@ -78,7 +74,7 @@ subroutine full_ed_getchi()
            enddo
            ! !Matsubara (bosonic) frequency
            ! if(de>cutoff)chiiwtot(0)=chiiwtot(0)-pesotot*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/de
-           ! do m=1,NL
+           ! do m=1,Lmats
            !    iw=xi*vm(m)
            !    chiiwtot(m)=chiiwtot(m)+pesotot*exp(-beta*Ej)*(exp(-beta*de)-1.d0)/(iw-de)
            ! enddo
@@ -88,7 +84,7 @@ subroutine full_ed_getchi()
            !         exp(-(beta-it)*espace(isector)%e(j))*pesotot
            !    !chitautot(m)=chitautot(m) + pesotot*exp(-beta*Ej)*exp(-it*de)
            ! enddo
-           ! do m=1,Nw
+           ! do m=1,Lreal
            !    w0=wr(m);iw=cmplx(w0,eps,8)
            !    ! chiwtot(m)=chiwtot(m)-exp(-beta*espace(isector)%e(j))*&
            !    !      (one/(w0+xi*eps+de) + one/(w0-xi*eps-de))*pesotot
