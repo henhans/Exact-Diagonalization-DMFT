@@ -5,7 +5,7 @@ FC=ifort
 #FPP=MPI
 #=========================================================================
 #--> HUBBARD MODELS:
-EXE=ed_ahm_bethe
+#EXE=ed_ahm_bethe
 #EXE=ed_hm_2dsquare
 #EXE=ed_hm_bethe_mixgf
 
@@ -13,13 +13,15 @@ EXE=ed_ahm_bethe
 #EXE=ed_pam_1b
 #EXE=ed_pam_2b
 #EXE=ed_lda1b
-#EXE=ed_lda
-EXE=ed_tddpam_lattice
+EXE=ed_lda
+#EXE=ed_tddpam_lattice
 #EXE=ed_tddpam_bethe
 
 #--> B-H-Z MODELS
 #EXE=ed_2x2bhz
 #EXE=ed_bhz
+#EXE=ed_afm_bhz
+
 
 DIR =drivers
 DIREXE=$(HOME)/.bin
@@ -57,7 +59,7 @@ compile: version $(OBJS)
 
 clean: 
 	@echo "Cleaning:"
-	@rm -f *.mod *.o *~ revision.inc
+	@rm -f *.mod *.o *~ 
 
 version:
 	@echo $(VER)

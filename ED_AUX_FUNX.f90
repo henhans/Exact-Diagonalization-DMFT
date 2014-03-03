@@ -56,9 +56,11 @@ contains
   !PURPOSE  : Init calculation
   !+------------------------------------------------------------------+
   subroutine init_ed_structure(Hunit)
-    character(len=64)         :: Hunit
-    logical                   :: control
-    integer                   :: i,NP,nup,ndw,iorb,jorb,ispin,jspin
+    character(len=64)                        :: Hunit
+    logical                                  :: control
+    real(8),dimension(Nspin,Nspin,Norb,Norb) :: reHloc         !local hamiltonian, real part 
+    real(8),dimension(Nspin,Nspin,Norb,Norb) :: imHloc         !local hamiltonian, imag part
+    integer                                  :: i,NP,nup,ndw,iorb,jorb,ispin,jspin
     !
     !Norb=# of impurity orbitals
     !Nbath=# of bath sites (per orbital or not depending on bath_type)
@@ -97,14 +99,13 @@ contains
        write(LOGfile,*)"--------------------------------------------"
     endif
 
-    allocate(reHloc(Nspin,Nspin,Norb,Norb))
-    allocate(imHloc(Nspin,Nspin,Norb,Norb))
     allocate(Hloc(Nspin,Nspin,Norb,Norb))
     reHloc = 0.d0
     imHloc = 0.d0
 
     inquire(file=Hunit,exist=control)    
     if(control)then
+       if(mpiID==0)write(LOGfile,*)"Reading Hloc from file: "//Hunit
        open(50,file=Hunit,status='old')
        do ispin=1,Nspin
           do iorb=1,Norb
@@ -117,34 +118,37 @@ contains
           enddo
        enddo
        close(50)
+       Hloc = dcmplx(reHloc,imHloc)
     else
        if(mpiID==0)then
-          print*,"Can not find Uloc/Hloc file"
-          print*,"Printing a default version in default."//Hunit
-          open(50,file="default."//Hunit)
-          do ispin=1,Nspin
-             do iorb=1,Norb
-                write(50,"(90F12.6)")((reHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
-             enddo
-          enddo
-          write(50,*)""
-          do ispin=1,Nspin
-             do iorb=1,Norb
-                write(50,"(90F12.6)")((imHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
-             enddo
-          enddo
-          write(50,*)""
-          close(50)
+          write(LOGfile,*)"Hloc file not found."
+          write(LOGfile,*)"Hloc should be defined elsewhere..."
        endif
-       stop
+       !    if(mpiID==0)then
+       !       print*,"Can not find Uloc/Hloc file"
+       !       print*,"Printing a default version in default."//Hunit
+       !       open(50,file="default."//Hunit)
+       !       do ispin=1,Nspin
+       !          do iorb=1,Norb
+       !             write(50,"(90F12.6)")((reHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
+       !          enddo
+       !       enddo
+       !       write(50,*)""
+       !       do ispin=1,Nspin
+       !          do iorb=1,Norb
+       !             write(50,"(90F12.6)")((imHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
+       !          enddo
+       !       enddo
+       !       write(50,*)""
+       !       close(50)
+       !    endif
+       !    stop
     endif
-
-    hloc = dcmplx(reHloc,imHloc)
-
     if(mpiID==0)then
        write(LOGfile,"(A)")"H_local:"
        call print_Hloc(Hloc)
     endif
+
 
 
     allocate(impIndex(Norb,2))
@@ -222,14 +226,16 @@ contains
     endif
 
     !allocate observables
-    allocate(nimp(Norb),dimp(Norb))
+    allocate(ed_dens(Norb),ed_docc(Norb))
+    if(ed_supercond)allocate(ed_phisc(Norb))
   end subroutine init_ed_structure
 
 
 
 
 
-  subroutine print_Hloc(hloc)
+  subroutine print_Hloc(hloc,unit)
+    integer,optional                            :: unit
     integer                                     :: iorb,jorb,ispin,jspin
     complex(8),dimension(Nspin,Nspin,Norb,Norb) :: hloc
     do ispin=1,Nspin
@@ -242,6 +248,20 @@ contains
                jspin=1,Nspin)
        enddo
     enddo
+    if(present(unit))then
+       do ispin=1,Nspin
+          do iorb=1,Norb
+             write(unit,"(90F12.6)")((dreal(Hloc(ispin,jspin,iorb,jorb)),jorb=1,Norb),jspin=1,Nspin)
+          enddo
+       enddo
+       write(unit,*)""
+       do ispin=1,Nspin
+          do iorb=1,Norb
+             write(unit,"(90F12.6)")((dimag(Hloc(ispin,jspin,iorb,jorb)),jorb=1,Norb),jspin=1,Nspin)
+          enddo
+       enddo
+       write(unit,*)""
+    endif
   end subroutine print_Hloc
 
 

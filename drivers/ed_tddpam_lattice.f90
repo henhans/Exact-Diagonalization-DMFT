@@ -199,7 +199,7 @@ contains
        enddo
     enddo
     npimp=get_density_fromFFT(gloc(2,2,:),beta)
-    ntotal=nimp(1)+npimp
+    ntotal=ed_dens(1)+npimp
     write(*,"(A,F25.18)")"np  =",npimp
     write(*,"(A,F25.18)")"ntot=",ntotal
     call splot("np.ntot_all.ed",npimp,ntotal,append=.true.)
@@ -227,7 +227,7 @@ contains
     deallocate(gloc)
 
     if(ntype==1)then
-       nobj=nimp(1)
+       nobj=ed_dens(1)
     elseif(ntype==2)then
        nobj=npimp
     else

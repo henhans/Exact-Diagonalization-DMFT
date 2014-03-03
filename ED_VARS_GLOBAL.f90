@@ -21,8 +21,6 @@ MODULE ED_VARS_GLOBAL
 
   !local part of the Hamiltonian
   !=========================================================
-  real(8),dimension(:,:,:,:),allocatable      :: reHloc         !local hamiltonian, real part 
-  real(8),dimension(:,:,:,:),allocatable      :: imHloc         !local hamiltonian, imag part
   complex(8),dimension(:,:,:,:),allocatable   :: Hloc           !local hamiltonian
 
 
@@ -65,6 +63,6 @@ MODULE ED_VARS_GLOBAL
 
   !Density and double occupancy
   !=========================================================
-  real(8),dimension(:),allocatable            ::  nimp,dimp
+  real(8),dimension(:),allocatable            ::  ed_dens,ed_docc,ed_phisc
 
 END MODULE ED_VARS_GLOBAL

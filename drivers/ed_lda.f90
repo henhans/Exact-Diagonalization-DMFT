@@ -4,11 +4,14 @@
 !###################################################################
 program lancED
   USE DMFT_ED
+  USE COMMON_VARS
+  USE IOTOOLS
   USE FUNCTIONS
   USE TOOLS
   USE MATRIX
   USE ERROR
   USE ARRAYS
+  USE PARSE_INPUT
   implicit none
   integer                :: iloop,Lk
   logical                :: converged
@@ -26,25 +29,25 @@ program lancED
   integer                :: ntype
   real(8)                :: nobj
   logical                :: fbethe
-  real(8)                :: ts(3)
+  real(8)                :: alpha(2),ts,thop(3)
   character(len=16)      :: finput,fhloc
 
   !parse additional variables && read input file && read Hk
-  call parse_cmd_variable(hkfile,"HKFILE",default="hkfile.in")
+  call parse_cmd_variable(finput,'FINPUT',default='inputED.in')
+  !call parse_input_variable(hkfile,"HKFILE",finput,default='hkfile.in')
   call parse_cmd_variable(ntype,"NTYPE",default=0)
-  call parse_cmd_variable(fbethe,"FBETHE",default=.false.)
+  call parse_cmd_variable(fbethe,"FBETHE",default=.true.)
   call parse_cmd_variable(Lk,"Lk",default=1000)
-  call parse_cmd_variable(ts,"TS",default=[1.d0,0.d0,0.d0])
-  call parse_cmd_variable(finput,"FINPUT",default='inputED.in')
-  call parse_cmd_variable(fhloc,"FHLOC",default='inputHLOC.in')
+  call parse_cmd_variable(ts,"TS",default=0.5d0)
+  call parse_cmd_variable(alpha,"alpha",default=[0.5d0,0.5d0])
   !
-  call ed_read_input(trim(finput),trim(fhloc))
+  call ed_read_input(trim(finput))
   !
   call read_hk(trim(hkfile))
 
 
   !Allocate Weiss Field:
-  allocate(delta(Norb,Norb,NL))
+  allocate(delta(Norb,Norb,Lmats))
 
 
   !setup solver
@@ -70,7 +73,7 @@ program lancED
 
      !Check convergence (if required change chemical potential)
      converged = check_convergence(delta(1,1,:),dmft_error,nsuccess,nloop,reset=.false.)
-     if(nread/=0.d0)call search_chemical_potential(nobj,niter,converged)
+     if(nread/=0.d0)call search_chemical_potential(nobj,converged)
      call end_loop
   enddo
 
@@ -87,14 +90,18 @@ contains
        !
        allocate(Hk(Norb,Norb,Lk))
        allocate(dos_wt(Lk))
+       thop(1)=ts
+       do iorb=2,Norb
+          thop(iorb)=alpha(iorb-1)*ts
+       enddo
        de=2.d0/dble(Lk)
        do ik=1,Lk
           e = -1.d0 + dble(ik-1)*de
           Hk(:,:,ik) = Hloc(1,1,:,:) !set local part
           do iorb=1,Norb
-             Hk(iorb,iorb,ik) = Hk(iorb,iorb,ik) - 2.d0*ts(iorb)*e
+             Hk(iorb,iorb,ik) = Hk(iorb,iorb,ik) - 2.d0*thop(iorb)*e
           enddo
-          dos_wt(ik)=dens_bethe(e,D)*de
+          dos_wt(ik)=dens_bethe(e,2.d0*ts)*de
        enddo
        !
     else
@@ -128,15 +135,15 @@ contains
     complex(8)                              :: iw
     complex(8),dimension(Norb,Norb)         :: zeta,fg,self,gdelta
     complex(8),allocatable,dimension(:,:,:) :: gloc
-    real(8)                                 :: wm(NL),wr(Nw)
+    real(8)                                 :: wm(Lmats),wr(Lreal)
 
-    wm = pi/beta*real(2*arange(1,NL)-1,8)
-    wr = linspace(wini,wfin,Nw)
+    wm = pi/beta*real(2*arange(1,Lmats)-1,8)
+    wr = linspace(wini,wfin,Lreal)
     !
     delta=zero
     !
-    allocate(gloc(Norb,Norb,NL))
-    do i=1,NL
+    allocate(gloc(Norb,Norb,Lmats))
+    do i=1,Lmats
        zeta=zero
        do iorb=1,Norb
           zeta(iorb,iorb) = (xi*wm(i) + xmu)
@@ -176,8 +183,8 @@ contains
     deallocate(gloc)
 
 
-    allocate(gloc(Norb,Norb,Nw))
-    do i=1,Nw
+    allocate(gloc(Norb,Norb,Lreal))
+    do i=1,Lreal
        zeta=zero
        do iorb=1,Norb
           zeta(iorb,iorb) = dcmplx(wr(i),eps) + xmu
@@ -200,14 +207,14 @@ contains
     enddo
     deallocate(gloc)
 
-    nobj=nimp(1)
+    nobj=ed_dens(1)
     if(Norb>1)then
        if(ntype==1)then
-          nobj=nimp(1)
+          nobj=ed_dens(1)
        elseif(ntype==2)then
-          nobj=nimp(2)
+          nobj=ed_dens(2)
        else
-          nobj=nimp(1)+nimp(2)
+          nobj=sum(ed_dens)
        endif
     endif
   end subroutine get_delta
