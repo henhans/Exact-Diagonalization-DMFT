@@ -2,11 +2,13 @@
 !PURPOSE  : Perform the \Chi^2 fit procedure on the Delta function
 !########################################################################
 MODULE ED_CHI2FIT
-  USE ED_VARS_GLOBAL
-  USE ED_BATH
-  !
+  USE COMMON_VARS
   USE OPTIMIZE, only:fmin_cg
   USE MATRIX,   only:matrix_inverse
+  USE IOTOOLS,  only:reg,free_unit 
+  USE ED_INPUT_VARS
+  USE ED_VARS_GLOBAL
+  USE ED_BATH
 
   implicit none
   private
@@ -92,7 +94,7 @@ contains
        if(size(fg,2)/=Norb)stop"CHI2_FITGF: wrong dimension 2 in chi2_input"
        check= check_bath_dimension(bath_)
        if(.not.check)stop "chi2_fitgf_irred: wrong bath dimensions"
-       Ldelta = Nfit
+       Ldelta = Lfit
        if(Ldelta>size(fg,3))Ldelta=size(fg,3)
        !
        allocate(Fdelta(1,Ldelta))
@@ -202,7 +204,7 @@ contains
        if(size(fg,3)/=Norb)stop"CHI2_FITGF: wrong dimension 3 in chi2_input"
        check= check_bath_dimension(bath_)
        if(.not.check)stop "chi2_fitgf_irred: wrong bath dimensions"
-       Ldelta = Nfit
+       Ldelta = Lfit
        if(Ldelta>size(fg,4))Ldelta=size(fg,4)
        !
        allocate(Fdelta(2,Ldelta))
@@ -338,7 +340,7 @@ contains
        totNorb=corb
        if(totNorb/=(Norb*(Norb+1)/2))stop "CHI2FIT: Error counting the orbitals"
        !
-       Ldelta = Nfit
+       Ldelta = Lfit
        if(Ldelta>size(fg,3))Ldelta=size(fg,3)
        allocate(Fdelta(totNorb,Ldelta))
        allocate(Xdelta(Ldelta))

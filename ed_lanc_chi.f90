@@ -4,7 +4,7 @@
 subroutine lanc_ed_getchi()
   integer :: iorb,jorb,ispin
   call allocate_grids
-  allocate(Chitau(Norb,0:Ltau),Chiw(Norb,Nw),Chiiw(Norb,0:NL))
+  allocate(Chitau(Norb,0:Ltau),Chiw(Norb,Lreal),Chiiw(Norb,0:Lmats))
   Chitau=0.d0
   Chiw=zero
   Chiiw=zero
@@ -176,11 +176,11 @@ subroutine add_to_lanczos_chi(vnorm,Ei,nlanc,alanc,blanc,iorb)
      de = diag(j)-Ei
      peso = pesoBZ*Z(1,j)*Z(1,j)
      if(de>cutoff)chiiw(iorb,0)=chiiw(iorb,0) - peso*(exp(-beta*de)-1.d0)/de
-     do i=1,NL
+     do i=1,Lmats
         iw=xi*vm(i)
         chiiw(iorb,i)=chiiw(iorb,i) + peso*(exp(-beta*de)-1.d0)/(iw-de)
      enddo
-     do i=1,Nw
+     do i=1,Lreal
         iw=dcmplx(wr(i),eps)
         chiw(iorb,i)=chiw(iorb,i) + peso*(exp(-beta*de)-1.d0)/(iw-de)
      enddo

@@ -4,6 +4,8 @@
 ! |1,2;3...Ns>_UP * |Ns+1,Ns+2;Ns+3,...,2*Ns>_DOWN
 !########################################################################
 MODULE ED_HAMILTONIAN
+  USE COMMON_VARS
+  USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_BATH
   USE ED_AUX_FUNX
@@ -944,12 +946,10 @@ contains
 !     call build_sector(isector,Hmap)
 !   end subroutine setup_Hv_sector
 
+
 !   subroutine delete_Hv_sector()
 !     deallocate(Hmap)
 !   end subroutine delete_Hv_sector
-
-
-
 ! =======
 ! >>>>>>> devel_sc
 end MODULE ED_HAMILTONIAN

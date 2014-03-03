@@ -4,6 +4,8 @@
 !###################################################################
 program lancED
   USE DMFT_ED
+  USE COMMON_VARS
+  USE IOTOOLS
   USE FUNCTIONS
   USE TOOLS
   USE MATRIX
@@ -21,31 +23,21 @@ program lancED
   character(len=16)      :: finput,fhloc
 
   call parse_cmd_variable(finput,"FINPUT",default='inputED.in')
-  call parse_cmd_variable(fhloc,"FHLOC",default='inputHLOC.in')
-  call parse_cmd_variable(wband,"wband",default=1.d0)
-  call parse_cmd_variable(Lk,"Lk",default=500)
+  call parse_input_variable(wband,"wband",finput,default=1.d0)
+  call parse_input_variable(Lk,"Lk",finput,default=500)
   !
-  call ed_read_input(trim(finput),trim(fhloc))
-  Hloc=zero
-  
+  call ed_read_input(trim(finput))!,trim(fhloc))
+
   !Allocate Weiss Field:
-  allocate(delta(2,Norb,Norb,NL))
+  allocate(delta(2,Norb,Norb,Lmats))
 
   !setup solver
   Nb=get_bath_size()
   allocate(bath(Nb(1),Nb(2)))
   call init_ed_solver(bath)
+
+
   !DMFT loop
-  
-
-  !+- DEBUG
-  ! impSAmats=-deltasc
-  ! impSAreal=-deltasc
-  ! call get_delta_bethe
-  ! stop
-  !+- DEBUG
-
-
   iloop=0;converged=.false.
   do while(.not.converged.AND.iloop<nloop)
      iloop=iloop+1
@@ -63,29 +55,29 @@ program lancED
      !Check convergence (if required change chemical potential)
      if(mpiID==0)then
         converged = check_convergence(delta(1,1,1,:)+delta(2,1,1,:),dmft_error,nsuccess,nloop,reset=.false.)
-        if(nread/=0.d0)call search_chemical_potential(nimp(1),converged)
+        if(nread/=0.d0)call search_chemical_potential(ed_dens(1),converged)
      endif
      call end_loop
   enddo
-  
+
 contains
 
   !+----------------------------------------+
   subroutine get_delta_bethe
     integer                    :: i,j,iorb,ik
     complex(8)                 :: iw,zita,g0loc,cdet,zita1,zita2
-    complex(8),dimension(NL)   :: zeta
-    complex(8),dimension(2,NL) :: gloc,calG
-    complex(8),dimension(2,Nw) :: grloc
-    real(8)                    :: wm(NL),wr(Nw),tau(0:NL)
+    complex(8),dimension(Lmats)   :: zeta
+    complex(8),dimension(2,Lmats) :: gloc,calG
+    complex(8),dimension(2,Lreal) :: grloc
+    real(8)                    :: wm(Lmats),wr(Lreal),tau(0:Lmats)
     real(8),dimension(Lk)       :: epsik,wt
 
-    wm = pi/beta*real(2*arange(1,NL)-1,8)
-    wr = linspace(wini,wfin,Nw)
+    wm = pi/beta*real(2*arange(1,Lmats)-1,8)
+    wr = linspace(wini,wfin,Lreal)
     call bethe_lattice(wt,epsik,Lk,1.d0)
-    
+
     delta=zero
-    do i=1,NL
+    do i=1,Lmats
        iw = xi*wm(i)
        zita    = iw + xmu - impSmats(1,1,1,1,i)
        gloc(:,i)=zero
@@ -110,18 +102,17 @@ contains
     enddo
     !
     zeta(:) = cmplx(wr(:),eps,8) + xmu - impSreal(1,1,1,1,:)
-    do i=1,Nw
+    do i=1,Lreal
        zita1 = zeta(i)
-       zita2 = conjg(zeta(Nw+1-i))
+       zita2 = conjg(zeta(Lreal+1-i))
        grloc(:,i) = zero
        do ik=1,Lk
-          cdet = (zita1-epsik(ik))*(zita2-epsik(ik)) + &
-               conjg(impSAreal(1,1,1,1,Nw+1-i))*impSAreal(1,1,1,1,i)
+          cdet = (zita1-epsik(ik))*(zita2-epsik(ik)) + impSAreal(1,1,1,1,i)*impSAreal(1,1,1,1,i)
           grloc(1,i) = grloc(1,i) + wt(ik)*(zita2-epsik(ik))/cdet
-          grloc(2,i) = grloc(2,i) - wt(ik)*conjg(impSAreal(1,1,1,1,Nw+1-i))/cdet
+          grloc(2,i) = grloc(2,i) + wt(ik)*impSAreal(1,1,1,1,i)/cdet
        enddo
     enddo
-    
+
     call splot("Gloc_iw.ed",wm,gloc(1,:))
     call splot("Floc_iw.ed",wm,gloc(2,:))
     call splot("Gloc_realw.ed",wr,grloc(1,:))

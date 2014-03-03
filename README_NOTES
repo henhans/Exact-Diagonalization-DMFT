@@ -1,7 +1,0 @@
-notes to the developer:
-- the serial version of the code should be tested a little bit more as I noticed that p_arpack gives slightly different 
-results (well beyond machine precision anyway) and more important, I GOT A BAD RESULT IN THE CHI^2 FIT
-- add a flag to fit the G_0 function rather than the \Delta, as in some cases \Delta behaves pretty bad.
-- code the mixed Green's function calculation, aka the full bath topology. Use a flag to choose which setup to use (it will be used
-for the superconducting code too)
-- test the Complex-H and vector case. 

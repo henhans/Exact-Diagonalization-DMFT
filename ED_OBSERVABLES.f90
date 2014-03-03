@@ -2,6 +2,9 @@
 !PURPOSE  : Obtain some physical quantities and print them out
 !########################################################################
 MODULE ED_OBSERVABLES
+  USE COMMON_VARS
+  USE IOTOOLS, only:free_unit,reg
+  USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_AUX_FUNX
   implicit none
@@ -11,11 +14,10 @@ MODULE ED_OBSERVABLES
 
   logical,save                       :: iolegend=.true.
   integer,save                       :: loop=0
-  real(8),dimension(:),allocatable   :: nupimp,ndwimp,magimp,phiscimp
+  real(8),dimension(:),allocatable   :: nimp,dimp,nupimp,ndwimp,magimp,phiscimp
   real(8),dimension(:,:),allocatable :: sz2imp,n2imp
   real(8),dimensioN(:,:),allocatable :: zimp,simp
   real(8)                            :: s2tot
-
 contains 
 
   !+-------------------------------------------------------------------+
@@ -41,7 +43,7 @@ contains
     !
     if(mpiID==0)then
        write(LOGfile,"(A)")"Evaluating Observables:"
-       allocate(nupimp(Norb),ndwimp(Norb),magimp(Norb),sz2imp(Norb,Norb),n2imp(Norb,Norb))
+       allocate(nimp(Norb),dimp(Norb),nupimp(Norb),ndwimp(Norb),magimp(Norb),sz2imp(Norb,Norb),n2imp(Norb,Norb))
        Egs    = state_list%emin
        nimp   = 0.d0
        nupimp = 0.d0
@@ -185,7 +187,6 @@ contains
              enddo
           end if
 
-
        case ('full')
           do isector=1,Nsect
              dim=getdim(isector)
@@ -245,7 +246,14 @@ contains
           write(LOGfile,"(A,10f18.12)")"mag=   ",(magimp(iorb),iorb=1,Norb)
        endif
        write(LOGfile,*)""
-       deallocate(nupimp,ndwimp,magimp,sz2imp,n2imp)
+       !
+       do iorb=1,Norb
+          ed_dens(iorb)=nimp(iorb)
+          ed_docc(iorb)=dimp(iorb)
+          if(ed_supercond)ed_phisc(iorb)=phiscimp(iorb)
+       enddo
+       !
+       deallocate(nimp,dimp,nupimp,ndwimp,magimp,sz2imp,n2imp)
        deallocate(simp,zimp)
        if(ed_supercond)deallocate(phiscimp)
     endif

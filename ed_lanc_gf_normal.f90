@@ -7,8 +7,8 @@ subroutine lanc_ed_getgf_normal()
   real(8) :: norm0
   call allocate_grids
 
-  if(.not.allocated(impGmats))allocate(impGmats(Nspin,Nspin,Norb,Norb,NL))
-  if(.not.allocated(impGreal))allocate(impGreal(Nspin,Nspin,Norb,Norb,Nw))
+  if(.not.allocated(impGmats))allocate(impGmats(Nspin,Nspin,Norb,Norb,Lmats))
+  if(.not.allocated(impGreal))allocate(impGreal(Nspin,Nspin,Norb,Norb,Lreal))
   impGmats=zero
   impGreal=zero
 
@@ -784,11 +784,11 @@ subroutine add_to_lanczos_gf(vnorm2,Ei,nlanc,alanc,blanc,isign,iorb,jorb,ispin)
   do j=1,nlanc
      de = diag(j)-Ei
      peso = pesoBZ*Z(1,j)*Z(1,j)
-     do i=1,NL
+     do i=1,Lmats
         iw=xi*wm(i)
         impGmats(ispin,ispin,iorb,jorb,i)=impGmats(ispin,ispin,iorb,jorb,i) + peso/(iw-isign*de)
      enddo
-     do i=1,Nw
+     do i=1,Lreal
         iw=dcmplx(wr(i),eps)
         impGreal(ispin,ispin,iorb,jorb,i)=impGreal(ispin,ispin,iorb,jorb,i) + peso/(iw-isign*de)
      enddo

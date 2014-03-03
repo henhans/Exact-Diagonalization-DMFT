@@ -1,4 +1,5 @@
 module ARPACK_LANCZOS
+  USE COMMON_VARS
   USE ED_VARS_GLOBAL
   implicit none
   private 
