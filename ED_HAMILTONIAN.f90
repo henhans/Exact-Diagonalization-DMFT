@@ -931,25 +931,4 @@ contains
 #endif
 
 
-! <<<<<<< HEAD
-!   !+------------------------------------------------------------------+
-!   !PURPOSE : 
-!   !+------------------------------------------------------------------+
-!   subroutine setup_Hv_sector(isector)
-!     integer                              :: isector
-!     integer                              :: dim
-!     Hsector=isector
-!     dim = getdim(Hsector)
-!     allocate(Hmap(dim))
-!     call build_sector(isector,Hmap)
-!   end subroutine setup_Hv_sector
-
-!   subroutine delete_Hv_sector()
-!     deallocate(Hmap)
-!   end subroutine delete_Hv_sector
-
-
-
-! =======
-! >>>>>>> devel_sc
 end MODULE ED_HAMILTONIAN
