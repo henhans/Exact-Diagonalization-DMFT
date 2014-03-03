@@ -51,11 +51,11 @@ MODULE ED_BATH
   ! end interface fdelta_and
 
   interface delta_bath
-     module procedure delta_bath_irred,delta_bath_irred_!,delta_bath_hybrd,delta_bath_hybrd_
+     module procedure delta_bath_irred,delta_bath_irred_,delta_bath_hybrd,delta_bath_hybrd_
   end interface delta_bath
 
   interface fdelta_bath
-     module procedure fdelta_bath_irred,fdelta_bath_irred_!,fdelta_bath_hybrd,fdelta_bath_hybrd_
+     module procedure fdelta_bath_irred,fdelta_bath_irred_,fdelta_bath_hybrd,fdelta_bath_hybrd_
   end interface fdelta_bath
 
   public :: allocate_bath
@@ -583,54 +583,58 @@ contains
 
 
 
-  ! !HYBRIDIZED BATH:
-  ! !Matsubara:
-  ! function delta_bath_hybrd(ispin,iorb,jorb,x,dmft_bath_) result(fg)
-  !   type(effective_bath)  :: dmft_bath_
-  !   complex(8),intent(in) :: x
-  !   integer,intent(in)    :: iorb,jorb,ispin
-  !   complex(8)            :: fg
-  !   if(.not.ed_supercond)then
-  !      fg = sum(dmft_bath_%v(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,jorb,1:Nbath)/(x - dmft_bath_%e(ispin,1,1:Nbath)))
-  !   else
-  !      fg = -sum(dmft_bath_%v(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,jorb,1:Nbath)*(x + dmft_bath_%e(ispin,1,1:Nbath))/&
-  !           (dimag(x)**2 + dmft_bath_%e(ispin,1,1:Nbath)**2 + dmft_bath_%d(ispin,1,1:Nbath)**2))
-  !   endif
-  ! end function delta_bath_hybrd
-  ! !
-  ! function fdelta_bath_hybrd(ispin,iorb,jorb,x,dmft_bath_) result(fg)
-  !   type(effective_bath)  :: dmft_bath_
-  !   complex(8),intent(in) :: x
-  !   integer,intent(in)    :: iorb,jorb,ispin
-  !   complex(8)            :: fg
-  !   fg =sum(dmft_bath_%d(ispin,1,1:Nbath)*dmft_bath_%v(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,jorb,1:Nbath)/&
-  !        ( dimag(x)**2 + dmft_bath_%e(ispin,1,1:Nbath)**2 + dmft_bath_%d(ispin,1,1:Nbath)**2))
-  ! end function fdelta_bath_hybrd
+  !HYBRIDIZED BATH:
+  !Matsubara:
+  function delta_bath_hybrd(ispin,iorb,jorb,x,dmft_bath_) result(fg)
+    type(effective_bath)  :: dmft_bath_
+    complex(8),intent(in) :: x
+    integer,intent(in)    :: iorb,jorb,ispin
+    complex(8)            :: fg
+    if(.not.ed_supercond)then
+       fg = sum(dmft_bath_%v(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,jorb,1:Nbath)/(x - dmft_bath_%e(ispin,1,1:Nbath)))
+    else
+       fg = -sum(dmft_bath_%v(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,jorb,1:Nbath)*(x + dmft_bath_%e(ispin,1,1:Nbath))/&
+            (dimag(x)**2 + dmft_bath_%e(ispin,1,1:Nbath)**2 + dmft_bath_%d(ispin,1,1:Nbath)**2))
+    endif
+  end function delta_bath_hybrd
+  !
+  function fdelta_bath_hybrd(ispin,iorb,jorb,x,dmft_bath_) result(fg)
+    type(effective_bath)  :: dmft_bath_
+    complex(8),intent(in) :: x
+    integer,intent(in)    :: iorb,jorb,ispin
+    complex(8)            :: fg
+    fg =sum(dmft_bath_%d(ispin,1,1:Nbath)*dmft_bath_%v(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,jorb,1:Nbath)/&
+         ( dimag(x)**2 + dmft_bath_%e(ispin,1,1:Nbath)**2 + dmft_bath_%d(ispin,1,1:Nbath)**2))
+  end function fdelta_bath_hybrd
 
 
 
-  ! !HYBRIDIZED BATH:
-  ! !Real-axis:
-  ! function delta_bath_hybrd_(ispin,iorb,jorb,x,dmft_bath_) result(fg)
-  !   type(effective_bath)  :: dmft_bath_
-  !   integer,intent(in)    :: iorb,jorb,ispin
-  !   complex(8)            :: fg,x
-  !   if(.not.ed_supercond)then
-  !      fg = sum(dmft_bath_%v(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,jorb,1:Nbath)&
-  !           /(x-dmft_bath_%e(ispin,1,1:Nbath)))
-  !   else
-  !      fg = sum(dmft_bath_%v(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,jorb,1:Nbath)*(x+dmft_bath_%e(ispin,1,1:Nbath))/&
-  !           ( -x**2 + dmft_bath_%e(ispin,1,1:Nbath)**2 + dmft_bath_%d(ispin,1,1:Nbath)**2))
-  !   endif
-  ! end function delta_bath_hybrd_
-  ! !
-  ! function fdelta_bath_hybrd_(ispin,iorb,jorb,x,dmft_bath_) result(fg)
-  !   type(effective_bath)  :: dmft_bath_
-  !   integer,intent(in)    :: iorb,jorb,ispin
-  !   complex(8)            :: fg,x
-  !   fg =sum(dmft_bath_%d(ispin,1,1:Nbath)*dmft_bath_%v(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,jorb,1:Nbath)/&
-  !        ( -x**2  + dmft_bath_%e(ispin,1,1:Nbath)**2 + dmft_bath_%d(ispin,1,1:Nbath)**2))
-  ! end function fdelta_bath_hybrd_
+  !HYBRIDIZED BATH:
+  !Real-axis:
+  function delta_bath_hybrd_(ispin,iorb,jorb,w,eps,dmft_bath_) result(fg)
+    type(effective_bath)  :: dmft_bath_
+    real(8),intent(in) :: w,eps
+    integer,intent(in)    :: iorb,jorb,ispin
+    complex(8)            :: fg,x
+    x=dcmplx(w,eps)
+    if(.not.ed_supercond)then
+       fg = sum(dmft_bath_%v(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,jorb,1:Nbath)&
+            /(x-dmft_bath_%e(ispin,1,1:Nbath)))
+    else
+       fg = sum(dmft_bath_%v(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,jorb,1:Nbath)*(x+dmft_bath_%e(ispin,1,1:Nbath))/&
+            ( -x**2 + dmft_bath_%e(ispin,1,1:Nbath)**2 + dmft_bath_%d(ispin,1,1:Nbath)**2))
+    endif
+  end function delta_bath_hybrd_
+  !
+  function fdelta_bath_hybrd_(ispin,iorb,jorb,w,eps,dmft_bath_) result(fg)
+    type(effective_bath)  :: dmft_bath_
+    real(8),intent(in) :: w,eps
+    integer,intent(in)    :: iorb,jorb,ispin
+    complex(8)            :: fg,x
+    x=dcmplx(w,eps)
+    fg =sum(dmft_bath_%d(ispin,1,1:Nbath)*dmft_bath_%v(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,jorb,1:Nbath)/&
+         ( -x**2  + dmft_bath_%e(ispin,1,1:Nbath)**2 + dmft_bath_%d(ispin,1,1:Nbath)**2))
+  end function fdelta_bath_hybrd_
 
 
 

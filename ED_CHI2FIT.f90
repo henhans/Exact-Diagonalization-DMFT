@@ -57,23 +57,11 @@ contains
     case default
        call chi2_fitgf_irred_sc(fg,bath,ispin,iverbose_)
     case ('hybrid')
-<<<<<<< HEAD
        stop 'Error: Hybrid bath + SC is not implemented yet: ask the developer...'
     end select
   end subroutine chi2_fitgf__
 
 
-
-
-
-
-
-=======
-       stop 'ask the developer...'
-    end select
-  end subroutine chi2_fitgf__
-
->>>>>>> 88b6b6dcaafd3709550dae07a451bf631042627d
 
 
 
@@ -170,10 +158,10 @@ contains
          do i=1,Ldelta
             w = Xdelta(i)
             if(cg_scheme=='weiss')then
-               fgand = xi*w + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath_mats(ispin,iorb,xi*w,dmft_bath)
+               fgand = xi*w + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath(ispin,iorb,xi*w,dmft_bath)
                fgand = one/fgand
             else
-               fgand = delta_bath_mats(ispin,iorb,xi*w,dmft_bath)
+               fgand = delta_bath(ispin,iorb,xi*w,dmft_bath)
             endif
             write(unit,"(5F24.15)")Xdelta(i),dimag(Fdelta(1,i)),dimag(fgand),dreal(Fdelta(1,i)),dreal(fgand)
          enddo
@@ -181,125 +169,6 @@ contains
       enddo
     end subroutine write_fit_result
   end subroutine chi2_fitgf_irred
-
-
-
-
-  subroutine chi2_fitgf_irred_sc(fg,bath_,ispin,iverbose)
-    complex(8),dimension(:,:,:,:)        :: fg
-    real(8),dimension(:,:),intent(inout) :: bath_
-    integer                              :: ispin
-    real(8),dimension(3*Nbath)           :: a
-    integer                              :: iter,stride_spin,stride_orb,ifirst,ilast,i,j,iorb
-    real(8)                              :: chi
-    logical                              :: check
-    type(effective_bath)                 :: dmft_bath
-    logical                              :: iverbose
-    complex(8)                           :: fgand
-    real(8)                              :: w
-    character(len=20)                    :: suffix
-    integer                              :: unit
-    if(mpiID==0)then
-       if(cg_scheme=='weiss')then
-          write(LOGfile,"(A)")"CHI2FIT: Weiss field function:"
-       else
-          write(LOGfile,"(A)")"CHI2FIT: Delta function:"
-       endif
-       if(size(fg,1)/=2)stop"CHI2_FITGF: wrong dimension 1 in chi2_input"
-       if(size(fg,2)/=Norb)stop"CHI2_FITGF: wrong dimension 2 in chi2_input"
-       if(size(fg,3)/=Norb)stop"CHI2_FITGF: wrong dimension 3 in chi2_input"
-       check= check_bath_dimension(bath_)
-       if(.not.check)stop "chi2_fitgf_irred: wrong bath dimensions"
-       Ldelta = Nfit
-       if(Ldelta>size(fg,4))Ldelta=size(fg,4)
-       !
-       allocate(Fdelta(2,Ldelta))
-       allocate(Xdelta(Ldelta))
-       allocate(Wdelta(Ldelta))
-       !
-       forall(i=1:Ldelta)Xdelta(i)=pi/beta*real(2*i-1,8)
-       !
-       select case(Cg_weight)
-       case default
-          Wdelta=(/(1.d0,i=1,Ldelta)/)
-       case(1)
-          Wdelta=(/(real(i,8),i=1,Ldelta)/)
-       case(2)
-          Wdelta=Xdelta
-       end select
-       !
-       call allocate_bath(dmft_bath)
-       call set_bath(bath_,dmft_bath)
-       do iorb=1,Norb
-          Orb_indx=iorb
-          Spin_indx=ispin
-          Fdelta(1,1:Ldelta) = fg(1,iorb,iorb,1:Ldelta)
-          Fdelta(2,1:Ldelta) = fg(2,iorb,iorb,1:Ldelta)
-          a(1:Nbath)         = dmft_bath%e(ispin,iorb,1:Nbath) 
-          a(Nbath+1:2*Nbath) = dmft_bath%d(ispin,iorb,1:Nbath)
-          a(2*Nbath+1:3*Nbath) = dmft_bath%v(ispin,iorb,1:Nbath)
-          if(cg_scheme=='weiss')then
-             call fmin_cg(a,chi2_weiss_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
-          else
-             call fmin_cg(a,chi2_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
-          endif
-          write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
-          suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//".ed"
-          unit=free_unit()
-          open(unit,file="chi2fit_results"//reg(suffix),position="append")
-          write(unit,"(ES18.9,1x,I5)") chi,iter
-          close(unit)
-          dmft_bath%e(ispin,iorb,1:Nbath) = a(1:Nbath)
-          dmft_bath%d(ispin,iorb,1:Nbath) = a(Nbath+1:2*Nbath)
-          dmft_bath%v(ispin,iorb,1:Nbath) = a(2*Nbath+1:3*Nbath)
-       enddo
-       if(iverbose)call write_bath(dmft_bath,LOGfile)
-       call write_fit_result(ispin)
-       call copy_bath(dmft_bath,bath_)
-       call deallocate_bath(dmft_bath)
-       print*," "
-       deallocate(Fdelta,Xdelta,Wdelta)
-    endif
-#ifdef _MPI
-    call MPI_BCAST(bath_,size(bath_),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-#endif
-    !
-  contains
-    !
-    subroutine write_fit_result(ispin)
-      complex(8)        :: fgand(2),det
-      integer           :: i,j,iorb,ispin
-      real(8)           :: w
-      do iorb=1,Norb
-         suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//".ed"
-         Fdelta(1,1:Ldelta) = fg(1,iorb,iorb,1:Ldelta)
-         Fdelta(2,1:Ldelta) = fg(2,iorb,iorb,1:Ldelta)
-         fgand=zero
-
-         unit=free_unit()
-         open(unit,file="fit_delta"//reg(suffix))
-         do i=1,Ldelta
-            w = Xdelta(i)
-            if(cg_scheme=='weiss')then
-               fgand(1) = xi*w + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath(ispin,iorb,xi*w,dmft_bath)
-               fgand(2) = fdelta_bath(ispin,iorb,xi*w,dmft_bath)
-               det     =  abs(fgand(1))**2 + (fgand(2))**2
-               fgand(1) = conjg(fgand(1))/det
-               fgand(2) = fgand(2)/det
-            else
-               fgand(1) = delta_bath(ispin,iorb,xi*w,dmft_bath)
-               fgand(2) = fdelta_bath(ispin,iorb,xi*w,dmft_bath)
-            endif
-            write(unit,"(10F24.15)")Xdelta(i),dimag(Fdelta(1,i)),dimag(fgand(1)),dreal(Fdelta(1,i)),dreal(fgand(1)), &
-                 dimag(Fdelta(2,i)),dimag(fgand(2)),dreal(Fdelta(2,i)),dreal(fgand(2))
-         enddo
-         close(unit)
-      enddo
-    end subroutine write_fit_result
-  end subroutine chi2_fitgf_irred_sc
-
-
-
 
 
 
@@ -404,14 +273,14 @@ contains
          do i=1,Ldelta
             w = Xdelta(i)
             if(cg_scheme=='weiss')then
-               fgand(1) = xi*w + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath_mats(ispin,iorb,xi*w,dmft_bath)
-               fgand(2) = fdelta_bath_mats(ispin,iorb,xi*w,dmft_bath)
+               fgand(1) = xi*w + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath(ispin,iorb,xi*w,dmft_bath)
+               fgand(2) = -fdelta_bath(ispin,iorb,xi*w,dmft_bath)
                det     =  abs(fgand(1))**2 + (fgand(2))**2
                fgand(1) = conjg(fgand(1))/det
                fgand(2) = fgand(2)/det
             else
-               fgand(1) = delta_bath_mats(ispin,iorb,xi*w,dmft_bath)
-               fgand(2) = fdelta_bath_mats(ispin,iorb,xi*w,dmft_bath)
+               fgand(1) = delta_bath(ispin,iorb,xi*w,dmft_bath)
+               fgand(2) = fdelta_bath(ispin,iorb,xi*w,dmft_bath)
             endif
             write(unit,"(10F24.15)")Xdelta(i),dimag(Fdelta(1,i)),dimag(fgand(1)),dreal(Fdelta(1,i)),dreal(fgand(1)), &
                  dimag(Fdelta(2,i)),dimag(fgand(2)),dreal(Fdelta(2,i)),dreal(fgand(2))
@@ -524,19 +393,19 @@ contains
          w=Xdelta(i)
          if(cg_scheme=='weiss')then
             do l=1,Norb
-               gwf(l,l)=xi*w + xmu - hloc(ispin,ispin,l,l) - delta_bath_mats(ispin,l,l,xi*w,dmft_bath)
+               gwf(l,l)=xi*w + xmu - hloc(ispin,ispin,l,l) - delta_bath(ispin,l,l,xi*w,dmft_bath)
                do m=l+1,Norb
-                  gwf(l,m) = - hloc(ispin,ispin,l,m) - delta_bath_mats(ispin,l,m,xi*w,dmft_bath)
-                  gwf(m,l) = - hloc(ispin,ispin,m,l) - delta_bath_mats(ispin,m,l,xi*w,dmft_bath)
+                  gwf(l,m) = - hloc(ispin,ispin,l,m) - delta_bath(ispin,l,m,xi*w,dmft_bath)
+                  gwf(m,l) = - hloc(ispin,ispin,m,l) - delta_bath(ispin,m,l,xi*w,dmft_bath)
                enddo
             enddo
             call matrix_inverse(gwf)
          else
             do l=1,Norb
-               gwf(l,l)= delta_bath_mats(ispin,l,l,xi*w,dmft_bath)
+               gwf(l,l)= delta_bath(ispin,l,l,xi*w,dmft_bath)
                do m=l+1,Norb
-                  gwf(l,m) = delta_bath_mats(ispin,l,m,xi*w,dmft_bath)
-                  gwf(m,l) = delta_bath_mats(ispin,m,l,xi*w,dmft_bath)
+                  gwf(l,m) = delta_bath(ispin,l,m,xi*w,dmft_bath)
+                  gwf(m,l) = delta_bath(ispin,m,l,xi*w,dmft_bath)
                enddo
             enddo
          endif

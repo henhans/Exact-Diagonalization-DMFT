@@ -130,12 +130,12 @@ contains
        do ispin=1,Nspin
           do iorb=1,Norb
              do i=1,NL
-                fg0 = xi*wm(i) + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath_mats(ispin,iorb,xi*wm(i),dmft_bath)
+                fg0 = xi*wm(i) + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath(ispin,iorb,xi*wm(i),dmft_bath)
                 impSmats(ispin,ispin,iorb,iorb,i)= fg0 - one/impGmats(ispin,ispin,iorb,iorb,i)
                 impG0mats(ispin,ispin,iorb,iorb,i) = one/fg0
              enddo
              do i=1,Nw
-                fg0 = wr(i) + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath_real(ispin,iorb,wr(i)+xi*eps,dmft_bath)
+                fg0 = wr(i) + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath(ispin,iorb,wr(i),eps,dmft_bath)
                 impSreal(ispin,ispin,iorb,iorb,i)= fg0 - one/impGreal(ispin,ispin,iorb,iorb,i)
                 impG0real(ispin,ispin,iorb,iorb,i) = one/fg0
              enddo
@@ -169,21 +169,21 @@ contains
        do ispin=1,Nspin         !Spin diagona
           do iorb=1,Norb        !Orbital diagonal part GF_0=(iw+mu)_aa-hloc_aa-Delta_aa
              do i=1,NL
-                impG0mats(ispin,ispin,iorb,iorb,i)= xi*wm(i)+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath_mats(ispin,iorb,iorb,xi*wm(i),dmft_bath)
+                impG0mats(ispin,ispin,iorb,iorb,i)= xi*wm(i)+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath(ispin,iorb,iorb,xi*wm(i),dmft_bath)
              enddo
              do i=1,Nw
-                impG0real(ispin,ispin,iorb,iorb,i)= wr(i)+xi*eps+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath_real(ispin,iorb,iorb,wr(i)+xi*eps,dmft_bath)
+                impG0real(ispin,ispin,iorb,iorb,i)= wr(i)+xi*eps+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath(ispin,iorb,iorb,wr(i),eps,dmft_bath)
              enddo
           enddo
           do iorb=1,Norb         !Orbital non-diagonal part
              do jorb=iorb+1,Norb !GF_0=-hloc_ab-Delta_ab
                 do i=1,NL
-                   impG0mats(ispin,ispin,iorb,jorb,i)= -hloc(ispin,ispin,iorb,jorb)-delta_bath_mats(ispin,iorb,jorb,xi*wm(i),dmft_bath)
-                   impG0mats(ispin,ispin,jorb,iorb,i)= -hloc(ispin,ispin,jorb,iorb)-delta_bath_mats(ispin,jorb,iorb,xi*wm(i),dmft_bath)
+                   impG0mats(ispin,ispin,iorb,jorb,i)= -hloc(ispin,ispin,iorb,jorb)-delta_bath(ispin,iorb,jorb,xi*wm(i),dmft_bath)
+                   impG0mats(ispin,ispin,jorb,iorb,i)= -hloc(ispin,ispin,jorb,iorb)-delta_bath(ispin,jorb,iorb,xi*wm(i),dmft_bath)
                 enddo
                 do i=1,Nw
-                   impG0real(ispin,ispin,iorb,jorb,i)= -hloc(ispin,ispin,iorb,jorb)-delta_bath_real(ispin,iorb,jorb,wr(i)+xi*eps,dmft_bath)
-                   impG0real(ispin,ispin,jorb,iorb,i)= -hloc(ispin,ispin,jorb,iorb)-delta_bath_real(ispin,jorb,iorb,wr(i)+xi*eps,dmft_bath)
+                   impG0real(ispin,ispin,iorb,jorb,i)= -hloc(ispin,ispin,iorb,jorb)-delta_bath(ispin,iorb,jorb,wr(i),eps,dmft_bath)
+                   impG0real(ispin,ispin,jorb,iorb,i)= -hloc(ispin,ispin,jorb,iorb)-delta_bath(ispin,jorb,iorb,wr(i),eps,dmft_bath)
                 enddo
              enddo
           enddo
@@ -281,6 +281,7 @@ contains
   subroutine print_imp_gf_sc
     integer                                        :: i,j,ispin,unit(12),iorb,jorb
     complex(8),allocatable,dimension(:)            :: det
+    complex(8) :: iw
     complex(8),allocatable,dimension(:,:)          :: fg0,fg,sigma
     complex(8),dimension(Nspin,Nspin,Norb,Norb,NL) :: impG0mats,impF0mats
     complex(8),dimension(Nspin,Nspin,Norb,Norb,Nw) :: impG0real,impF0real
