@@ -92,7 +92,7 @@ program ed_lda1b
 
      !Check convergence (if required change chemical potential)
      converged = check_convergence(delta(1,1,:),dmft_error,nsuccess,nloop)
-     if(nread/=0.d0)call search_chemical_potential(nobj,converged)
+     if(nread/=0.d0)call search_chemical_potential(nobj,niter,converged)
      call end_loop
   enddo
 

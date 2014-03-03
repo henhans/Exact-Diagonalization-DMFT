@@ -6,7 +6,7 @@ MODULE ED_OBSERVABLES
   USE ED_AUX_FUNX
   implicit none
   private
-
+  
   public                             :: ed_getobs
 
   logical,save                       :: iolegend=.true.
@@ -72,6 +72,9 @@ contains
              endif
              peso = 1.d0 ; if(finiteT)peso=exp(-beta*(Ei-Egs))
              peso = peso/zeta_function
+             !<DEBUG
+             !write(*,'(A,I,6f18.10)') 'peso',izero,peso
+             !>DEBUG
              !
              allocate(Hmap(dim0))
              call build_sector(isect0,Hmap)
@@ -124,20 +127,25 @@ contains
                    if(finiteT)numstates=state_list%size
                    !   
                    do izero=1,numstates
-                      isect0     =  es_return_sector(state_list,izero)
-                      ei    =  es_return_energy(state_list,izero)
-                      gsvec  => es_return_vector(state_list,izero)
-                      norm0=sqrt(dot_product(gsvec,gsvec))
+                      !
+                      isect0 = es_return_sector(state_list,izero)
+                      Ei     = es_return_energy(state_list,izero)
+                      dim0   = getdim(isect0)
+                      if(ed_type=='d')then
+                         gsvec  => es_return_vector(state_list,izero)
+                         norm0=sqrt(dot_product(gsvec,gsvec))
+                      elseif(ed_type=='c')then
+                         gscvec  => es_return_cvector(state_list,izero)
+                         norm0=sqrt(dot_product(gscvec,gscvec))
+                      endif
                       if(abs(norm0-1.d0)>1.d-9)then
                          write(LOGfile,*) "GS : "//reg(txtfy(izero))//"is not normalized:"//txtfy(norm0)
                          stop
                       endif
                       peso = 1.d0 ; if(finiteT)peso=exp(-beta*(Ei-Egs))
                       peso = peso/zeta_function
-                      dim0  = getdim(isect0)
                       allocate(Hmap(dim0))
                       call build_sector(isect0,Hmap)
-
                       !APPLY CDG_UP + C_DW
                       isz0 = getsz(isect0)
                       if(isz0<Ns)then

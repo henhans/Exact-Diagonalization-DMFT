@@ -70,7 +70,6 @@ program lancED
   
 contains
 
-  !+----------------------------------------+
   subroutine get_delta_bethe
     integer                    :: i,j,iorb,ik
     complex(8)                 :: iw,zita,g0loc,cdet,zita1,zita2

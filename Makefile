@@ -21,7 +21,7 @@ EXE=ed_tddpam_bethe
 #EXE=ed_bhz
 
 DIR =drivers
-DIREXE=$(HOME)/.bin
+DIREXE=$(HOME_G)/.project_bin
 
 
 

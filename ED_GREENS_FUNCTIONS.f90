@@ -67,7 +67,7 @@ contains
   include 'ed_lanc_gf_normal.f90'
   !SUPERCONDUCTING PHASE ROUTINES:
   include 'ed_lanc_gf_superc.f90'
-
+  
 
   !                    LANC SUSCPTIBILITY
   !+------------------------------------------------------------------+
@@ -303,8 +303,9 @@ contains
           fg(1,:) =  conjg(impGmats(ispin,ispin,iorb,iorb,:))/det
           fg(2,:) =  impFmats(ispin,ispin,iorb,iorb,:)/det
           do i=1,NL
-             fg0(1,i) =  xi*wm(i)+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath_mats(ispin,iorb,xi*wm(i),dmft_bath)
-             fg0(2,i) = -fdelta_bath_mats(ispin,iorb,xi*wm(i),dmft_bath)
+             iw = xi*wm(i)
+             fg0(1,i) = iw+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath(ispin,iorb,iw,dmft_bath)
+             fg0(2,i) = -fdelta_bath(ispin,iorb,iw,dmft_bath)
           enddo
           impSmats(ispin,ispin,iorb,iorb,:)= fg0(1,:) - fg(1,:)
           impSAmats(ispin,ispin,iorb,iorb,:)= fg0(2,:) - fg(2,:)
@@ -320,20 +321,25 @@ contains
     do ispin=1,Nspin
        do iorb=1,Norb
           do i=1,Nw
-             det(i)  = impGreal(ispin,ispin,iorb,iorb,i)*conjg(impGreal(ispin,ispin,iorb,iorb,Nw+1-i)) + &
-                  impFreal(ispin,ispin,iorb,iorb,i)*conjg(impFreal(ispin,ispin,iorb,iorb,Nw+1-i))
-             fg(1,i) =  conjg(impGreal(ispin,ispin,iorb,iorb,Nw+1-i))/det(i)
-             fg(2,i) =  conjg(impFreal(ispin,ispin,iorb,iorb,Nw+1-i))/det(i)
-             fg0(1,i) = wr(i) + xmu - hloc(ispin,ispin,iorb,iorb) - delta_bath_real(ispin,iorb,wr(i)+xi*eps,dmft_bath)
-             fg0(2,i) = fdelta_bath_real(ispin,iorb,wr(i)+xi*eps,dmft_bath)
+             iw=cmplx(wr(i),eps)
+             ! det(i)  = impGreal(ispin,ispin,iorb,iorb,i)*conjg(impGreal(ispin,ispin,iorb,iorb,Nw+1-i)) + &
+             !      impFreal(ispin,ispin,iorb,iorb,i)*conjg(impFreal(ispin,ispin,iorb,iorb,Nw+1-i))
+             ! fg(1,i) =  conjg(impGreal(ispin,ispin,iorb,iorb,Nw+1-i))/det(i)
+             ! fg(2,i) =  conjg(impFreal(ispin,ispin,iorb,iorb,Nw+1-i))/det(i)
+             det(i)  = -impGreal(ispin,ispin,iorb,iorb,i)*conjg(impGreal(ispin,ispin,iorb,iorb,Nw+1-i)) - &
+                  impFreal(ispin,ispin,iorb,iorb,i)*impFreal(ispin,ispin,iorb,iorb,i)
+             fg(1,i) =  -conjg(impGreal(ispin,ispin,iorb,iorb,Nw+1-i))/det(i)
+             fg(2,i) =  -impFreal(ispin,ispin,iorb,iorb,i)/det(i)
+             fg0(1,i) =  wr(i)+xmu-hloc(ispin,ispin,iorb,iorb)-delta_bath(ispin,iorb,wr(i),eps,dmft_bath)
+             fg0(2,i) = -fdelta_bath(ispin,iorb,wr(i),eps,dmft_bath)
           enddo
           impSreal(ispin,ispin,iorb,iorb,:) = fg0(1,:) - fg(1,:)
           impSAreal(ispin,ispin,iorb,iorb,:)= fg0(2,:) - fg(2,:)
           ! something wrong here, Im(impG0(w)) has the wrong sign
           do i=1,Nw          
-             det(i)     =  fg0(1,i)*conjg(fg0(1,Nw+1-i)) + fg0(2,i)*conjg(fg0(2,Nw+1-i))
-             impG0real(ispin,ispin,iorb,iorb,i) = conjg(fg0(1,Nw+1-i))/det(i)
-             impF0real(ispin,ispin,iorb,iorb,i) = conjg(fg0(2,Nw+1-i))/det(i)
+             det(i)     =  -fg0(1,i)*conjg(fg0(1,Nw+1-i)) - fg0(2,i)*fg0(2,i)
+             impG0real(ispin,ispin,iorb,iorb,i) = -conjg(fg0(1,Nw+1-i))/det(i)
+             impF0real(ispin,ispin,iorb,iorb,i) = -fg0(2,i)/det(i)
           enddo
        enddo
     enddo
