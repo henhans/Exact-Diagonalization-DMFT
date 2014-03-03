@@ -63,7 +63,7 @@ program lancED
      !Check convergence (if required change chemical potential)
      if(mpiID==0)then
         converged = check_convergence(delta(1,1,1,:)+delta(2,1,1,:),dmft_error,nsuccess,nloop,reset=.false.)
-        if(nread/=0.d0)call search_chemical_potential(nimp(1),niter,converged)
+        if(nread/=0.d0)call search_chemical_potential(nimp(1),converged)
      endif
      call end_loop
   enddo

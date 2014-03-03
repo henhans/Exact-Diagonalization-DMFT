@@ -65,11 +65,6 @@ contains
 
 
 
-
-
-
-
-
   !+-------------------------------------------------------------+
   !PURPOSE  : Chi^2 interface for Irreducible bath normal phase
   !+-------------------------------------------------------------+
@@ -174,10 +169,6 @@ contains
       enddo
     end subroutine write_fit_result
   end subroutine chi2_fitgf_irred
-
-
-
-
 
 
 

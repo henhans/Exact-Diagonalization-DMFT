@@ -14,7 +14,7 @@ EXE=ed_ahm_bethe
 #EXE=ed_pam_2b
 #EXE=ed_lda1b
 #EXE=ed_lda
-EXE=ed_tddpam_bethe
+#EXE=ed_tddpam_bethe
 
 #--> B-H-Z MODELS
 #EXE=ed_2x2bhz

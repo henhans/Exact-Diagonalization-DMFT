@@ -521,10 +521,10 @@ contains
     integer,intent(in)    :: iorb,ispin
     complex(8)            :: fg
     if(.not.ed_supercond)then
-       fg = sum(dmft_bath_%v(ispin,iorb,1:Nbath)**2/(x - dmft_bath_%e(ispin,iorb,1:Nbath)))
+       fg = sum(dmft_bath_%v(ispin,iorb,1:Nbath)**2/(x-dmft_bath_%e(ispin,iorb,1:Nbath)))
     else
-       fg = -sum(dmft_bath_%v(ispin,iorb,1:Nbath)**2*(x + dmft_bath_%e(ispin,iorb,1:Nbath))/&
-            (dimag(x)**2 + dmft_bath_%e(ispin,iorb,1:Nbath)**2 + dmft_bath_%d(ispin,iorb,1:Nbath)**2))
+       fg = -sum(dmft_bath_%v(ispin,iorb,1:Nbath)**2*(x+dmft_bath_%e(ispin,iorb,1:Nbath))/&
+            (dimag(x)**2+dmft_bath_%e(ispin,iorb,1:Nbath)**2+dmft_bath_%d(ispin,iorb,1:Nbath)**2))
     endif
   end function delta_bath_irred_mats
   !
@@ -534,7 +534,7 @@ contains
     integer,intent(in)    :: iorb,ispin
     complex(8)            :: fg
     fg = sum(dmft_bath_%d(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,iorb,1:Nbath)**2/&
-         ( dimag(x)**2 + dmft_bath_%e(ispin,iorb,1:Nbath)**2 + dmft_bath_%d(ispin,iorb,1:Nbath)**2))
+         (dimag(x)**2+dmft_bath_%e(ispin,iorb,1:Nbath)**2+dmft_bath_%d(ispin,iorb,1:Nbath)**2))
   end function fdelta_bath_irred_mats
 
 
@@ -549,8 +549,8 @@ contains
     if(.not.ed_supercond)then
        fg = sum(dmft_bath_%v(ispin,iorb,1:Nbath)**2/(x-dmft_bath_%e(ispin,iorb,1:Nbath)))
     else
-       fg = sum(dmft_bath_%v(ispin,iorb,1:Nbath)**2*(x+dmft_bath_%e(ispin,iorb,1:Nbath))/&
-            ( -x**2+dmft_bath_%e(ispin,iorb,1:Nbath)**2+dmft_bath_%d(ispin,iorb,1:Nbath)**2))
+       fg = -sum(dmft_bath_%v(ispin,iorb,1:Nbath)**2*(x+dmft_bath_%e(ispin,iorb,1:Nbath))/&
+            ( x*(-x)+dmft_bath_%e(ispin,iorb,1:Nbath)**2+dmft_bath_%d(ispin,iorb,1:Nbath)**2))
     endif
   end function delta_bath_irred_real
   !
@@ -560,12 +560,13 @@ contains
     complex(8),intent(in) :: x
     complex(8)            :: fg
     fg = sum(dmft_bath_%d(ispin,iorb,1:Nbath)*dmft_bath_%v(ispin,iorb,1:Nbath)**2/&
-         ( -x**2+dmft_bath_%e(ispin,iorb,1:Nbath)**2+dmft_bath_%d(ispin,iorb,1:Nbath)**2))
+         ( x*(-x) + dmft_bath_%e(ispin,iorb,1:Nbath)**2+dmft_bath_%d(ispin,iorb,1:Nbath)**2))
   end function fdelta_bath_irred_real
 
 
 
 
+  !<ACTHUNG/TODO: extend the irred expressions for the Delta to the hybrid case.
   !HYBRIDIZED BATH:
   !Matsubara:
   function delta_bath_hybrd_mats(ispin,iorb,jorb,x,dmft_bath_) result(fg)
@@ -624,164 +625,5 @@ contains
 
 
 
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : given the bath array, compute the hybridization function
-  ! for a given spin and orbital indices ispin,iorb at a given point x
-  !+-------------------------------------------------------------------+
-  ! function delta_and_irred(ispin,iorb,x,bath_) result(fg)
-  !   integer,intent(in)                               :: ispin,iorb
-  !   complex(8),intent(in)                            :: x
-  !   real(8),dimension(Nspin,2*Norb*Nbath),intent(in) :: bath_
-  !   complex(8)                                       :: fg
-  !   integer                                          :: i
-  !   type(effective_bath)                             :: dmft_bath_
-  !   call allocate_bath(dmft_bath_)
-  !   call set_bath(bath_,dmft_bath_)
-  !   fg=zero
-  !   if(.not.ed_supercond)then
-  !      do i=1,Nbath
-  !         fg=fg + dmft_bath_%v(ispin,iorb,i)**2/(x-dmft_bath_%e(ispin,iorb,i))
-  !      enddo
-  !   else
-  !      do i=1,Nbath
-  !         fg=fg - dmft_bath_%v(ispin,iorb,i)**2*(x+dmft_bath_%e(ispin,iorb,i))/&
-  !              (dimag(x)**2+dmft_bath_%e(ispin,iorb,i)**2+dmft_bath_%d(ispin,iorb,i)**2)
-  !      enddo
-  !   endif
-  !   call deallocate_bath(dmft_bath_)
-  ! end function delta_and_irred
-  ! function delta_and_irred_(ispin,iorb,w,eps,bath_) result(fg)
-  !   integer,intent(in)                               :: ispin,iorb
-  !   real(8),intent(in)                               :: w,eps
-  !   real(8),dimension(Nspin,2*Norb*Nbath),intent(in) :: bath_
-  !   complex(8)                                       :: fg,x
-  !   integer                                          :: i
-  !   type(effective_bath)                             :: dmft_bath_
-  !   call allocate_bath(dmft_bath_)
-  !   call set_bath(bath_,dmft_bath_)
-  !   fg=zero
-  !   x=dcmplx(w,eps)
-  !   if(.not.ed_supercond)then
-  !      do i=1,Nbath
-  !         fg=fg + dmft_bath_%v(ispin,iorb,i)**2/(x-dmft_bath_%e(ispin,iorb,i))
-  !      enddo
-  !   else
-  !      do i=1,Nbath
-  !         fg=fg + dmft_bath_%v(ispin,iorb,i)**2*(x+dmft_bath_%e(ispin,iorb,i))/&
-  !              (w**2+xi*eps-dmft_bath_%e(ispin,iorb,i)**2-dmft_bath_%d(ispin,iorb,i)**2)
-  !      enddo
-  !   endif
-  !   call deallocate_bath(dmft_bath_)
-  ! end function delta_and_irred_
-  ! function fdelta_and_irred(ispin,iorb,x,bath_) result(fg)
-  !   integer,intent(in)                               :: ispin,iorb
-  !   complex(8),intent(in)                            :: x
-  !   real(8),dimension(Nspin,2*Norb*Nbath),intent(in) :: bath_
-  !   complex(8)                                       :: fg
-  !   integer                                          :: i
-  !   type(effective_bath)                             :: dmft_bath_
-  !   call allocate_bath(dmft_bath_)
-  !   call set_bath(bath_,dmft_bath_)
-  !   fg=zero
-  !   do i=1,Nbath
-  !      fg=fg + dmft_bath_%d(ispin,iorb,i)*dmft_bath_%v(ispin,iorb,i)**2/&
-  !           (dimag(x)**2+dmft_bath_%e(ispin,iorb,i)**2+dmft_bath_%d(ispin,iorb,i)**2)
-  !   enddo
-  !   call deallocate_bath(dmft_bath_)
-  ! end function fdelta_and_irred
-  ! function fdelta_and_irred_(ispin,iorb,w,eps,bath_) result(fg)
-  !   integer,intent(in)                               :: ispin,iorb
-  !   real(8),intent(in)                               :: w,eps
-  !   real(8),dimension(Nspin,2*Norb*Nbath),intent(in) :: bath_
-  !   complex(8)                                       :: fg
-  !   integer                                          :: i
-  !   type(effective_bath)                             :: dmft_bath_
-  !   call allocate_bath(dmft_bath_)
-  !   call set_bath(bath_,dmft_bath_)
-  !   fg=zero
-  !   do i=1,Nbath
-  !      fg=fg + dmft_bath_%d(ispin,iorb,i)*dmft_bath_%v(ispin,iorb,i)**2/&
-  !           (w**2+xi*eps+dmft_bath_%e(ispin,iorb,i)**2+dmft_bath_%d(ispin,iorb,i)**2)
-  !   enddo
-  !   call deallocate_bath(dmft_bath_)
-  ! end function fdelta_and_irred_
-  ! function delta_and_hybrd(ispin,iorb,jorb,x,bath_) result(fg)
-  !   integer,intent(in)                                 :: ispin,iorb,jorb
-  !   complex(8),intent(in)                              :: x
-  !   real(8),dimension(Nspin,(Norb+1)*Nbath),intent(in) :: bath_
-  !   complex(8)                                         :: fg
-  !   integer                                            :: i
-  !   type(effective_bath)                               :: dmft_bath_
-  !   call allocate_bath(dmft_bath_)
-  !   call set_bath(bath_,dmft_bath_)
-  !   fg=zero
-  !   if(.not.ed_supercond)then
-  !      do i=1,Nbath
-  !         fg=fg + dmft_bath_%v(ispin,iorb,i)*dmft_bath_%v(ispin,jorb,i)/(x-dmft_bath_%e(ispin,1,i))
-  !      enddo
-  !   else
-  !      do i=1,Nbath
-  !         fg=fg - dmft_bath_%v(ispin,iorb,i)*dmft_bath_%v(ispin,jorb,i)*(x+dmft_bath_%e(ispin,1,i))/&
-  !              (dimag(x)**2+dmft_bath_%e(ispin,1,i)**2+dmft_bath_%d(ispin,1,i)**2)
-  !      enddo
-  !   endif
-  !   call deallocate_bath(dmft_bath_)
-  ! end function delta_and_hybrd
-  ! function delta_and_hybrd_(ispin,iorb,jorb,w,eps,bath_) result(fg)
-  !   integer,intent(in)                                 :: ispin,iorb,jorb
-  !   real(8),intent(in)                                 :: w,eps
-  !   real(8),dimension(Nspin,(Norb+1)*Nbath),intent(in) :: bath_
-  !   complex(8)                                         :: fg,x
-  !   integer                                            :: i
-  !   type(effective_bath)                               :: dmft_bath_
-  !   call allocate_bath(dmft_bath_)
-  !   call set_bath(bath_,dmft_bath_)
-  !   fg=zero
-  !   x=dcmplx(w,eps)
-  !   if(.not.ed_supercond)then
-  !      do i=1,Nbath
-  !         fg=fg + dmft_bath_%v(ispin,iorb,i)*dmft_bath_%v(ispin,jorb,i)/(x-dmft_bath_%e(ispin,1,i))
-  !      enddo
-  !   else
-  !      do i=1,Nbath
-  !         fg=fg + dmft_bath_%v(ispin,iorb,i)*dmft_bath_%v(ispin,jorb,i)*(x+dmft_bath_%e(ispin,1,i))/&
-  !              (w**2+xi*eps-dmft_bath_%e(ispin,1,i)**2-dmft_bath_%d(ispin,1,i)**2)
-  !      enddo
-  !   endif
-  !   call deallocate_bath(dmft_bath_)
-  ! end function delta_and_hybrd_
-  ! function fdelta_and_hybrd(ispin,iorb,jorb,x,bath_) result(fg)
-  !   integer,intent(in)                                 :: ispin,iorb,jorb
-  !   complex(8),intent(in)                              :: x
-  !   real(8),dimension(Nspin,(Norb+1)*Nbath),intent(in) :: bath_
-  !   complex(8)                                         :: fg
-  !   integer                                            :: i
-  !   type(effective_bath)                               :: dmft_bath_
-  !   call allocate_bath(dmft_bath_)
-  !   call set_bath(bath_,dmft_bath_)
-  !   fg=zero
-  !   do i=1,Nbath
-  !      fg=fg + dmft_bath_%d(ispin,1,i)*dmft_bath_%v(ispin,iorb,i)*dmft_bath_%v(ispin,jorb,i)/&
-  !           (dimag(x)**2+dmft_bath_%e(ispin,1,i)**2+dmft_bath_%d(ispin,1,i)**2)
-  !   enddo
-  !   call deallocate_bath(dmft_bath_)
-  ! end function fdelta_and_hybrd
-  ! function fdelta_and_hybrd_(ispin,iorb,jorb,w,eps,bath_) result(fg)
-  !   integer,intent(in)                                 :: ispin,iorb,jorb
-  !   real(8),intent(in)                                 :: w,eps
-  !   real(8),dimension(Nspin,(Norb+1)*Nbath),intent(in) :: bath_
-  !   complex(8)                                         :: fg
-  !   integer                                            :: i
-  !   type(effective_bath)                               :: dmft_bath_
-  !   call allocate_bath(dmft_bath_)
-  !   call set_bath(bath_,dmft_bath_)
-  !   fg=zero
-  !   do i=1,Nbath
-  !      fg=fg + dmft_bath_%d(ispin,1,i)*dmft_bath_%v(ispin,iorb,i)*dmft_bath_%v(ispin,jorb,i)/&
-  !           (w**2+xi*eps+dmft_bath_%e(ispin,1,i)**2+dmft_bath_%d(ispin,1,i)**2)
-  !   enddo
-  !   call deallocate_bath(dmft_bath_)
-  ! end function fdelta_and_hybrd_
 
 END MODULE ED_BATH
