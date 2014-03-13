@@ -39,11 +39,11 @@ program lancED
   call parse_cmd_variable(fbethe,"FBETHE",default=.true.)
   call parse_cmd_variable(Lk,"Lk",default=1000)
   call parse_cmd_variable(ts,"TS",default=0.5d0)
-  call parse_cmd_variable(alpha,"alpha",default=[0.5d0,0.5d0])
+  call parse_cmd_variable(alpha,"alpha",default=[1.d0,1.d0])
   !
   call ed_read_input(trim(finput))
   !
-  call read_hk(trim(hkfile))
+
 
 
   !Allocate Weiss Field:
@@ -54,6 +54,8 @@ program lancED
   Nb=get_bath_size()
   allocate(bath(Nb(1),Nb(2)))
   call init_ed_solver(bath)
+
+  call read_hk(trim(hkfile))
 
 
   !DMFT loop

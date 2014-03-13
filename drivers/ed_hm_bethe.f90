@@ -4,12 +4,15 @@
 !###################################################################
 program lancED
   USE DMFT_ED
+  USE COMMON_VARS
   USE FUNCTIONS
+  USE IOTOOLS
   USE TOOLS
   USE MATRIX
   USE ERROR
   USE ARRAYS
   USE FFTGF
+  USE PARSE_INPUT
   implicit none
   integer                :: iloop,Nb(2)
   logical                :: converged
@@ -25,14 +28,16 @@ program lancED
 #endif
 
   call parse_cmd_variable(finput,"FINPUT",default='inputED.in')
-  call parse_cmd_variable(fhloc,"FHLOC",default='inputHLOC.in')
   call parse_cmd_variable(wband,"wband",default=1.d0)
   !
-  call ed_read_input(trim(finput),trim(fhloc))
+  call ed_read_input(trim(finput))
   Hloc=zero
 
   !Allocate Weiss Field:
-  allocate(delta(Norb,Norb,NL))
+  allocate(delta(Norb,Norb,Lmats))
+
+  LOGfile=100+mpiID
+  open(LOGfile,file="LOG"//reg(ed_file_suffix))
 
   !setup solver
   Nb=get_bath_size()
@@ -52,12 +57,12 @@ program lancED
      call get_delta_bethe
 
      !Perform the SELF-CONSISTENCY by fitting the new bath
-     call chi2_fitgf(delta,bath,ispin=1,iverbose=.true.)
+     call chi2_fitgf(delta,bath,ispin=1,iverbose=.false.)
 
      !Check convergence (if required change chemical potential)
      if(mpiID==0)then
         converged = check_convergence(delta(1,1,:),dmft_error,nsuccess,nloop,reset=.false.)
-        if(nread/=0.d0)call search_chemical_potential(nimp(1),niter,converged)
+        if(nread/=0.d0)call search_chemical_potential(ed_dens(1),converged)
      endif
 #ifdef _MPI
      call MPI_BCAST(converged,1,MPI_LOGICAL,0,MPI_COMM_WORLD,mpiERR)
@@ -77,15 +82,15 @@ contains
   subroutine get_delta_bethe
     integer                   :: i,j,iorb
     complex(8)                :: iw,zita,g0loc
-    complex(8),dimension(NL)  :: gloc,sigma
-    complex(8),dimension(Nw)  :: grloc
-    real(8)                   :: wm(NL),wr(Nw),tau(0:NL),C0,C1,n0
-    real(8),dimension(0:NL)   :: sigt
-    wm = pi/beta*real(2*arange(1,NL)-1,8)
-    wr = linspace(wini,wfin,Nw)
-    tau(0:) = linspace(0.d0,beta,NL+1)
+    complex(8),dimension(Lmats)  :: gloc,sigma
+    complex(8),dimension(Lreal)  :: grloc
+    real(8)                   :: wm(Lmats),wr(Lreal),tau(0:Lmats),C0,C1,n0
+    real(8),dimension(0:Lmats)   :: sigt
+    wm = pi/beta*real(2*arange(1,Lmats)-1,8)
+    wr = linspace(wini,wfin,Lreal)
+    tau(0:) = linspace(0.d0,beta,Lmats+1)
     do iorb=1,Norb
-       do i=1,NL
+       do i=1,Lmats
           iw = xi*wm(i)
           zita    = iw + xmu - impSmats(1,1,iorb,iorb,i)
           gloc(i) = gfbethe(wm(i),zita,Wband)
@@ -96,7 +101,7 @@ contains
           endif
        enddo
 
-       do i=1,Nw
+       do i=1,Lreal
           iw=cmplx(wr(i),eps)
           zita     = iw + xmu - impSreal(1,1,iorb,iorb,i)
           grloc(i) = gfbether(wr(i),zita,Wband)
@@ -106,7 +111,7 @@ contains
        call splot("DOS"//reg(txtfy(iorb))//".ed",wr,-dimag(grloc)/pi)
        call splot("Delta_"//reg(txtfy(iorb))//"_iw.ed",wm,delta(iorb,iorb,:))
 
-       n0=nimp(1)/2.d0
+       n0=ed_dens(1)/2.d0
        C0=Uloc(1)*(n0-0.5d0)
        C1=Uloc(1)**2*n0*(1.d0-n0)
        print*,n0,C0,C1

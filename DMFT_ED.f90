@@ -1,6 +1,6 @@
 module DMFT_ED
   USE COMMON_VARS, only: mpiID
-  USE IOTOOLS, only:free_unit
+  USE IOTOOLS, only:free_unit,reg
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_BATH
@@ -76,7 +76,7 @@ contains
     call ed_getobs
     if(mpiID==0)then
        unit=free_unit()
-       open(unit,file=trim(Hfile))
+       open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
        call write_bath(dmft_bath,unit)
        close(unit)
     endif

@@ -25,7 +25,7 @@ MODULE ED_CHI2FIT
   integer                               :: totNorb
   integer,dimension(:),allocatable      :: getIorb,getJorb
   integer                               :: Orb_indx,Spin_indx
-
+  logical                               :: iverbose_
 contains
 
 
@@ -38,7 +38,6 @@ contains
     real(8),dimension(:,:),intent(inout) :: bath
     integer                              :: ispin
     logical,optional                     :: iverbose
-    logical                              :: iverbose_
     iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
     select case(bath_type)
     case default
@@ -53,7 +52,6 @@ contains
     real(8),dimension(:,:),intent(inout) :: bath
     integer                              :: ispin
     logical,optional                     :: iverbose
-    logical                              :: iverbose_
     iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
     select case(bath_type)
     case default
@@ -121,14 +119,14 @@ contains
           a(1:Nbath)         = dmft_bath%e(ispin,iorb,1:Nbath) 
           a(Nbath+1:2*Nbath) = dmft_bath%v(ispin,iorb,1:Nbath)
           if(cg_scheme=='weiss')then
-             call fmin_cg(a,chi2_weiss,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
+             call fmin_cg(a,chi2_weiss,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
           else
-             call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
+             call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
           endif
           write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
-          suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//".ed"
+          suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
           unit=free_unit()
-          open(unit,file="chi2fit_results"//reg(suffix),position="append")
+          open(unit,file="chi2fit_results"//reg(suffix)//".ed",position="append")
           write(unit,"(ES18.9,1x,I5)") chi,iter
           close(unit)
           dmft_bath%e(ispin,iorb,1:Nbath) = a(1:Nbath)
@@ -152,11 +150,11 @@ contains
       integer           :: i,j,iorb,ispin
       real(8)           :: w
       do iorb=1,Norb
-         suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//".ed"
+         suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
          Fdelta(1,1:Ldelta) = fg(iorb,iorb,1:Ldelta)
          fgand=zero
          unit=free_unit()
-         open(unit,file="fit_delta"//reg(suffix))
+         open(unit,file="fit_delta"//reg(suffix)//".ed")
          do i=1,Ldelta
             w = Xdelta(i)
             if(cg_scheme=='weiss')then
@@ -233,14 +231,14 @@ contains
           a(Nbath+1:2*Nbath) = dmft_bath%d(ispin,iorb,1:Nbath)
           a(2*Nbath+1:3*Nbath) = dmft_bath%v(ispin,iorb,1:Nbath)
           if(cg_scheme=='weiss')then
-             call fmin_cg(a,chi2_weiss_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
+             call fmin_cg(a,chi2_weiss_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
           else
-             call fmin_cg(a,chi2_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
+             call fmin_cg(a,chi2_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
           endif
           write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
-          suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//".ed"
+          suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
           unit=free_unit()
-          open(unit,file="chi2fit_results"//reg(suffix),position="append")
+          open(unit,file="chi2fit_results"//reg(suffix)//".ed",position="append")
           write(unit,"(ES18.9,1x,I5)") chi,iter
           close(unit)
           dmft_bath%e(ispin,iorb,1:Nbath) = a(1:Nbath)
@@ -265,13 +263,13 @@ contains
       integer           :: i,j,iorb,ispin
       real(8)           :: w
       do iorb=1,Norb
-         suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//".ed"
+         suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
          Fdelta(1,1:Ldelta) = fg(1,iorb,iorb,1:Ldelta)
          Fdelta(2,1:Ldelta) = fg(2,iorb,iorb,1:Ldelta)
          fgand=zero
 
          unit=free_unit()
-         open(unit,file="fit_delta"//reg(suffix))
+         open(unit,file="fit_delta"//reg(suffix)//".ed")
          do i=1,Ldelta
             w = Xdelta(i)
             if(cg_scheme=='weiss')then
@@ -362,9 +360,9 @@ contains
        Spin_indx=ispin
        a(:) = bath_(ispin,:)
        if(cg_scheme=='weiss')then
-          call fmin_cg(a,chi2_hybrd_weiss,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
+          call fmin_cg(a,chi2_hybrd_weiss,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
        else
-          call fmin_cg(a,chi2_hybrd,dchi2_hybrd,iter,chi,itmax=cg_niter,ftol=cg_Ftol)
+          call fmin_cg(a,chi2_hybrd,dchi2_hybrd,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
        endif
        bath_(ispin,:) = a(:)
        call set_bath(bath_,dmft_bath)
@@ -372,9 +370,9 @@ contains
        call write_fit_result(ispin)
        call deallocate_bath(dmft_bath)
        write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
-       suffix="_ALLorb_s"//reg(txtfy(ispin))//".ed"
+       suffix="_ALLorb_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
        unit=free_unit()
-       open(unit,file="chi2fit_results"//reg(suffix),position="append")
+       open(unit,file="chi2fit_results"//reg(suffix)//".ed",position="append")
        write(unit,"(ES18.9,1x,I5)") chi,iter
        close(unit)
        deallocate(Fdelta,Xdelta,Wdelta)
@@ -421,9 +419,9 @@ contains
       do l=1,totNorb
          iorb=getIorb(l)
          jorb=getJorb(l)
-         suffix="_l"//reg(txtfy(iorb))//"_m"//reg(txtfy(jorb))//".ed"
+         suffix="_l"//reg(txtfy(iorb))//"_m"//reg(txtfy(jorb))//reg(ed_file_suffix)
          unit=free_unit()
-         open(unit,file="fit_delta"//reg(suffix))
+         open(unit,file="fit_delta"//reg(suffix)//".ed")
          do i=1,Ldelta
             write(unit,"(5F24.15)")Xdelta(i),dimag(Fdelta(l,i)),dimag(fgand(l,i)),&
                  dreal(Fdelta(l,i)),dreal(fgand(l,i))

@@ -18,8 +18,10 @@ END MODULE PLAIN_LANCZOS_HTIMESV_INTERFACE
 
 MODULE PLAIN_LANCZOS
   USE COMMON_VARS
+  USE IOFILE, only: reg
   USE PLAIN_LANCZOS_HTIMESV_INTERFACE
   USE ED_VARS_GLOBAL
+  USE ED_INPUT_VARS, only:ed_file_suffix
   implicit none
   private
   procedure(lanc_htimesv_d),pointer     :: dp_hprod
@@ -255,7 +257,7 @@ contains
        if(verb)then
           print *,'---> lowest eigenvalue  <---'
           write(*,*)"E_lowest    = ",diag(1)
-          open(10,file="lanc_eigenvals.dat")
+          open(10,file="lanc_eigenvals"//reg(ed_file_suffix)//".ed")
           do i=1,Nlanc
              write(10,*)i,diag(i)
           enddo
@@ -353,7 +355,7 @@ contains
        if(verb)then
           print *,'---> lowest eigenvalue  <---'
           write(*,*)"E_lowest    = ",diag(1)
-          open(10,file="lanc_eigenvals.dat")
+          open(10,file="lanc_eigenvals"//reg(ed_file_suffix)//".ed")
           do i=1,Nlanc
              write(10,*)i,diag(i)
           enddo

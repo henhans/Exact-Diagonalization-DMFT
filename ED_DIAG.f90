@@ -121,7 +121,7 @@ contains
     !POST PROCESSING:
     if(mpiID==0)then
        unit=free_unit()
-       open(unit,file="state_list.ed")
+       open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
        if(.not.ed_supercond)then
           write(unit,"(A)")"#i       E_i             DE_i             nup ndw Sect  Dim"
        else
@@ -175,7 +175,7 @@ contains
     if(mpiID==0)then
        write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function
        write(LOGfile,*)""
-       open(3,file='egs.ed',access='append')
+       open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
        write(3,*)egs
        close(3)
     endif
@@ -185,11 +185,11 @@ contains
     if(finiteT)then
        if(mpiID==0)then
           unit=free_unit()
-          open(unit,file="histogram_states.ed",access='append')
+          open(unit,file="histogram_states"//reg(ed_file_suffix)//".ed",access='append')
           hist_n = Nsect
           hist_a = 1.d0
           hist_b = real(Nsect,8)
-          hist_w = 1.d0!/real(state_list%size,8)
+          hist_w = 1.d0
           hist = histogram_allocate(hist_n)
           call histogram_set_range_uniform(hist,hist_a,hist_b)
           do i=1,state_list%size
@@ -322,7 +322,7 @@ contains
     !POST PROCESSING:
     if(mpiID==0)then
        unit=free_unit()
-       open(unit,file="state_list.ed")
+       open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
        write(unit,"(A)")"#i       E_i                nup ndw"
        do i=1,state_list%size
           Ei     = es_return_energy(state_list,i)
@@ -372,7 +372,7 @@ contains
     if(mpiID==0)then
        write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function
        write(LOGfile,*)""
-       open(3,file='egs.ed',access='append')
+       open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
        write(3,*)egs
        close(3)
     endif
@@ -381,7 +381,7 @@ contains
     if(finiteT)then
        if(mpiID==0)then
           unit=free_unit()
-          open(unit,file="histogram_states.ed",access='append')
+          open(unit,file="histogram_states"//reg(ed_file_suffix)//".ed",access='append')
           hist_n = Nsect
           hist_a = 1.d0
           hist_b = real(Nsect,8)
@@ -474,7 +474,7 @@ contains
        write(LOGfile,"(A,f18.12)")'egs  =',egs
        write(LOGfile,"(A,f18.12)")'Z    =',zeta_function    
        write(LOGfile,*)""
-       open(3,file='egs.ed',access='append')
+       open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
        write(3,*)egs
        close(3)
 #ifdef _MPI

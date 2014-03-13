@@ -239,12 +239,12 @@ contains
     subroutine open_units(string)
       character(len=*) :: string
       unit=free_units(size(unit))
-      open(unit(1),file="impG"//string//"_iw.ed")
-      open(unit(2),file="impG"//string//"_realw.ed")
-      open(unit(3),file="impSigma"//string//"_iw.ed")
-      open(unit(4),file="impSigma"//string//"_realw.ed")
-      open(unit(5),file="impG0"//string//"_iw.ed")
-      open(unit(6),file="impG0"//string//"_realw.ed")
+      open(unit(1),file="impG"//string//"_iw"//reg(ed_file_suffix)//".ed")
+      open(unit(2),file="impG"//string//"_realw"//reg(ed_file_suffix)//".ed")
+      open(unit(3),file="impSigma"//string//"_iw"//reg(ed_file_suffix)//".ed")
+      open(unit(4),file="impSigma"//string//"_realw"//reg(ed_file_suffix)//".ed")
+      open(unit(5),file="impG0"//string//"_iw"//reg(ed_file_suffix)//".ed")
+      open(unit(6),file="impG0"//string//"_realw"//reg(ed_file_suffix)//".ed")
     end subroutine open_units
 
     subroutine close_units()
@@ -371,19 +371,19 @@ contains
     subroutine open_units(string)
       character(len=*) :: string
       unit=free_units(size(unit))
-      open(unit(1),file="impG"//string//"_iw.ed")
-      open(unit(2),file="impF"//string//"_iw.ed")
-      open(unit(3),file="impSigma"//string//"_iw.ed")
-      open(unit(4),file="impSelf"//string//"_iw.ed")
-      open(unit(5),file="impG0"//string//"_iw.ed")
-      open(unit(6),file="impF0"//string//"_iw.ed")
+      open(unit(1),file="impG"//string//"_iw"//reg(ed_file_suffix)//".ed")
+      open(unit(2),file="impF"//string//"_iw"//reg(ed_file_suffix)//".ed")
+      open(unit(3),file="impSigma"//string//"_iw"//reg(ed_file_suffix)//".ed")
+      open(unit(4),file="impSelf"//string//"_iw"//reg(ed_file_suffix)//".ed")
+      open(unit(5),file="impG0"//string//"_iw"//reg(ed_file_suffix)//".ed")
+      open(unit(6),file="impF0"//string//"_iw"//reg(ed_file_suffix)//".ed")
       !
-      open(unit(7),file="impG"//string//"_realw.ed")
-      open(unit(8),file="impF"//string//"_realw.ed")
-      open(unit(9),file="impSigma"//string//"_realw.ed")
-      open(unit(10),file="impSelf"//string//"_realw.ed")
-      open(unit(11),file="impG0"//string//"_realw.ed")
-      open(unit(12),file="impF0"//string//"_realw.ed")
+      open(unit(7),file="impG"//string//"_realw"//reg(ed_file_suffix)//".ed")
+      open(unit(8),file="impF"//string//"_realw"//reg(ed_file_suffix)//".ed")
+      open(unit(9),file="impSigma"//string//"_realw"//reg(ed_file_suffix)//".ed")
+      open(unit(10),file="impSelf"//string//"_realw"//reg(ed_file_suffix)//".ed")
+      open(unit(11),file="impG0"//string//"_realw"//reg(ed_file_suffix)//".ed")
+      open(unit(12),file="impF0"//string//"_realw"//reg(ed_file_suffix)//".ed")
     end subroutine open_units
 
     subroutine close_units()
@@ -412,11 +412,11 @@ contains
     write(LOGfile,"(A)")"Printing the spin Chi:"
     do iorb=1,Norb
        unit(1)=free_unit()
-       open(unit(1),file="Chi_orb"//reg(txtfy(iorb))//"_tau.ed")
+       open(unit(1),file="Chi_orb"//reg(txtfy(iorb))//"_tau"//reg(ed_file_suffix)//".ed")
        unit(2)=free_unit()
-       open(unit(2),file="Chi_orb"//reg(txtfy(iorb))//"_realw.ed")
+       open(unit(2),file="Chi_orb"//reg(txtfy(iorb))//"_realw"//reg(ed_file_suffix)//".ed")
        unit(3)=free_unit()
-       open(unit(3),file="Chi_orb"//reg(txtfy(iorb))//"_iw.ed")
+       open(unit(3),file="Chi_orb"//reg(txtfy(iorb))//"_iw"//reg(ed_file_suffix)//".ed")
        do i=0,Ltau/2
           write(unit(1),*)tau(i),chitau(iorb,i)
        enddo

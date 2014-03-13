@@ -293,7 +293,7 @@ contains
   subroutine write_legend()
     integer :: unit,iorb,jorb,ispin
     unit = free_unit()
-    open(unit,file="columns_info.ed")
+    open(unit,file="columns_info"//reg(ed_file_suffix)//".ed")
     if(.not.ed_supercond)then
        write(unit,"(A1,1A7,90(A10,5X))")"#","loop","xmu",&
             (reg(txtfy(2+iorb))//"nimp_"//reg(txtfy(iorb)),iorb=1,Norb),&
@@ -334,7 +334,7 @@ contains
     integer :: unit,flast
     integer :: iorb,jorb,ispin
     unit = free_unit()
-    open(unit,file="observables_all.ed",position='append')
+    open(unit,file="observables_all"//reg(ed_file_suffix)//".ed",position='append')
     if(.not.ed_supercond)then
        write(unit,"(I7,90F15.9)")loop,xmu,&
             (nimp(iorb),iorb=1,Norb),&
@@ -364,7 +364,7 @@ contains
     close(unit)         
 
     unit = free_unit()
-    open(unit,file="observables_last.ed")
+    open(unit,file="observables_last"//reg(ed_file_suffix)//".ed")
     if(.not.ed_supercond)then
        write(unit,"(I7,90F15.9)")loop,xmu,&
             (nimp(iorb),iorb=1,Norb),&
