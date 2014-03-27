@@ -21,7 +21,7 @@ FC=ifort
 #--> B-H-Z MODELS
 #EXE=ed_2x2bhz
 #EXE=ed_bhz
-EXE=ed_afm_bhz
+EXE=ed_bhz_afm
 
 
 DIR =drivers

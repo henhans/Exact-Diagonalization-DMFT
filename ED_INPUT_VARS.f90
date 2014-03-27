@@ -105,7 +105,7 @@ contains
     call parse_input_variable(lanc_ngfiter,"LANC_NGFITER",INPUTunit,default=200)
     call parse_input_variable(cg_niter,"CG_NITER",INPUTunit,default=200)
     call parse_input_variable(cg_scheme,"CG_SCHEME",INPUTunit,default='delta')
-    call parse_input_variable(cg_ftol,"CG_FTOL",INPUTunit,default=0.000000001d0)
+    call parse_input_variable(cg_ftol,"CG_FTOL",INPUTunit,default=0.00001d0)
     call parse_input_variable(cg_weight,"CG_WEIGHT",INPUTunit,default=0)
     call parse_input_variable(ed_Type,"ED_TYPE",INPUTunit,default='d')
     call parse_input_variable(ed_Supercond,"ED_SUPERCOND",INPUTunit,default=.false.)

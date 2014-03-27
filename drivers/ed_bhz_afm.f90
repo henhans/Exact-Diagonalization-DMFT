@@ -7,7 +7,7 @@ program ed_bhz_afm
   integer                :: Nindep
   !Bath:
   integer                :: Nb(2)
-  real(8),allocatable    :: Bath(:,:,:)
+  real(8),allocatable    :: Bath(:,:,:),Bath_(:,:,:)
   !The local hybridization function:
   complex(8),allocatable :: Delta(:,:,:,:,:,:)
   complex(8),allocatable :: Smats(:,:,:,:,:,:)
@@ -17,7 +17,7 @@ program ed_bhz_afm
   real(8),allocatable    :: dos_wt(:)
   !variables for the model:
   integer                :: Nk
-  real(8)                :: mh,lambda
+  real(8)                :: mh,lambda,wmixing
   character(len=16)      :: finput
   character(len=32)      :: hkfile
   character(len=32)      :: hamfile
@@ -25,7 +25,8 @@ program ed_bhz_afm
   call parse_cmd_variable(finput,"FINPUT",default='inputED_BHZ.in')
   call parse_input_variable(hkfile,"HKFILE",finput,default="hkfile.in")
   call parse_input_variable(nk,"NK",finput,default=100)
-  call parse_input_variable(mh,"MH",finput,default=3.d0)
+  call parse_input_variable(mh,"MH",finput,default=0.d0)
+  call parse_input_variable(wmixing,"WMIXING",finput,default=0.75d0)
   call parse_input_variable(lambda,"LAMBDA",finput,default=0.d0)
   !
   call ed_read_input(trim(finput))
@@ -49,6 +50,7 @@ program ed_bhz_afm
   !Setup solver
   Nb=get_bath_size()
   allocate(bath(Nindep,Nb(1),Nb(2)))
+  allocate(Bath_(Nindep,Nb(1),Nb(2)))
   do ip=1,Nindep
      ed_file_suffix="_is"//reg(txtfy(ip))
      call init_ed_solver(bath(ip,:,:))
@@ -69,7 +71,6 @@ program ed_bhz_afm
         write(LOGfile,*)"Solving site:",ip
         ed_file_suffix="_is"//reg(txtfy(ip))
         Hloc = bhzHloc_site(ip)
-        !LOGfile=900+ip
         call ed_solver(bath(ip,:,:))
         Smats(ip,:,:,:,:,:) = impSmats
         Sreal(ip,:,:,:,:,:) = impSreal
@@ -86,13 +87,26 @@ program ed_bhz_afm
         call chi2_fitgf(delta(ip,2,2,:,:,:),bath(ip,:,:),ispin=2,iverbose=.false.)
      enddo
 
-     converged = check_convergence(sum(delta(:,1,1,1,1,:),1),dmft_error,nsuccess,nloop)
+
+     !AVERAGE OUT 1-->4, 2-->3
+     ! bath(1,:,:)=(bath(1,:,:)+bath(4,:,:))/2.d0
+     ! bath(2,:,:)=(bath(2,:,:)+bath(3,:,:))/2.d0
+     ! bath(3,:,:)=bath(2,:,:)
+     ! bath(4,:,:)=bath(1,:,:)
+     !MIXING:
+     do ip=1,Nindep
+        if(iloop>1)bath(ip,:,:) = wmixing*bath(ip,:,:) + (1.d0-wmixing)*Bath_(ip,:,:)
+        Bath_(ip,:,:)=bath(ip,:,:)
+     enddo
+     converged = check_convergence(delta(1,1,1,1,1,:)+delta(4,1,1,1,1,:),dmft_error,nsuccess,nloop)
 
      call end_loop
   enddo
 
 
+
 contains
+
 
 
   !---------------------------------------------------------------------
@@ -105,6 +119,8 @@ contains
     complex(8),dimension(Nso,Nso)                 :: gdelta,self
     complex(8),dimension(:,:,:,:,:,:),allocatable :: gloc
     complex(8)                                    :: iw
+    complex(8),dimension(Lmats,afmNso,afmNso) :: gmats
+    complex(8),dimension(Lreal,afmNso,afmNso) :: greal
     real(8)                                       :: wm(Lmats),wr(Lreal)
     character(len=32)                             :: suffix
     !
@@ -129,8 +145,8 @@ contains
        fg_site = matrix_to_blocks(fg)
        do ip=1,Nindep
           gloc(ip,:,:,:,:,i) = j2so(fg_site(ip,:,:))
-          !Get Delta=\Delta or G_0
-          call matrix_inverse(fg_site(ip,:,:))
+          call matrix_inverse(fg_site(ip,:,:)) !Get G_loc^{-1} used later
+          !
           if(cg_scheme=='weiss')then
              gdelta = fg_site(ip,:,:) + so2j(Smats(ip,:,:,:,:,i))
              call matrix_inverse(gdelta)
@@ -142,18 +158,13 @@ contains
           !
        enddo
     enddo
-
+    !PRINT
     do ip=1,Nindep
        do ispin=1,Nspin
           do iorb=1,Norb
-             do jorb=iorb,Norb
-                suffix="_is"//reg(txtfy(ip))//&
-                     "_l"//reg(txtfy(iorb))//&
-                     "_m"//reg(txtfy(jorb))//&
-                     "_s"//reg(txtfy(ispin))//"_iw.ed"
-                call splot("Delta"//reg(suffix),wm,delta(ip,ispin,ispin,iorb,jorb,:))
-                call splot("Gloc"//reg(suffix),wm,gloc(ip,ispin,ispin,iorb,jorb,:))
-             enddo
+             suffix="_is"//reg(txtfy(ip))//"_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//"_iw.ed"
+             call splot("Delta"//reg(suffix),wm,delta(ip,ispin,ispin,iorb,iorb,:))
+             call splot("Gloc"//reg(suffix),wm,gloc(ip,ispin,ispin,iorb,iorb,:))
           enddo
        enddo
     enddo
@@ -173,7 +184,7 @@ contains
        enddo
        zeta = blocks_to_matrix(zeta_site)
        fg   = zero
-       do ik=1,Lk         
+       do ik=1,Lk
           fg = fg + inverse_gk(zeta,Hk(:,:,ik))*dos_wt(ik)
        enddo
        fg_site = matrix_to_blocks(fg)
@@ -181,18 +192,13 @@ contains
           gloc(ip,:,:,:,:,i) = j2so(fg_site(ip,:,:))
        enddo
     enddo
-
+    !PRINT
     do ip=1,Nindep
        do ispin=1,Nspin
           do iorb=1,Norb
-             do jorb=iorb,Norb
-                suffix="_is"//reg(txtfy(ip))//&
-                     "_l"//reg(txtfy(iorb))//&
-                     "_m"//reg(txtfy(jorb))//&
-                     "_s"//reg(txtfy(ispin))//"_realw.ed"
-                call splot("Gloc"//reg(suffix),wr,gloc(ip,ispin,ispin,iorb,jorb,:))
-                call splot("DOS"//reg(suffix),wr,-dimag(gloc(ip,ispin,ispin,iorb,jorb,:))/pi)
-             enddo
+             suffix="_is"//reg(txtfy(ip))//"_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//"_realw.ed"
+             call splot("Gloc"//reg(suffix),wr,gloc(ip,ispin,ispin,iorb,iorb,:))
+             call splot("DOS"//reg(suffix),wr,-dimag(gloc(ip,ispin,ispin,iorb,iorb,:))/pi)
           enddo
        enddo
     enddo
@@ -211,19 +217,19 @@ contains
   !PURPOSE: BUILD THE H(k) FOR THE BHZ-AFM MODEL.
   !--------------------------------------------------------------------!
   subroutine build_hk(file)
-    character(len=*)                                :: file
-    integer                                         :: i,j,ik=0
-    integer                                         :: ix,iy
-    real(8)                                         :: kx,ky    
-    integer                                         :: iorb,jorb
-    integer                                         :: isporb,jsporb
-    integer                                         :: ispin,jspin
-    real(8)                                         :: foo
-    integer                                         :: unit
+    character(len=*)                          :: file
+    integer                                   :: i,j,ik=0
+    integer                                   :: ix,iy
+    real(8)                                   :: kx,ky    
+    integer                                   :: iorb,jorb
+    integer                                   :: isporb,jsporb
+    integer                                   :: ispin,jspin
+    real(8)                                   :: foo
+    integer                                   :: unit
     complex(8),dimension(afmNso,afmNso)       :: Hkmix
     complex(8),dimension(Lmats,afmNso,afmNso) :: fg
     complex(8),dimension(Lreal,afmNso,afmNso) :: fgr
-    real(8)                                         :: wm(Lmats),wr(Lreal),dw,n0(afmNso)
+    real(8)                                   :: wm(Lmats),wr(Lreal),dw,n0(afmNso)
     wm = pi/beta*real(2*arange(1,Lmats)-1,8)
     wr = linspace(wini,wfin,Lreal,mesh=dw)
     Lk=Nk**2
@@ -246,10 +252,10 @@ contains
              write(unit,"(100(2F10.7,1x))")(Hk(i,j,ik),j=1,Norb)
           enddo
           do i=1,Lreal
-             fgr(i,:,:)=fgr(i,:,:) + inverse_g0k_afm(dcmplx(wr(i),eps)+xmu,Hk(:,:,ik))
+             fgr(i,:,:)=fgr(i,:,:) + inverse_g0k(dcmplx(wr(i),eps)+xmu,Hk(:,:,ik))
           enddo
           do i=1,Lmats
-             fg(i,:,:) =fg(i,:,:)  + inverse_g0k_afm(xi*wm(i)+xmu,Hk(:,:,ik))
+             fg(i,:,:) =fg(i,:,:)  + inverse_g0k(xi*wm(i)+xmu,Hk(:,:,ik))
           enddo
           call progress(ik,Lk)
        enddo
@@ -291,11 +297,14 @@ contains
   function inverse_gk(zeta,hk) result(gk)
     complex(8),dimension(afmNso,afmNso)   :: zeta,hk
     complex(8),dimension(afmNso,afmNso)   :: gk
-    gk=zeta-Hk
+    integer :: i
+    ! gk=zeta-Hk
+    gk = -Hk
+    forall(i=1:afmNso)gk(i,i)=zeta(i,i) - hk(i,i)
     call matrix_inverse(gk)
   end function inverse_gk
 
-  function inverse_g0k_afm(zeta,hk,type) result(g0k)
+  function inverse_g0k(zeta,hk,type) result(g0k)
     integer :: i
     complex(8)                  :: zeta
     complex(8),dimension(16,16) :: hk
@@ -309,12 +318,12 @@ contains
        call matrix_inverse(g0k)
     else
        g0k=zero
-       g0k(1:8,1:8)   = inverse_g0k_afm8x8(zeta,hk(1:8,1:8))
-       g0k(9:16,9:16) = inverse_g0k_afm8x8(zeta,hk(9:16,9:16))
+       g0k(1:8,1:8)   = inverse_g0k_8x8(zeta,hk(1:8,1:8))
+       g0k(9:16,9:16) = inverse_g0k_8x8(zeta,hk(9:16,9:16))
     endif
-  end function inverse_g0k_afm
+  end function inverse_g0k
 
-  function inverse_g0k_afm8x8(zeta,hk) result(g0k)
+  function inverse_g0k_8x8(zeta,hk) result(g0k)
     complex(8)                :: zeta
     complex(8),dimension(8,8) :: hk
     complex(8),dimension(8,8) :: g0k
@@ -322,7 +331,7 @@ contains
     g0k = -hk
     forall(i=1:8)g0k(i,i)=zeta - hk(i,i)
     call matrix_inverse(g0k)
-  end function inverse_g0k_afm8x8
+  end function inverse_g0k_8x8
 
 
 
@@ -381,11 +390,11 @@ contains
   !PURPOSE: 
   !--------------------------------------------------------------------!
   function bhzHloc_site(isite) result(H)
-    integer    :: isite,i,j
-    complex(8) :: H(Nspin,Nspin,Norb,Norb)
-    i=1+(isite-1)*Nso
-    j=isite*Nso
-    H = j2so(bhzHloc(i:j,i:j))
+    integer                              :: isite
+    complex(8),dimension(Nindep,Nso,Nso) :: Vblocks
+    complex(8)                           :: H(Nspin,Nspin,Norb,Norb)
+    Vblocks = matrix_to_blocks(bhzHloc)
+    H = j2so(Vblocks(isite,:,:))
   end function bhzHloc_site
 
 
@@ -419,6 +428,24 @@ contains
        Vblocks(ip,:,:) = Matrix(i:j,i:j)
     enddo
   end function matrix_to_blocks
+
+
+
+  !--------------------------------------------------------------------!
+  !PURPOSE: 
+  !--------------------------------------------------------------------!
+  function matrix_to_block(ip,Matrix) result(Vblock)
+    complex(8),dimension(Nso,Nso) :: Vblock
+    complex(8),dimension(afmNso,afmNso)  :: Matrix
+    integer                              :: i,j,ip
+    Vblock=zero
+    i = (ip-1)*Nso + 1
+    j = ip*Nso
+    Vblock(:,:) = Matrix(i:j,i:j)
+  end function matrix_to_block
+
+
+
 
   !--------------------------------------------------------------------!
   !PURPOSE: 

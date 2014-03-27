@@ -12,13 +12,13 @@ module DMFT_ED
   USE ED_DIAG
   implicit none
 
-
+  logical :: iverbose_
 contains
 
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine init_ed_solver(bath_,hwband,Hunit)
+  subroutine init_ed_solver(bath_,hwband,Hunit,iverbose)
     real(8),dimension(:,:),intent(inout) :: bath_
     real(8),optional,intent(in)          :: hwband
     real(8)                              :: hwband_
@@ -26,9 +26,11 @@ contains
     character(len=64)                    :: Hunit_
     logical                              :: check 
     logical,save                         :: isetup=.true.
+    logical,optional                     :: iverbose
+    iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
     hwband_=2.d0;if(present(hwband))hwband_=hwband
     Hunit_='inputHLOC.in';if(present(Hunit))Hunit_=Hunit
-    if(mpiID==0)write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
+    if(mpiID==0.AND.iverbose_)write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
     if(isetup)call init_ed_structure(Hunit_)
     bath_ = 0.d0
     check = check_bath_dimension(bath_)
@@ -56,7 +58,7 @@ contains
     real(8),dimension(:,:),intent(in) :: bath_
     integer                           :: unit
     logical                           :: check
-    if(mpiID==0)write(LOGfile,"(A)")"ED SOLUTION"
+    if(mpiID==0.AND.iverbose_)write(LOGfile,"(A)")"ED SOLUTION"
     check = check_bath_dimension(bath_)
     if(.not.check)stop "init_ed_solver: wrong bath dimensions"
     call allocate_bath(dmft_bath)

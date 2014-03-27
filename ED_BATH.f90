@@ -170,14 +170,13 @@ contains
     real(8)              :: hwband_,wband_
     integer              :: i,iorb,ispin,unit,flen
     logical              :: IOfile
-    real(8)              :: Nh,de !N2,di, 
+    real(8)              :: Nh,de
     if(.not.dmft_bath_%status)stop "init_bath: bath not allocated"
     if(mpiID==0)then
        !Generating the bath anyway, then you may want to read it to 
        !update some entries. This way you can restart even 
        !from different Ns calculation, this is better than 
        !start from a complete guess
-       write(LOGfile,"(A)")"Generating bath:"
        dmft_bath_%e(:,:,1)    =-hwband_ 
        dmft_bath_%e(:,:,Nbath)= hwband_ 
        Nh=Nbath/2
@@ -208,7 +207,7 @@ contains
        !
        inquire(file=trim(Hfile)//trim(ed_file_suffix)//".restart",exist=IOfile)
        if(IOfile)then
-          write(LOGfile,"(A)")'Reading bath from file'
+          write(LOGfile,"(A)")'Reading bath from file'//trim(Hfile)//trim(ed_file_suffix)//".restart"
           unit = free_unit()
           flen = file_length(trim(Hfile)//trim(ed_file_suffix)//".restart")
           open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
