@@ -1,8 +1,8 @@
 #=========================================================================
 include sfmake.inc
-FC=ifort
-#$(SFMPI)/mpif90
-#FPP=MPI
+#FC=ifort
+FC=$(SFMPI)/mpif90
+FPP=MPI
 #=========================================================================
 #--> HUBBARD MODELS:
 #EXE=ed_hm_bethe
