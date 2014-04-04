@@ -9,7 +9,7 @@ subroutine lanc_ed_getchi()
   Chiw=zero
   Chiiw=zero
   do iorb=1,Norb
-     if(mpiID==0)write(LOGfile,"(A)")"Evaluating Chi_Orb"//reg(txtfy(iorb))
+     write(LOGfile,"(A)")"Evaluating Chi_Orb"//reg(txtfy(iorb))
      select case(ed_type)
      case default
         call lanc_ed_buildchi_d(iorb)
@@ -20,7 +20,7 @@ subroutine lanc_ed_getchi()
   Chitau = Chitau/zeta_function
   Chiw   = Chiw/zeta_function
   Chiiw  = Chiiw/zeta_function
-  if(mpiID==0)call print_imp_chi()
+  call print_imp_chi()
   deallocate(Chitau,Chiw,Chiiw)
   deallocate(wm,wr,tau,vm)
 end subroutine lanc_ed_getchi
@@ -52,7 +52,7 @@ subroutine lanc_ed_buildchi_d(iorb,iverbose)
   numstates=numgs
   if(finiteT)numstates=state_list%size
   !
-  if(mpiID==0)call start_progress
+  call start_progress
   do izero=1,numstates
      call progress(izero,numstates)
      isect0     =  es_return_sector(state_list,izero)
@@ -83,7 +83,7 @@ subroutine lanc_ed_buildchi_d(iorb,iverbose)
      if(spH0%status)call sp_delete_matrix(spH0)
      nullify(state_vec)
   enddo
-  if(mpiID==0)call stop_progress
+  call stop_progress
   deallocate(alfa_,beta_)
 end subroutine lanc_ed_buildchi_d
 
@@ -112,7 +112,7 @@ subroutine lanc_ed_buildchi_c(iorb,iverbose)
   numstates=numgs
   if(finiteT)numstates=state_list%size
   !
-  if(mpiID==0)call start_progress
+  call start_progress
   do izero=1,numstates
      call progress(izero,numstates)
      isect0     =  es_return_sector(state_list,izero)
@@ -142,7 +142,7 @@ subroutine lanc_ed_buildchi_c(iorb,iverbose)
      if(spH0%status)call sp_delete_matrix(spH0)
      nullify(state_cvec)
   enddo
-  if(mpiID==0)call stop_progress
+  call stop_progress
   deallocate(alfa_,beta_)
 end subroutine lanc_ed_buildchi_c
 

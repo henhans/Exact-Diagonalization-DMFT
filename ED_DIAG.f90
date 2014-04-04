@@ -63,10 +63,10 @@ contains
     call es_free_espace(state_list)
     oldzero=1000.d0
     numgs=0
-    if(mpiID==0)write(LOGfile,"(A)")"Get Hamiltonian:"
-    if(mpiID==0)call start_progress(LOGfile)
+    write(LOGfile,"(A)")"Get Hamiltonian:"
+    call start_progress(LOGfile)
     sector: do isector=1,Nsect
-       if(mpiID==0)call progress(isector,Nsect)
+       call progress(isector,Nsect)
        dim     = getdim(isector)
        Neigen  = min(dim,neigen_sector(isector))
        Nitermax= min(dim,lanc_niter)
@@ -79,11 +79,7 @@ contains
           allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
           eig_values=0.d0 ; eig_basis=0.d0
           call ed_buildH_d(isector)
-#ifdef _MPI
-          call lanczos_parpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_dd,.false.)
-#else
           call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_dd,.false.)
-#endif
        else
           allocate(eig_values(Dim),eig_basis(Dim,dim))
           eig_values=0.d0 ; eig_basis=0.d0 
@@ -116,32 +112,30 @@ contains
        if(spH0%status)call sp_delete_matrix(spH0)
        !
     enddo sector
-    if(mpiID==0)call stop_progress
+    call stop_progress
 
     !POST PROCESSING:
-    if(mpiID==0)then
-       unit=free_unit()
-       open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
-       if(.not.ed_supercond)then
-          write(unit,"(A)")"#i       E_i             DE_i             nup ndw Sect  Dim"
-       else
-          write(unit,"(A)")"#i       E_i             DE_i             Sz    Sect    Dim"
-       endif
-       do i=1,state_list%size
-          Ei     = es_return_energy(state_list,i)
-          isect0 = es_return_sector(state_list,i)
-          if(.not.ed_supercond)then
-             nup0   = getnup(isect0)
-             ndw0   = getndw(isect0)
-             write(unit,"(i3,f18.12,E18.9,1x,2i3,3x,i3,i10)"),i,Ei,exp(-beta*(Ei-state_list%emin)),nup0,ndw0,isect0,getdim(isect0)
-          else
-             sz0   = getsz(isect0)
-             write(unit,"(i3,f18.12,E18.9,1x,i3,3x,i3,i10)"),i,Ei,exp(-beta*(Ei-state_list%emin)),sz0,isect0,getdim(isect0)
-          endif
-       enddo
-       close(unit)
-       write(LOGfile,"(A)")"Get Z_function:"
+    unit=free_unit()
+    open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
+    if(.not.ed_supercond)then
+       write(unit,"(A)")"#i       E_i             DE_i             nup ndw Sect  Dim"
+    else
+       write(unit,"(A)")"#i       E_i             DE_i             Sz    Sect    Dim"
     endif
+    do i=1,state_list%size
+       Ei     = es_return_energy(state_list,i)
+       isect0 = es_return_sector(state_list,i)
+       if(.not.ed_supercond)then
+          nup0   = getnup(isect0)
+          ndw0   = getndw(isect0)
+          write(unit,"(i3,f18.12,E18.9,1x,2i3,3x,i3,i10)"),i,Ei,exp(-beta*(Ei-state_list%emin)),nup0,ndw0,isect0,getdim(isect0)
+       else
+          sz0   = getsz(isect0)
+          write(unit,"(i3,f18.12,E18.9,1x,i3,3x,i3,i10)"),i,Ei,exp(-beta*(Ei-state_list%emin)),sz0,isect0,getdim(isect0)
+       endif
+    enddo
+    close(unit)
+    write(LOGfile,"(A)")"Get Z_function:"
     zeta_function=0.d0
     Egs = state_list%emin
     if(finiteT)then
@@ -154,7 +148,7 @@ contains
        zeta_function=real(numgs,8)
     end if
     !
-    if(mpiID==0)write(LOGfile,"(A)")"Groundstate sector(s):"
+    write(LOGfile,"(A)")"Groundstate sector(s):"
     if(finiteT)then
        numgs=es_return_groundstates(state_list)
        if(numgs>Nsect)stop "ed_diag: too many gs"
@@ -166,40 +160,36 @@ contains
        if(.not.ed_supercond)then
           nup0  = getnup(isect0)
           ndw0  = getndw(isect0)
-          if(mpiID==0)write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
+          write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
        else
           sz0  = getsz(isect0)
-          if(mpiID==0)write(LOGfile,"(1A6,f20.12,I4)")'egs =',egs,sz0
+          write(LOGfile,"(1A6,f20.12,I4)")'egs =',egs,sz0
        endif
     enddo
-    if(mpiID==0)then
-       write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function
-       write(LOGfile,*)""
-       open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
-       write(3,*)egs
-       close(3)
-    endif
+    write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function
+    write(LOGfile,*)""
+    open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
+    write(3,*)egs
+    close(3)
 
     !Get histogram distribution of the sector contributing to the evaluated spectrum:
     !Go thru states list and update the neigen_sector(isector) sector-by-sector
     if(finiteT)then
-       if(mpiID==0)then
-          unit=free_unit()
-          open(unit,file="histogram_states"//reg(ed_file_suffix)//".ed",access='append')
-          hist_n = Nsect
-          hist_a = 1.d0
-          hist_b = real(Nsect,8)
-          hist_w = 1.d0
-          hist = histogram_allocate(hist_n)
-          call histogram_set_range_uniform(hist,hist_a,hist_b)
-          do i=1,state_list%size
-             isect0 = es_return_sector(state_list,i)
-             call histogram_accumulate(hist,dble(isect0),hist_w)
-          enddo
-          call histogram_print(hist,unit)
-          write(unit,*)""
-          close(unit)
-       endif
+       unit=free_unit()
+       open(unit,file="histogram_states"//reg(ed_file_suffix)//".ed",access='append')
+       hist_n = Nsect
+       hist_a = 1.d0
+       hist_b = real(Nsect,8)
+       hist_w = 1.d0
+       hist = histogram_allocate(hist_n)
+       call histogram_set_range_uniform(hist,hist_a,hist_b)
+       do i=1,state_list%size
+          isect0 = es_return_sector(state_list,i)
+          call histogram_accumulate(hist,dble(isect0),hist_w)
+       enddo
+       call histogram_print(hist,unit)
+       write(unit,*)""
+       close(unit)
        !
        allocate(list_sector(state_list%size),count_sector(Nsect))
        !get the list of actual sectors contributing to the list
@@ -230,7 +220,7 @@ contains
        Ec  = state_list%emax
        if(exp(-beta*(Ec-Egs)) > cutoff)then
           lanc_nstates_total=lanc_nstates_total + 2!*lanc_nincrement
-          if(mpiID==0)write(*,"(A,I4)")"Increasing lanc_nstates_total+2:",lanc_nstates_total
+          write(*,"(A,I4)")"Increasing lanc_nstates_total+2:",lanc_nstates_total
        endif
     endif
   end subroutine lanc_ed_diag_d
@@ -258,13 +248,13 @@ contains
     call es_free_espace(state_list)
     oldzero=1000.d0
     numgs=0
-    if(mpiID==0)write(LOGfile,"(A)")"Get Hamiltonian:"
+    write(LOGfile,"(A)")"Get Hamiltonian:"
     !<DEBUG
     print*,"DOING COMPLEX"
     !>DEBUG
-    if(mpiID==0)call start_progress(LOGfile)
+    call start_progress(LOGfile)
     sector: do isector=1,Nsect
-       if(mpiID==0)call progress(isector,Nsect)
+       call progress(isector,Nsect)
        dim     = getdim(isector)
        Neigen  = min(dim,neigen_sector(isector))
        Nitermax= min(dim,lanc_niter)
@@ -276,20 +266,12 @@ contains
        if(lanc_solve)then
           allocate(eig_values(Neigen),eig_basis(Dim,Neigen))
           eig_values=0.d0 ; eig_basis=zero
-          !call setup_Hv_sector(isector)
           call ed_buildH_c(isector)
-#ifdef _MPI
-          call lanczos_parpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_cc,.false.)
-#else
           call lanczos_arpack(dim,Neigen,Nblock,Nitermax,eig_values,eig_basis,spHtimesV_cc,.false.)
-#endif
-          !call delete_Hv_sector()
        else
           allocate(eig_values(Dim),eig_basis(Dim,dim))
           eig_values=0.d0 ; eig_basis=zero
-          !call setup_Hv_sector(isector)
           call ed_buildH_c(isector,eig_basis)
-          !call delete_Hv_sector()
           call matrix_diagonalize(eig_basis,eig_values,'V','U')
           if(dim==1)eig_basis(dim,dim)=one
        endif
@@ -318,27 +300,26 @@ contains
        if(spH0%status)call sp_delete_matrix(spH0)
        !
     enddo sector
-    if(mpiID==0)call stop_progress
+    call stop_progress
     !POST PROCESSING:
-    if(mpiID==0)then
-       unit=free_unit()
-       open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
-       write(unit,"(A)")"#i       E_i                nup ndw"
-       do i=1,state_list%size
-          Ei     = es_return_energy(state_list,i)
-          isect0 = es_return_sector(state_list,i)
-          if(.not.ed_supercond)then
-             nup0   = getnup(isect0)
-             ndw0   = getndw(isect0)
-             write(unit,"(i3,f25.18,2i3,3x,2i3)"),i,Ei,nup0,ndw0,isect0,getdim(isect0)
-          else
-             sz0   = getsz(isect0)
-             write(unit,"(i3,f25.18,i3,3x,2i3)"),i,Ei,sz0,isect0,getdim(isect0)
-          endif
-       enddo
-       close(unit)
-       write(LOGfile,"(A)")"Get Z_function:"
-    endif
+
+    unit=free_unit()
+    open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
+    write(unit,"(A)")"#i       E_i                nup ndw"
+    do i=1,state_list%size
+       Ei     = es_return_energy(state_list,i)
+       isect0 = es_return_sector(state_list,i)
+       if(.not.ed_supercond)then
+          nup0   = getnup(isect0)
+          ndw0   = getndw(isect0)
+          write(unit,"(i3,f25.18,2i3,3x,2i3)"),i,Ei,nup0,ndw0,isect0,getdim(isect0)
+       else
+          sz0   = getsz(isect0)
+          write(unit,"(i3,f25.18,i3,3x,2i3)"),i,Ei,sz0,isect0,getdim(isect0)
+       endif
+    enddo
+    close(unit)
+    write(LOGfile,"(A)")"Get Z_function:"
     zeta_function=0.d0
     Egs = state_list%emin
     if(finiteT)then
@@ -351,7 +332,7 @@ contains
        zeta_function=real(numgs,8)
     end if
     !
-    if(mpiID==0)write(LOGfile,"(A)")"Groundstate sector(s):"
+    write(LOGfile,"(A)")"Groundstate sector(s):"
     if(finiteT)then
        numgs=es_return_groundstates(state_list)
        if(numgs>Nsect)stop "ed_diag: too many gs"
@@ -363,39 +344,35 @@ contains
        if(.not.ed_supercond)then
           nup0  = getnup(isect0)
           ndw0  = getndw(isect0)
-          if(mpiID==0)write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
+          write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
        else
           sz0  = getsz(isect0)
-          if(mpiID==0)write(LOGfile,"(1A6,f20.12,I4)")'egs =',egs,sz0
+          write(LOGfile,"(1A6,f20.12,I4)")'egs =',egs,sz0
        endif
     enddo
-    if(mpiID==0)then
-       write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function
-       write(LOGfile,*)""
-       open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
-       write(3,*)egs
-       close(3)
-    endif
+    write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function
+    write(LOGfile,*)""
+    open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
+    write(3,*)egs
+    close(3)
     !Get histogram distribution of the sector contributing to the evaluated spectrum:
     !Go thru states list and update the neigen_sector(isector) sector-by-sector
     if(finiteT)then
-       if(mpiID==0)then
-          unit=free_unit()
-          open(unit,file="histogram_states"//reg(ed_file_suffix)//".ed",access='append')
-          hist_n = Nsect
-          hist_a = 1.d0
-          hist_b = real(Nsect,8)
-          hist_w = 1.d0!/real(state_list%size,8)
-          hist = histogram_allocate(hist_n)
-          call histogram_set_range_uniform(hist,hist_a,hist_b)
-          do i=1,state_list%size
-             isect0 = es_return_sector(state_list,i)
-             call histogram_accumulate(hist,dble(isect0),hist_w)
-          enddo
-          call histogram_print(hist,unit)
-          write(unit,*)""
-          close(unit)
-       endif
+       unit=free_unit()
+       open(unit,file="histogram_states"//reg(ed_file_suffix)//".ed",access='append')
+       hist_n = Nsect
+       hist_a = 1.d0
+       hist_b = real(Nsect,8)
+       hist_w = 1.d0!/real(state_list%size,8)
+       hist = histogram_allocate(hist_n)
+       call histogram_set_range_uniform(hist,hist_a,hist_b)
+       do i=1,state_list%size
+          isect0 = es_return_sector(state_list,i)
+          call histogram_accumulate(hist,dble(isect0),hist_w)
+       enddo
+       call histogram_print(hist,unit)
+       write(unit,*)""
+       close(unit)
        allocate(list_sector(state_list%size),count_sector(Nsect))
        !get the list of actual sectors contributing to the list
        do i=1,state_list%size
@@ -425,7 +402,7 @@ contains
        Ec  = state_list%emax
        if(exp(-beta*(Ec-Egs)) > cutoff)then
           lanc_nstates_total=lanc_nstates_total + 2!*lanc_nincrement
-          if(mpiID==0)write(*,"(A,I4)")"Increasing lanc_nstates_total+2:",lanc_nstates_total
+          write(*,"(A,I4)")"Increasing lanc_nstates_total+2:",lanc_nstates_total
        endif
     endif
   end subroutine lanc_ed_diag_c
@@ -444,10 +421,10 @@ contains
     real(8),dimension(Nsect) :: e0 
     real(8)                  :: egs
     e0=0.d0
-    if(mpiID==0)write(LOGfile,"(A)")"Get Hamiltonian:"
-    if(mpiID==0)call start_progress(LOGfile)
+    write(LOGfile,"(A)")"Get Hamiltonian:"
+    call start_progress(LOGfile)
     do isector=1,Nsect
-       if(mpiID==0)call progress(isector,Nsect)
+       call progress(isector,Nsect)
        dim=getdim(isector)
        !call setup_Hv_sector(isector)
        call ed_buildH_d(isector,espace(isector)%M(:,:))
@@ -455,7 +432,7 @@ contains
        call matrix_diagonalize(espace(isector)%M,espace(isector)%e,'V','U')
        e0(isector)=minval(espace(isector)%e)
     enddo
-    if(mpiID==0)call stop_progress
+    call stop_progress
     !
     egs=minval(e0)
     forall(isector=1:Nsect)espace(isector)%e = espace(isector)%e - egs
@@ -467,19 +444,13 @@ contains
           zeta_function=zeta_function+exp(-beta*espace(isector)%e(i))
        enddo
     enddo
-#ifdef _MPI
-    if(mpiID==0)then
-#endif
-       write(LOGfile,"(A)")"DIAG resume:"
-       write(LOGfile,"(A,f18.12)")'egs  =',egs
-       write(LOGfile,"(A,f18.12)")'Z    =',zeta_function    
-       write(LOGfile,*)""
-       open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
-       write(3,*)egs
-       close(3)
-#ifdef _MPI
-    endif
-#endif
+    write(LOGfile,"(A)")"DIAG resume:"
+    write(LOGfile,"(A,f18.12)")'egs  =',egs
+    write(LOGfile,"(A,f18.12)")'Z    =',zeta_function    
+    write(LOGfile,*)""
+    open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
+    write(3,*)egs
+    close(3)
     return
   end subroutine full_ed_diag
 

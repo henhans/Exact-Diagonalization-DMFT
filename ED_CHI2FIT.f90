@@ -82,66 +82,62 @@ contains
     real(8)                              :: w
     character(len=20)                  :: suffix
     integer                            :: unit
-    if(mpiID==0)then
-       if(cg_scheme=='weiss')then
-          write(LOGfile,"(A)")"CHI2FIT: Weiss field function:"
-       else
-          write(LOGfile,"(A)")"CHI2FIT: Delta function:"
-       endif
-       if(size(fg,1)/=Norb)stop"CHI2_FITGF: wrong dimension 1 in chi2_input"
-       if(size(fg,2)/=Norb)stop"CHI2_FITGF: wrong dimension 2 in chi2_input"
-       check= check_bath_dimension(bath_)
-       if(.not.check)stop "chi2_fitgf_irred: wrong bath dimensions"
-       Ldelta = Lfit
-       if(Ldelta>size(fg,3))Ldelta=size(fg,3)
-       !
-       allocate(Fdelta(1,Ldelta))
-       allocate(Xdelta(Ldelta))
-       allocate(Wdelta(Ldelta))
-       !
-       forall(i=1:Ldelta)Xdelta(i)=pi/beta*real(2*i-1,8)
-       !
-       select case(Cg_weight)
-       case default
-          Wdelta=(/(1.d0,i=1,Ldelta)/)
-       case(1)
-          Wdelta=(/(real(i,8),i=1,Ldelta)/)
-       case(2)
-          Wdelta=Xdelta
-       end select
-       !
-       call allocate_bath(dmft_bath)
-       call set_bath(bath_,dmft_bath)
-       do iorb=1,Norb
-          Orb_indx=iorb
-          Spin_indx=ispin
-          Fdelta(1,1:Ldelta) = fg(iorb,iorb,1:Ldelta)
-          a(1:Nbath)         = dmft_bath%e(ispin,iorb,1:Nbath) 
-          a(Nbath+1:2*Nbath) = dmft_bath%v(ispin,iorb,1:Nbath)
-          if(cg_scheme=='weiss')then
-             call fmin_cg(a,chi2_weiss,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
-          else
-             call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
-          endif
-          write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
-          suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
-          unit=free_unit()
-          open(unit,file="chi2fit_results"//reg(suffix)//".ed",position="append")
-          write(unit,"(ES18.9,1x,I5)") chi,iter
-          close(unit)
-          dmft_bath%e(ispin,iorb,1:Nbath) = a(1:Nbath)
-          dmft_bath%v(ispin,iorb,1:Nbath) = a(Nbath+1:2*Nbath)
-       enddo
-       if(iverbose)call write_bath(dmft_bath,LOGfile)
-       call write_fit_result(ispin)
-       call copy_bath(dmft_bath,bath_)
-       call deallocate_bath(dmft_bath)
-       print*," "
-       deallocate(Fdelta,Xdelta,Wdelta)
+
+    if(cg_scheme=='weiss')then
+       write(LOGfile,"(A)")"CHI2FIT: Weiss field function:"
+    else
+       write(LOGfile,"(A)")"CHI2FIT: Delta function:"
     endif
-#ifdef _MPI
-    call MPI_BCAST(bath_,size(bath_),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-#endif
+    if(size(fg,1)/=Norb)stop"CHI2_FITGF: wrong dimension 1 in chi2_input"
+    if(size(fg,2)/=Norb)stop"CHI2_FITGF: wrong dimension 2 in chi2_input"
+    check= check_bath_dimension(bath_)
+    if(.not.check)stop "chi2_fitgf_irred: wrong bath dimensions"
+    Ldelta = Lfit
+    if(Ldelta>size(fg,3))Ldelta=size(fg,3)
+    !
+    allocate(Fdelta(1,Ldelta))
+    allocate(Xdelta(Ldelta))
+    allocate(Wdelta(Ldelta))
+    !
+    forall(i=1:Ldelta)Xdelta(i)=pi/beta*real(2*i-1,8)
+    !
+    select case(Cg_weight)
+    case default
+       Wdelta=(/(1.d0,i=1,Ldelta)/)
+    case(1)
+       Wdelta=(/(real(i,8),i=1,Ldelta)/)
+    case(2)
+       Wdelta=Xdelta
+    end select
+    !
+    call allocate_bath(dmft_bath)
+    call set_bath(bath_,dmft_bath)
+    do iorb=1,Norb
+       Orb_indx=iorb
+       Spin_indx=ispin
+       Fdelta(1,1:Ldelta) = fg(iorb,iorb,1:Ldelta)
+       a(1:Nbath)         = dmft_bath%e(ispin,iorb,1:Nbath) 
+       a(Nbath+1:2*Nbath) = dmft_bath%v(ispin,iorb,1:Nbath)
+       if(cg_scheme=='weiss')then
+          call fmin_cg(a,chi2_weiss,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
+       else
+          call fmin_cg(a,chi2,dchi2,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
+       endif
+       write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
+       suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
+       unit=free_unit()
+       open(unit,file="chi2fit_results"//reg(suffix)//".ed",position="append")
+       write(unit,"(ES18.9,1x,I5)") chi,iter
+       close(unit)
+       dmft_bath%e(ispin,iorb,1:Nbath) = a(1:Nbath)
+       dmft_bath%v(ispin,iorb,1:Nbath) = a(Nbath+1:2*Nbath)
+    enddo
+    if(iverbose)call write_bath(dmft_bath,LOGfile)
+    call write_fit_result(ispin)
+    call copy_bath(dmft_bath,bath_)
+    call deallocate_bath(dmft_bath)
+    print*," "
+    deallocate(Fdelta,Xdelta,Wdelta)
     !
   contains
     !
@@ -191,70 +187,65 @@ contains
     real(8)                              :: w
     character(len=20)                    :: suffix
     integer                              :: unit
-    if(mpiID==0)then
-       if(cg_scheme=='weiss')then
-          write(LOGfile,"(A)")"CHI2FIT: Weiss field function:"
-       else
-          write(LOGfile,"(A)")"CHI2FIT: Delta function:"
-       endif
-       if(size(fg,1)/=2)stop"CHI2_FITGF: wrong dimension 1 in chi2_input"
-       if(size(fg,2)/=Norb)stop"CHI2_FITGF: wrong dimension 2 in chi2_input"
-       if(size(fg,3)/=Norb)stop"CHI2_FITGF: wrong dimension 3 in chi2_input"
-       check= check_bath_dimension(bath_)
-       if(.not.check)stop "chi2_fitgf_irred: wrong bath dimensions"
-       Ldelta = Lfit
-       if(Ldelta>size(fg,4))Ldelta=size(fg,4)
-       !
-       allocate(Fdelta(2,Ldelta))
-       allocate(Xdelta(Ldelta))
-       allocate(Wdelta(Ldelta))
-       !
-       forall(i=1:Ldelta)Xdelta(i)=pi/beta*real(2*i-1,8)
-       !
-       select case(Cg_weight)
-       case default
-          Wdelta=(/(1.d0,i=1,Ldelta)/)
-       case(1)
-          Wdelta=(/(real(i,8),i=1,Ldelta)/)
-       case(2)
-          Wdelta=Xdelta
-       end select
-       !
-       call allocate_bath(dmft_bath)
-       call set_bath(bath_,dmft_bath)
-       do iorb=1,Norb
-          Orb_indx=iorb
-          Spin_indx=ispin
-          Fdelta(1,1:Ldelta) = fg(1,iorb,iorb,1:Ldelta)
-          Fdelta(2,1:Ldelta) = fg(2,iorb,iorb,1:Ldelta)
-          a(1:Nbath)         = dmft_bath%e(ispin,iorb,1:Nbath) 
-          a(Nbath+1:2*Nbath) = dmft_bath%d(ispin,iorb,1:Nbath)
-          a(2*Nbath+1:3*Nbath) = dmft_bath%v(ispin,iorb,1:Nbath)
-          if(cg_scheme=='weiss')then
-             call fmin_cg(a,chi2_weiss_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
-          else
-             call fmin_cg(a,chi2_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
-          endif
-          write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
-          suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
-          unit=free_unit()
-          open(unit,file="chi2fit_results"//reg(suffix)//".ed",position="append")
-          write(unit,"(ES18.9,1x,I5)") chi,iter
-          close(unit)
-          dmft_bath%e(ispin,iorb,1:Nbath) = a(1:Nbath)
-          dmft_bath%d(ispin,iorb,1:Nbath) = a(Nbath+1:2*Nbath)
-          dmft_bath%v(ispin,iorb,1:Nbath) = a(2*Nbath+1:3*Nbath)
-       enddo
-       if(iverbose)call write_bath(dmft_bath,LOGfile)
-       call write_fit_result(ispin)
-       call copy_bath(dmft_bath,bath_)
-       call deallocate_bath(dmft_bath)
-       print*," "
-       deallocate(Fdelta,Xdelta,Wdelta)
+    if(cg_scheme=='weiss')then
+       write(LOGfile,"(A)")"CHI2FIT: Weiss field function:"
+    else
+       write(LOGfile,"(A)")"CHI2FIT: Delta function:"
     endif
-#ifdef _MPI
-    call MPI_BCAST(bath_,size(bath_),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-#endif
+    if(size(fg,1)/=2)stop"CHI2_FITGF: wrong dimension 1 in chi2_input"
+    if(size(fg,2)/=Norb)stop"CHI2_FITGF: wrong dimension 2 in chi2_input"
+    if(size(fg,3)/=Norb)stop"CHI2_FITGF: wrong dimension 3 in chi2_input"
+    check= check_bath_dimension(bath_)
+    if(.not.check)stop "chi2_fitgf_irred: wrong bath dimensions"
+    Ldelta = Lfit
+    if(Ldelta>size(fg,4))Ldelta=size(fg,4)
+    !
+    allocate(Fdelta(2,Ldelta))
+    allocate(Xdelta(Ldelta))
+    allocate(Wdelta(Ldelta))
+    !
+    forall(i=1:Ldelta)Xdelta(i)=pi/beta*real(2*i-1,8)
+    !
+    select case(Cg_weight)
+    case default
+       Wdelta=(/(1.d0,i=1,Ldelta)/)
+    case(1)
+       Wdelta=(/(real(i,8),i=1,Ldelta)/)
+    case(2)
+       Wdelta=Xdelta
+    end select
+    !
+    call allocate_bath(dmft_bath)
+    call set_bath(bath_,dmft_bath)
+    do iorb=1,Norb
+       Orb_indx=iorb
+       Spin_indx=ispin
+       Fdelta(1,1:Ldelta) = fg(1,iorb,iorb,1:Ldelta)
+       Fdelta(2,1:Ldelta) = fg(2,iorb,iorb,1:Ldelta)
+       a(1:Nbath)         = dmft_bath%e(ispin,iorb,1:Nbath) 
+       a(Nbath+1:2*Nbath) = dmft_bath%d(ispin,iorb,1:Nbath)
+       a(2*Nbath+1:3*Nbath) = dmft_bath%v(ispin,iorb,1:Nbath)
+       if(cg_scheme=='weiss')then
+          call fmin_cg(a,chi2_weiss_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
+       else
+          call fmin_cg(a,chi2_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
+       endif
+       write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
+       suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
+       unit=free_unit()
+       open(unit,file="chi2fit_results"//reg(suffix)//".ed",position="append")
+       write(unit,"(ES18.9,1x,I5)") chi,iter
+       close(unit)
+       dmft_bath%e(ispin,iorb,1:Nbath) = a(1:Nbath)
+       dmft_bath%d(ispin,iorb,1:Nbath) = a(Nbath+1:2*Nbath)
+       dmft_bath%v(ispin,iorb,1:Nbath) = a(2*Nbath+1:3*Nbath)
+    enddo
+    if(iverbose)call write_bath(dmft_bath,LOGfile)
+    call write_fit_result(ispin)
+    call copy_bath(dmft_bath,bath_)
+    call deallocate_bath(dmft_bath)
+    print*," "
+    deallocate(Fdelta,Xdelta,Wdelta)
     !
   contains
     !
@@ -316,71 +307,67 @@ contains
     character(len=20)                    :: suffix
     integer                              :: unit
     !
-    if(mpiID==0)then
-       if(cg_scheme=='weiss')then
-          write(LOGfile,"(A)")"CHI2FIT: Weiss field function:"
-       else
-          write(LOGfile,"(A)")"CHI2FIT: Delta function:"
-       endif
-       if(size(fg,1)/=Norb)stop "CHI2FIT: wrong dimension 1 in chi2_input"
-       if(size(fg,2)/=Norb)stop "CHI2FIT: wrong dimension 2 in chi2_input"
-       check= check_bath_dimension(bath_)
-       if(.not.check)stop "chi2_fitgf_irred: wrong bath dimensions"
-       allocate(getIorb(Norb*(Norb+1)/2),getJorb(Norb*(Norb+1)/2))
-       corb=0
-       do iorb=1,Norb
-          do jorb=iorb,Norb
-             corb=corb+1
-             getIorb(corb)=iorb
-             getJorb(corb)=jorb
-          enddo
-       enddo
-       totNorb=corb
-       if(totNorb/=(Norb*(Norb+1)/2))stop "CHI2FIT: Error counting the orbitals"
-       !
-       Ldelta = Lfit
-       if(Ldelta>size(fg,3))Ldelta=size(fg,3)
-       allocate(Fdelta(totNorb,Ldelta))
-       allocate(Xdelta(Ldelta))
-       allocate(Wdelta(Ldelta))
-       do i=1,totNorb
-          Fdelta(i,1:Ldelta) = fg(getIorb(i),getJorb(i),1:Ldelta)
-       enddo
-       forall(i=1:Ldelta)Xdelta(i)=pi/beta*real(2*i-1,8)
-       select case(Cg_weight)
-       case default
-          Wdelta=(/(1.d0,i=1,Ldelta)/)
-       case(1)
-          Wdelta=(/(dble(i),i=1,Ldelta)/)
-       case(2)
-          Wdelta=Xdelta
-       end select
-       !
-       call allocate_bath(dmft_bath)
-       Spin_indx=ispin
-       a(:) = bath_(ispin,:)
-       if(cg_scheme=='weiss')then
-          call fmin_cg(a,chi2_hybrd_weiss,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
-       else
-          call fmin_cg(a,chi2_hybrd,dchi2_hybrd,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
-       endif
-       bath_(ispin,:) = a(:)
-       call set_bath(bath_,dmft_bath)
-       if(iverbose)call write_bath(dmft_bath,LOGfile)
-       call write_fit_result(ispin)
-       call deallocate_bath(dmft_bath)
-       write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
-       suffix="_ALLorb_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
-       unit=free_unit()
-       open(unit,file="chi2fit_results"//reg(suffix)//".ed",position="append")
-       write(unit,"(ES18.9,1x,I5)") chi,iter
-       close(unit)
-       deallocate(Fdelta,Xdelta,Wdelta)
-       deallocate(getIorb,getJorb)
+
+    if(cg_scheme=='weiss')then
+       write(LOGfile,"(A)")"CHI2FIT: Weiss field function:"
+    else
+       write(LOGfile,"(A)")"CHI2FIT: Delta function:"
     endif
-#ifdef _MPI
-    call MPI_BCAST(bath_,size(bath_),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-#endif
+    if(size(fg,1)/=Norb)stop "CHI2FIT: wrong dimension 1 in chi2_input"
+    if(size(fg,2)/=Norb)stop "CHI2FIT: wrong dimension 2 in chi2_input"
+    check= check_bath_dimension(bath_)
+    if(.not.check)stop "chi2_fitgf_irred: wrong bath dimensions"
+    allocate(getIorb(Norb*(Norb+1)/2),getJorb(Norb*(Norb+1)/2))
+    corb=0
+    do iorb=1,Norb
+       do jorb=iorb,Norb
+          corb=corb+1
+          getIorb(corb)=iorb
+          getJorb(corb)=jorb
+       enddo
+    enddo
+    totNorb=corb
+    if(totNorb/=(Norb*(Norb+1)/2))stop "CHI2FIT: Error counting the orbitals"
+    !
+    Ldelta = Lfit
+    if(Ldelta>size(fg,3))Ldelta=size(fg,3)
+    allocate(Fdelta(totNorb,Ldelta))
+    allocate(Xdelta(Ldelta))
+    allocate(Wdelta(Ldelta))
+    do i=1,totNorb
+       Fdelta(i,1:Ldelta) = fg(getIorb(i),getJorb(i),1:Ldelta)
+    enddo
+    forall(i=1:Ldelta)Xdelta(i)=pi/beta*real(2*i-1,8)
+    select case(Cg_weight)
+    case default
+       Wdelta=(/(1.d0,i=1,Ldelta)/)
+    case(1)
+       Wdelta=(/(dble(i),i=1,Ldelta)/)
+    case(2)
+       Wdelta=Xdelta
+    end select
+    !
+    call allocate_bath(dmft_bath)
+    Spin_indx=ispin
+    a(:) = bath_(ispin,:)
+    if(cg_scheme=='weiss')then
+       call fmin_cg(a,chi2_hybrd_weiss,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
+    else
+       call fmin_cg(a,chi2_hybrd,dchi2_hybrd,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=iverbose_)
+    endif
+    bath_(ispin,:) = a(:)
+    call set_bath(bath_,dmft_bath)
+    if(iverbose)call write_bath(dmft_bath,LOGfile)
+    call write_fit_result(ispin)
+    call deallocate_bath(dmft_bath)
+    write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter = ',chi," | ",iter
+    suffix="_ALLorb_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
+    unit=free_unit()
+    open(unit,file="chi2fit_results"//reg(suffix)//".ed",position="append")
+    write(unit,"(ES18.9,1x,I5)") chi,iter
+    close(unit)
+    deallocate(Fdelta,Xdelta,Wdelta)
+    deallocate(getIorb,getJorb)
   contains
     subroutine write_fit_result(ispin)
       integer                              :: i,j,l,m,iorb,jorb,ispin,jspin

@@ -3,7 +3,7 @@
 !AUTHORS  : Adriano Amaricci
 !########################################################################
 MODULE ED_AUX_FUNX
-  USE COMMON_VARS, only:mpiID
+  !USE COMMON_VARS
   USE TIMER
   USE IOTOOLS, only:free_unit,reg
   USE ED_INPUT_VARS
@@ -12,10 +12,6 @@ MODULE ED_AUX_FUNX
   private
 
   public :: print_Hloc
-#ifdef _MPI
-  public :: ed_init_mpi
-  public :: ed_finalize_mpi
-#endif
   !
   public :: init_ed_structure
   public :: search_chemical_potential
@@ -30,24 +26,6 @@ MODULE ED_AUX_FUNX
 contains
 
 
-
-
-#ifdef _MPI
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine ed_init_mpi
-    call MPI_INIT(mpiERR)
-    call MPI_COMM_RANK(MPI_COMM_WORLD,mpiID,mpiERR)
-    call MPI_COMM_SIZE(MPI_COMM_WORLD,mpiSIZE,mpiERR)
-    write(*,"(A,I4,A,I4,A)")'Processor ',mpiID,' of ',mpiSIZE,' is alive'
-    call MPI_BARRIER(MPI_COMM_WORLD,mpiERR)
-  end subroutine ed_init_mpi
-
-  subroutine ed_finalize_mpi
-    call MPI_FINALIZE(mpiERR)
-  end subroutine ed_finalize_mpi
-#endif
 
 
 
@@ -85,18 +63,16 @@ contains
        NP=get_sc_sector_dimension(0)
     endif
     !
-    if(mpiID==0)then
-       write(LOGfile,*)"Summary:"
-       write(LOGfile,*)"--------------------------------------------"
-       write(LOGfile,*)'Number of impurities         = ',Norb
-       write(LOGfile,*)'Number of bath/impurity      = ',Nbath
-       write(LOGfile,*)'Total # of Bath sites/spin   = ',Nbo
-       write(LOGfile,*)'Total # of sites/spin        = ',Ns
-       write(LOGfile,*)'Maximum dimension            = ',NP
-       write(LOGfile,*)'Total size, Hilber space dim.= ',Ntot,NN
-       write(LOGfile,*)'Number of sectors            = ',Nsect
-       write(LOGfile,*)"--------------------------------------------"
-    endif
+    write(LOGfile,*)"Summary:"
+    write(LOGfile,*)"--------------------------------------------"
+    write(LOGfile,*)'Number of impurities         = ',Norb
+    write(LOGfile,*)'Number of bath/impurity      = ',Nbath
+    write(LOGfile,*)'Total # of Bath sites/spin   = ',Nbo
+    write(LOGfile,*)'Total # of sites/spin        = ',Ns
+    write(LOGfile,*)'Maximum dimension            = ',NP
+    write(LOGfile,*)'Total size, Hilber space dim.= ',Ntot,NN
+    write(LOGfile,*)'Number of sectors            = ',Nsect
+    write(LOGfile,*)"--------------------------------------------"
 
     allocate(Hloc(Nspin,Nspin,Norb,Norb))
     reHloc = 0.d0
@@ -104,7 +80,7 @@ contains
 
     inquire(file=Hunit,exist=control)    
     if(control)then
-       if(mpiID==0)write(LOGfile,*)"Reading Hloc from file: "//Hunit
+       write(LOGfile,*)"Reading Hloc from file: "//Hunit
        open(50,file=Hunit,status='old')
        do ispin=1,Nspin
           do iorb=1,Norb
@@ -118,16 +94,12 @@ contains
        enddo
        close(50)
     else
-       if(mpiID==0)then
-          write(LOGfile,*)"Hloc file not found."
-          write(LOGfile,*)"Hloc should be defined elsewhere..."
-       endif
+       write(LOGfile,*)"Hloc file not found."
+       write(LOGfile,*)"Hloc should be defined elsewhere..."
     endif
     Hloc = dcmplx(reHloc,imHloc)
-    if(mpiID==0)then
-       write(LOGfile,"(A)")"H_local:"
-       call print_Hloc(Hloc)
-    endif
+    write(LOGfile,"(A)")"H_local:"
+    call print_Hloc(Hloc)
 
 
 
@@ -149,9 +121,7 @@ contains
     if(lanc_nstates_total==1)then     !is you only want to keep 1 state
        lanc_nstates_sector=1            !set the required eigen per sector to 1 see later for neigen_sector
        finiteT=.false.          !set to do zero temperature calculations
-       if(mpiID==0)then
-          write(LOGfile,"(A)")"Required Lanc_nstates_total=1 => set T=0 calculation"
-       endif
+       write(LOGfile,"(A)")"Required Lanc_nstates_total=1 => set T=0 calculation"
     endif
 
 
@@ -159,15 +129,11 @@ contains
     if(finiteT)then
        if(mod(lanc_nstates_sector,2)/=0)then
           lanc_nstates_sector=lanc_nstates_sector+1
-          if(mpiID==0)then
-             write(LOGfile,"(A,I10)")"Increased Lanc_nstates_sector:",lanc_nstates_sector
-          endif
+          write(LOGfile,"(A,I10)")"Increased Lanc_nstates_sector:",lanc_nstates_sector
        endif
        if(mod(lanc_nstates_total,2)/=0)then
           lanc_nstates_total=lanc_nstates_total+1
-          if(mpiID==0)then
-             write(LOGfile,"(A,I10)")"Increased Lanc_nstates_total:",lanc_nstates_total
-          endif
+          write(LOGfile,"(A,I10)")"Increased Lanc_nstates_total:",lanc_nstates_total
        endif
 
     endif
@@ -257,7 +223,7 @@ contains
     integer                          :: nup,ndw,jup,jdw,iorb
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
-    if(mpiID==0)write(LOGfile,"(A)")"Setting up pointers:"
+    write(LOGfile,"(A)")"Setting up pointers:"
     call start_timer
     isector=0
     do nup=0,Ns
@@ -328,7 +294,7 @@ contains
     integer                          :: sz,iorb,dim2,jsz
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
-    if(mpiID==0)write(LOGfile,"(A)")"Setting up pointers:"
+    write(LOGfile,"(A)")"Setting up pointers:"
     call start_timer
     isector=0
     do isz=-Ns,Ns

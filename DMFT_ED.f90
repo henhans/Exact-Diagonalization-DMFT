@@ -1,5 +1,4 @@
 module DMFT_ED
-  USE COMMON_VARS, only: mpiID
   USE IOTOOLS, only:free_unit,reg
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
@@ -30,7 +29,7 @@ contains
     iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
     hwband_=2.d0;if(present(hwband))hwband_=hwband
     Hunit_='inputHLOC.in';if(present(Hunit))Hunit_=Hunit
-    if(mpiID==0.AND.iverbose_)write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
+    if(iverbose_)write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
     if(isetup)call init_ed_structure(Hunit_)
     bath_ = 0.d0
     check = check_bath_dimension(bath_)
@@ -58,7 +57,7 @@ contains
     real(8),dimension(:,:),intent(in) :: bath_
     integer                           :: unit
     logical                           :: check
-    if(mpiID==0.AND.iverbose_)write(LOGfile,"(A)")"ED SOLUTION"
+    if(iverbose_)write(LOGfile,"(A)")"ED SOLUTION"
     check = check_bath_dimension(bath_)
     if(.not.check)stop "init_ed_solver: wrong bath dimensions"
     call allocate_bath(dmft_bath)
@@ -76,12 +75,10 @@ contains
        if(chiflag)call full_ed_getchi
     end select
     call ed_getobs
-    if(mpiID==0)then
-       unit=free_unit()
-       open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
-       call write_bath(dmft_bath,unit)
-       close(unit)
-    endif
+    unit=free_unit()
+    open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
+    call write_bath(dmft_bath,unit)
+    close(unit)
     call deallocate_bath(dmft_bath)
   end subroutine ed_solver
 

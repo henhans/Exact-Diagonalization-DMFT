@@ -96,12 +96,6 @@ contains
        b=0.d0
     end if
     nloc=1
-#ifdef _MPI
-    mpiQ = ns_/mpiSIZE
-    mpiR = 0
-    if(mpiID==(mpiSIZE-1))mpiR=mod(ns_,mpiSIZE)
-    nloc=mpiQ+mpiR
-#endif
     call dp_Hprod(nloc,ns_,vin,tmp)
     tmp=tmp-b*vout
     a = dot_product(vin,tmp)
@@ -127,12 +121,6 @@ contains
        b=0.d0
     end if
     nloc = 1 
-#ifdef _MPI
-    mpiQ = ns_/mpiSIZE
-    mpiR = 0
-    if(mpiID == mpiSIZE-1)mpiR=mod(Ns_,mpiSIZE)
-    nloc=mpiQ+mpiR
-#endif
     call cp_Hprod(nloc,ns_,vin,tmp)
     tmp=tmp-b*vout
     a = dot_product(vin,tmp)

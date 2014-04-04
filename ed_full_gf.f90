@@ -8,14 +8,14 @@ subroutine full_ed_getgf()
   call allocate_grids
   impGmats   =zero
   impGreal   =zero
-  if(mpiID==0)call start_timer
+  call start_timer
   do ispin=1,Nspin
      do iorb=1,Norb
         call full_ed_buildgf(iorb,ispin)
      enddo
   enddo
-  if(mpiID==0)call print_imp_gf
-  if(mpiID==0)call stop_timer
+  call print_imp_gf
+  call stop_timer
   deallocate(wm,tau,wr,vm)
 end subroutine full_ed_getgf
 
@@ -38,12 +38,12 @@ subroutine full_ed_buildgf(iorb,ispin)
 
   nsite=1
   isite=impIndex(iorb,ispin)
-  if(mpiID==0)write(LOGfile,"(A)")"Evaluating G_imp_Orb"//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin))
-  if(mpiID==0)call start_progress(LOGfile)
+  write(LOGfile,"(A)")"Evaluating G_imp_Orb"//reg(txtfy(iorb))//"_Spin"//reg(txtfy(ispin))
+  call start_progress(LOGfile)
 
   do isector=1,Nsect
      jsector=getCsector(1,isector);if(jsector==0)cycle
-     if(mpiID==0)call progress(isector,Nsect)
+     call progress(isector,Nsect)
      idim=getdim(isector)     !i-th sector dimension
      jdim=getdim(jsector)     !j-th sector dimension
      allocate(HImap(idim))
@@ -82,7 +82,7 @@ subroutine full_ed_buildgf(iorb,ispin)
      enddo
      deallocate(HImap,HJmap)
   enddo
-  if(mpiID==0)call stop_progress
+  call stop_progress
 end subroutine full_ed_buildgf
 
 

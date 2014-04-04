@@ -1,8 +1,6 @@
 #=========================================================================
 include sfmake.inc
 FC=ifort
-#$(SFMPI)/mpif90
-#FPP=MPI
 #=========================================================================
 #--> HUBBARD MODELS:
 #EXE=ed_hm_bethe
@@ -33,17 +31,17 @@ BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 OBJS= MATRIX_SPARSE.o ED_EIGENSPACE.o ED_BATH_TYPE.o ED_INPUT_VARS.o ED_VARS_GLOBAL.o ARPACK_LANCZOS.o PLAIN_LANCZOS.o ED_AUX_FUNX.o ED_BATH.o ED_HAMILTONIAN.o ED_GREENS_FUNCTIONS.o ED_OBSERVABLES.o ED_CHI2FIT.o ED_DIAG.o DMFT_ED.o
 
 #=================STANDARD COMPILATION====================================
-all: FLAG=$(STD) -fpp -D_$(FPP) #-openmp
+all: FLAG=$(STD)
 all: ARGS=$(SFLIBS)
 all:compile
 
 #================OPTIMIZED COMPILATION====================================
-opt: FLAG=$(OPT) -fpp -D_$(FPP) #-openmp
+opt: FLAG=$(OPT)
 opt: ARGS=$(SFLIBS)
 opt:compile
 
 #================DEBUGGIN COMPILATION=====================================
-debug: FLAG=$(DEB) -fpp -D_$(FPP)
+debug: FLAG=$(DEB)
 debug: ARGS=$(SFLIBS_DEB)
 debug:compile
 

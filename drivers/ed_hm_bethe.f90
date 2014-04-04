@@ -23,10 +23,6 @@ program lancED
   complex(8),allocatable :: Delta(:,:,:)
   character(len=16)      :: finput,fhloc
 
-#ifdef _MPI
-  call ed_init_mpi()
-#endif
-
   call parse_cmd_variable(finput,"FINPUT",default='inputED.in')
   call parse_cmd_variable(wband,"wband",default=1.d0)
   !
@@ -35,9 +31,6 @@ program lancED
 
   !Allocate Weiss Field:
   allocate(delta(Norb,Norb,Lmats))
-
-  LOGfile=100+mpiID
-  open(LOGfile,file="LOG"//reg(ed_file_suffix))
 
   !setup solver
   Nb=get_bath_size()
@@ -60,19 +53,10 @@ program lancED
      call chi2_fitgf(delta,bath,ispin=1,iverbose=.false.)
 
      !Check convergence (if required change chemical potential)
-     if(mpiID==0)then
-        converged = check_convergence(delta(1,1,:),dmft_error,nsuccess,nloop,reset=.false.)
-        if(nread/=0.d0)call search_chemical_potential(ed_dens(1),converged)
-     endif
-#ifdef _MPI
-     call MPI_BCAST(converged,1,MPI_LOGICAL,0,MPI_COMM_WORLD,mpiERR)
-#endif
+     converged = check_convergence(delta(1,1,:),dmft_error,nsuccess,nloop,reset=.false.)
+     if(nread/=0.d0)call search_chemical_potential(ed_dens(1),converged)
      call end_loop
   enddo
-
-#ifdef _MPI
-  call ed_finalize_mpi()
-#endif
 
 
 contains
