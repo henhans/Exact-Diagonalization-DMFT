@@ -22,7 +22,7 @@ subroutine lanc_ed_getgf_superc()
 
   do ispin=1,Nspin
      do iorb=1,Norb
-        write(LOGfile,"(A)")" Get G&F_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))
+        if(ed_verbose)write(LOGfile,"(A)")" Get G&F_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))
         call lanc_ed_buildgf_sc_d(iorb,ispin,.false.)
      enddo
   enddo
@@ -80,7 +80,7 @@ subroutine lanc_ed_buildgf_sc_d(iorb,ispin,iverbose)
   !   
   call start_progress
   do izero=1,numstates
-     call progress(izero,numstates)
+     if(ed_verbose)call progress(izero,numstates)
      isect0     =  es_return_sector(state_list,izero)
      state_e    =  es_return_energy(state_list,izero)
      state_vec  => es_return_vector(state_list,izero)

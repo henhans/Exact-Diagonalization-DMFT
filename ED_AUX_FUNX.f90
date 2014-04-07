@@ -78,7 +78,7 @@ contains
     reHloc = 0.d0
     imHloc = 0.d0
 
-    inquire(file=Hunit,exist=control)    
+    inquire(file=Hunit,exist=control)
     if(control)then
        write(LOGfile,*)"Reading Hloc from file: "//Hunit
        open(50,file=Hunit,status='old')
@@ -158,9 +158,9 @@ contains
     endif
     if(nread/=0.d0)then
        i=abs(floor(log10(abs(nerr)))) !modulus of the order of magnitude of nerror
-       niter=nloop
-       nloop=(i-1)*niter                !increase the max number of dmft loop allowed so to do threshold loop
-       write(LOGfile,"(A,I10)")"Increased Nloop to:",nloop
+       niter=nloop/3
+       !nloop=(i-1)*niter                !increase the max number of dmft loop allowed so to do threshold loop
+       !write(LOGfile,"(A,I10)")"Increased Nloop to:",nloop
     endif
 
     !allocate functions

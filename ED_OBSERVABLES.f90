@@ -41,7 +41,6 @@ contains
     integer,allocatable,dimension(:) :: Hmap,HJmap
     real(8),allocatable              :: vvinit(:)
     !
-    write(LOGfile,"(A)")"Evaluating Observables:"
     allocate(nimp(Norb),dimp(Norb),nupimp(Norb),ndwimp(Norb),magimp(Norb),sz2imp(Norb,Norb),n2imp(Norb,Norb))
     Egs    = state_list%emin
     nimp   = 0.d0
@@ -286,7 +285,7 @@ contains
   subroutine write_legend()
     integer :: unit,iorb,jorb,ispin
     unit = free_unit()
-    open(unit,file="columns_info"//reg(ed_file_suffix)//".ed")
+    open(unit,file="columns_info.ed")
     if(.not.ed_supercond)then
        write(unit,"(A1,90(A10,5X))")"#",&
             (reg(txtfy(iorb))//"nimp_"//reg(txtfy(iorb)),iorb=1,Norb),&
@@ -316,7 +315,7 @@ contains
     close(unit)
     !
     unit = free_unit()
-    open(unit,file="control_info"//reg(ed_file_suffix)//".ed")
+    open(unit,file="control_info.ed")
     write(unit,"(A1,90(A10,5X))")"#","1xmu","2beta",&
          (reg(txtfy(2+iorb))//"U_"//reg(txtfy(iorb)),iorb=1,Norb),&
          reg(txtfy(2+Norb+1))//"U`",reg(txtfy(2+Norb+2))//"Jh"
@@ -333,40 +332,42 @@ contains
   subroutine write_to_unit_column()
     integer :: unit,flast
     integer :: iorb,jorb,ispin
-    unit = free_unit()
-    open(unit,file="control_vars"//reg(ed_file_suffix)//".ed")
-    write(unit,"(90F15.9)")xmu,beta,(uloc(iorb),iorb=1,Norb),Ust,Jh
-    close(unit)
+    if(ed_verbose)then
+       unit = free_unit()
+       open(unit,file="control_vars"//reg(ed_file_suffix)//".ed")
+       write(unit,"(90F15.9)")xmu,beta,(uloc(iorb),iorb=1,Norb),Ust,Jh
+       close(unit)
 
-    unit = free_unit()
-    open(unit,file="observables_all"//reg(ed_file_suffix)//".ed",position='append')
-    if(.not.ed_supercond)then
-       write(unit,"(90F15.9)")&
-            (nimp(iorb),iorb=1,Norb),&
-            (dimp(iorb),iorb=1,Norb),&
-            (nupimp(iorb),iorb=1,Norb),&
-            (ndwimp(iorb),iorb=1,Norb),&
-            (magimp(iorb),iorb=1,Norb),&
-            s2tot,&
-            ((sz2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
-            ((n2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
-            ((zimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
-            ((simp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
-    else
-       write(unit,"(90F15.9)")&
-            (nimp(iorb),iorb=1,Norb),&
-            (phiscimp(iorb),iorb=1,Norb),&
-            (dimp(iorb),iorb=1,Norb),&
-            (nupimp(iorb),iorb=1,Norb),&
-            (ndwimp(iorb),iorb=1,Norb),&
-            (magimp(iorb),iorb=1,Norb),&
-            s2tot,&
-            ((sz2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
-            ((n2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
-            ((zimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
-            ((simp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
+       unit = free_unit()
+       open(unit,file="observables_all"//reg(ed_file_suffix)//".ed",position='append')
+       if(.not.ed_supercond)then
+          write(unit,"(90F15.9)")&
+               (nimp(iorb),iorb=1,Norb),&
+               (dimp(iorb),iorb=1,Norb),&
+               (nupimp(iorb),iorb=1,Norb),&
+               (ndwimp(iorb),iorb=1,Norb),&
+               (magimp(iorb),iorb=1,Norb),&
+               s2tot,&
+               ((sz2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
+               ((n2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
+               ((zimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
+               ((simp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
+       else
+          write(unit,"(90F15.9)")&
+               (nimp(iorb),iorb=1,Norb),&
+               (phiscimp(iorb),iorb=1,Norb),&
+               (dimp(iorb),iorb=1,Norb),&
+               (nupimp(iorb),iorb=1,Norb),&
+               (ndwimp(iorb),iorb=1,Norb),&
+               (magimp(iorb),iorb=1,Norb),&
+               s2tot,&
+               ((sz2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
+               ((n2imp(iorb,jorb),jorb=1,Norb),iorb=1,Norb),&
+               ((zimp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin),&
+               ((simp(iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
+       endif
+       close(unit)    
     endif
-    close(unit)         
 
     unit = free_unit()
     open(unit,file="observables_last"//reg(ed_file_suffix)//".ed")

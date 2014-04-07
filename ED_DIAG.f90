@@ -31,6 +31,7 @@ contains
   ! GS, build the Green's functions calling all the necessary routines
   !+------------------------------------------------------------------+
   subroutine lanc_ed_diag
+    logical :: iverbose_
     select case(ed_type)
     case default
        call lanc_ed_diag_d
@@ -63,10 +64,9 @@ contains
     call es_free_espace(state_list)
     oldzero=1000.d0
     numgs=0
-    write(LOGfile,"(A)")"Get Hamiltonian:"
     call start_progress(LOGfile)
     sector: do isector=1,Nsect
-       call progress(isector,Nsect)
+       if(ed_verbose)call progress(isector,Nsect)
        dim     = getdim(isector)
        Neigen  = min(dim,neigen_sector(isector))
        Nitermax= min(dim,lanc_niter)
@@ -115,27 +115,28 @@ contains
     call stop_progress
 
     !POST PROCESSING:
-    unit=free_unit()
-    open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
-    if(.not.ed_supercond)then
-       write(unit,"(A)")"#i       E_i             DE_i             nup ndw Sect  Dim"
-    else
-       write(unit,"(A)")"#i       E_i             DE_i             Sz    Sect    Dim"
-    endif
-    do i=1,state_list%size
-       Ei     = es_return_energy(state_list,i)
-       isect0 = es_return_sector(state_list,i)
+    if(ed_verbose)then
+       unit=free_unit()
+       open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
        if(.not.ed_supercond)then
-          nup0   = getnup(isect0)
-          ndw0   = getndw(isect0)
-          write(unit,"(i3,f18.12,E18.9,1x,2i3,3x,i3,i10)"),i,Ei,exp(-beta*(Ei-state_list%emin)),nup0,ndw0,isect0,getdim(isect0)
+          write(unit,"(A)")"#i       E_i             DE_i             nup ndw Sect  Dim"
        else
-          sz0   = getsz(isect0)
-          write(unit,"(i3,f18.12,E18.9,1x,i3,3x,i3,i10)"),i,Ei,exp(-beta*(Ei-state_list%emin)),sz0,isect0,getdim(isect0)
+          write(unit,"(A)")"#i       E_i             DE_i             Sz    Sect    Dim"
        endif
-    enddo
-    close(unit)
-    write(LOGfile,"(A)")"Get Z_function:"
+       do i=1,state_list%size
+          Ei     = es_return_energy(state_list,i)
+          isect0 = es_return_sector(state_list,i)
+          if(.not.ed_supercond)then
+             nup0   = getnup(isect0)
+             ndw0   = getndw(isect0)
+             write(unit,"(i3,f18.12,E18.9,1x,2i3,3x,i3,i10)"),i,Ei,exp(-beta*(Ei-state_list%emin)),nup0,ndw0,isect0,getdim(isect0)
+          else
+             sz0   = getsz(isect0)
+             write(unit,"(i3,f18.12,E18.9,1x,i3,3x,i3,i10)"),i,Ei,exp(-beta*(Ei-state_list%emin)),sz0,isect0,getdim(isect0)
+          endif
+       enddo
+       close(unit)
+    endif
     zeta_function=0.d0
     Egs = state_list%emin
     if(finiteT)then
@@ -148,7 +149,6 @@ contains
        zeta_function=real(numgs,8)
     end if
     !
-    write(LOGfile,"(A)")"Groundstate sector(s):"
     if(finiteT)then
        numgs=es_return_groundstates(state_list)
        if(numgs>Nsect)stop "ed_diag: too many gs"
@@ -167,14 +167,13 @@ contains
        endif
     enddo
     write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function
-    write(LOGfile,*)""
     open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
     write(3,*)egs
     close(3)
 
     !Get histogram distribution of the sector contributing to the evaluated spectrum:
     !Go thru states list and update the neigen_sector(isector) sector-by-sector
-    if(finiteT)then
+    if(ed_verbose.AND.finiteT)then
        unit=free_unit()
        open(unit,file="histogram_states"//reg(ed_file_suffix)//".ed",access='append')
        hist_n = Nsect
@@ -254,7 +253,7 @@ contains
     !>DEBUG
     call start_progress(LOGfile)
     sector: do isector=1,Nsect
-       call progress(isector,Nsect)
+       if(ed_verbose)call progress(isector,Nsect)
        dim     = getdim(isector)
        Neigen  = min(dim,neigen_sector(isector))
        Nitermax= min(dim,lanc_niter)
@@ -302,24 +301,24 @@ contains
     enddo sector
     call stop_progress
     !POST PROCESSING:
-
-    unit=free_unit()
-    open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
-    write(unit,"(A)")"#i       E_i                nup ndw"
-    do i=1,state_list%size
-       Ei     = es_return_energy(state_list,i)
-       isect0 = es_return_sector(state_list,i)
-       if(.not.ed_supercond)then
-          nup0   = getnup(isect0)
-          ndw0   = getndw(isect0)
-          write(unit,"(i3,f25.18,2i3,3x,2i3)"),i,Ei,nup0,ndw0,isect0,getdim(isect0)
-       else
-          sz0   = getsz(isect0)
-          write(unit,"(i3,f25.18,i3,3x,2i3)"),i,Ei,sz0,isect0,getdim(isect0)
-       endif
-    enddo
-    close(unit)
-    write(LOGfile,"(A)")"Get Z_function:"
+    if(ed_verbose)then
+       unit=free_unit()
+       open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
+       write(unit,"(A)")"#i       E_i                nup ndw"
+       do i=1,state_list%size
+          Ei     = es_return_energy(state_list,i)
+          isect0 = es_return_sector(state_list,i)
+          if(.not.ed_supercond)then
+             nup0   = getnup(isect0)
+             ndw0   = getndw(isect0)
+             write(unit,"(i3,f25.18,2i3,3x,2i3)"),i,Ei,nup0,ndw0,isect0,getdim(isect0)
+          else
+             sz0   = getsz(isect0)
+             write(unit,"(i3,f25.18,i3,3x,2i3)"),i,Ei,sz0,isect0,getdim(isect0)
+          endif
+       enddo
+       close(unit)
+    endif
     zeta_function=0.d0
     Egs = state_list%emin
     if(finiteT)then
@@ -332,7 +331,6 @@ contains
        zeta_function=real(numgs,8)
     end if
     !
-    write(LOGfile,"(A)")"Groundstate sector(s):"
     if(finiteT)then
        numgs=es_return_groundstates(state_list)
        if(numgs>Nsect)stop "ed_diag: too many gs"
@@ -357,7 +355,7 @@ contains
     close(3)
     !Get histogram distribution of the sector contributing to the evaluated spectrum:
     !Go thru states list and update the neigen_sector(isector) sector-by-sector
-    if(finiteT)then
+    if(ed_verbose.AND.finiteT)then
        unit=free_unit()
        open(unit,file="histogram_states"//reg(ed_file_suffix)//".ed",access='append')
        hist_n = Nsect
@@ -447,7 +445,6 @@ contains
     write(LOGfile,"(A)")"DIAG resume:"
     write(LOGfile,"(A,f18.12)")'egs  =',egs
     write(LOGfile,"(A,f18.12)")'Z    =',zeta_function    
-    write(LOGfile,*)""
     open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
     write(3,*)egs
     close(3)

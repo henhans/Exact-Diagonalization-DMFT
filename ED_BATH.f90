@@ -196,7 +196,7 @@ contains
        enddo
     endif
     do i=1,Nbath
-       dmft_bath_%v(:,:,i)=1.d-1/sqrt(dble(Nbath))
+       dmft_bath_%v(:,:,i)=max(0.1d0,1.d0/sqrt(dble(Nbath)))
     enddo
     if(ed_supercond)then
        dmft_bath_%d(:,:,:)=deltasc

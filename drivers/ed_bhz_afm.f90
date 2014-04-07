@@ -21,12 +21,14 @@ program ed_bhz_afm
   character(len=16)      :: finput
   character(len=32)      :: hkfile
   character(len=32)      :: hamfile
+  logical :: waverage
   !Parse additional variables && read Input && read H(k)^4x4
   call parse_cmd_variable(finput,"FINPUT",default='inputED_BHZ.in')
   call parse_input_variable(hkfile,"HKFILE",finput,default="hkfile.in")
   call parse_input_variable(nk,"NK",finput,default=100)
   call parse_input_variable(mh,"MH",finput,default=0.d0)
   call parse_input_variable(wmixing,"WMIXING",finput,default=0.75d0)
+  call parse_input_variable(waverage,"WAVERAGE",finput,default=.false.)
   call parse_input_variable(lambda,"LAMBDA",finput,default=0.d0)
   !
   call ed_read_input(trim(finput))
@@ -83,16 +85,18 @@ program ed_bhz_afm
      do ip=1,Nindep
         ed_file_suffix="_is"//reg(txtfy(ip))
         Hloc = bhzHloc_site(ip)
-        call chi2_fitgf(delta(ip,1,1,:,:,:),bath(ip,:,:),ispin=1,iverbose=.false.)
-        call chi2_fitgf(delta(ip,2,2,:,:,:),bath(ip,:,:),ispin=2,iverbose=.false.)
+        call chi2_fitgf(delta(ip,1,1,:,:,:),bath(ip,:,:),ispin=1)
+        call chi2_fitgf(delta(ip,2,2,:,:,:),bath(ip,:,:),ispin=2)
      enddo
 
 
      !AVERAGE OUT 1-->4, 2-->3
-     ! bath(1,:,:)=(bath(1,:,:)+bath(4,:,:))/2.d0
-     ! bath(2,:,:)=(bath(2,:,:)+bath(3,:,:))/2.d0
-     ! bath(3,:,:)=bath(2,:,:)
-     ! bath(4,:,:)=bath(1,:,:)
+     if(waverage)then
+        bath(1,:,:)=(bath(1,:,:)+bath(4,:,:))/2.d0
+        bath(2,:,:)=(bath(2,:,:)+bath(3,:,:))/2.d0
+        bath(3,:,:)=bath(2,:,:)
+        bath(4,:,:)=bath(1,:,:)
+     endif
      !MIXING:
      do ip=1,Nindep
         if(iloop>1)bath(ip,:,:) = wmixing*bath(ip,:,:) + (1.d0-wmixing)*Bath_(ip,:,:)
