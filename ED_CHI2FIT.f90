@@ -144,7 +144,7 @@ contains
        else
           call fmin_cg(a,chi2_delta_irred,dchi2_delta_irred,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.)
        endif
-       if(ed_verbose<4)write(LOGfile,"(A,ES18.9,A,I5,A)") 'chi^2|iter'//reg(ed_file_suffix)//'= ',chi," | ",iter,"  <--  Orb"//reg(txtfy(iorb))//" Spin"//reg(txtfy(ispin))
+       if(ed_verbose<5)write(LOGfile,"(A,ES18.9,A,I5,A)") 'chi^2|iter'//reg(ed_file_suffix)//'= ',chi," | ",iter,"  <--  Orb"//reg(txtfy(iorb))//" Spin"//reg(txtfy(ispin))
        if(ed_verbose<2)then
           suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
           unit=free_unit()
@@ -376,9 +376,9 @@ contains
        if(cg_scheme=='weiss')then
           call fmin_cg(a,chi2_weiss_irred_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.)
        else
-          call fmin_cg(a,chi2_delta_irred_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.)
+          call fmin_cg(a,chi2_delta_irred_sc,dchi2_delta_irred_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.)
        endif
-       if(ed_verbose<4)write(LOGfile,"(A,ES18.9,A,I5,A)") 'chi^2|iter'//reg(ed_file_suffix)//'=',chi," | ",iter,"  <--  Orb"//reg(txtfy(iorb))//" Spin"//reg(txtfy(ispin))
+       if(ed_verbose<5)write(LOGfile,"(A,ES18.9,A,I5,A)") 'chi^2|iter'//reg(ed_file_suffix)//'=',chi," | ",iter,"  <--  Orb"//reg(txtfy(iorb))//" Spin"//reg(txtfy(ispin))
        if(ed_verbose<2)then
           suffix="_orb"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
           unit=free_unit()
@@ -455,9 +455,31 @@ contains
     do i=1,Ldelta
        g0(:,i)   = fg_delta_irred_sc(xdelta(i),iorb,a)
     enddo
-    chi2_sc=sum(abs(Fdelta(1,:)-g0(1,:))**2/Wdelta(:)) 
-    chi2_sc=chi2_sc + sum(abs(Fdelta(2,:)-g0(2,:))**2/Wdelta(:)) 
+    chi2_sc=sum(abs(Fdelta(1,:)-g0(1,:))**2/Wdelta(:)) + sum(abs(Fdelta(2,:)-g0(2,:))**2/Wdelta(:)) 
   end function chi2_delta_irred_sc
+  ! the analytic GRADIENT of \chi^2
+  !+-------------------------------------------------------------+
+  function dchi2_delta_irred_sc(a) result(dchi2_sc)
+    real(8),dimension(:)                   ::  a
+    complex(8),dimension(2,Ldelta)         ::  g0
+    real(8),dimension(size(a))             ::  dchi2_sc,df
+    complex(8),dimension(2,Ldelta,size(a)) ::  dg0
+    integer                                ::  i,j,iorb
+    dchi2_sc = 0.d0 
+    df = 0.d0
+    iorb=Orb_indx
+    do i=1,Ldelta
+       g0(:,i)   = fg_delta_irred_sc(xdelta(i),iorb,a)
+       dg0(:,i,:)= grad_fg_delta_irred_sc(xdelta(i),iorb,a)
+    enddo
+    do j=1,size(a)
+       df(j) = &
+            sum( dreal(Fdelta(1,:)-g0(1,:))*dreal(dg0(1,:,j))/Wdelta(:) ) + sum(  dimag(Fdelta(1,:)-g0(1,:))*dimag(dg0(1,:,j))/Wdelta(:) ) +&
+            sum( dreal(Fdelta(2,:)-g0(2,:))*dreal(dg0(2,:,j))/Wdelta(:) ) + sum(  dimag(Fdelta(2,:)-g0(2,:))*dimag(dg0(2,:,j))/Wdelta(:) )
+    enddo
+    dchi2_sc=-2.d0*df
+  end function dchi2_delta_irred_sc
+
   ! the \Delta_Anderson function used in \chi^2 and d\chi^2
   ! \Delta = \sum_l V_l^2/(iw-e_l)
   !+-------------------------------------------------------------+
@@ -476,6 +498,32 @@ contains
     gg(1) = -sum(vps(:)**2*(x+eps(:))/(dimag(x)**2+eps(:)**2+dps(:)**2))
     gg(2) =  sum(dps(:)*vps(:)**2/(dimag(x)**2+eps(:)**2+dps(:)**2))
   end function fg_delta_irred_sc
+  ! the gradient d\Delta_Anderson function used in d\chi^2
+  ! d\Delta = \grad_{e_k,d_k,V_k}Delta(e_k,d_k,V_k)
+  !+-------------------------------------------------------------+
+  function grad_fg_delta_irred_sc(w,iorb,a) result(dgz)
+    real(8)                         :: w
+    real(8),dimension(:)            :: a
+    real(8),dimension(size(a)/3)    :: eps,vps,dps
+    complex(8),dimension(2,size(a)) :: dgz
+    complex(8)                      :: x,den
+    integer                         :: i,iorb,Nb
+    Nb=size(a)/3
+    eps=a(1:Nb)
+    dps=a(Nb+1:2*Nb)
+    vps=a(2*Nb+1:3*Nb)
+    x = xi*w
+    do i=1,Nb
+       den = dimag(x)**2+eps(i)**2+dps(i)**2
+       dgz(1,i) = -vps(i)*vps(i)*(1.d0/den - 2.d0*eps(i)*(x+eps(i))/den**2)
+       dgz(1,i+Nb) = 2.d0*vps(i)*vps(i)*dps(i)*(x+eps(i))/den**2
+       dgz(1,i+2*Nb) = -2.d0*vps(i)*(x+eps(i))/den
+       !
+       dgz(2,i) = -2.d0*vps(i)*vps(i)*dps(i)*eps(i)/den**2
+       dgz(2,i+Nb) = vps(i)*vps(i)*(1.d0/den - 2.d0*dps(i)*dps(i)/den**2)
+       dgz(2,i+2*Nb) = 2.d0*vps(i)*dps(i)/den
+    enddo
+  end function grad_fg_delta_irred_sc
 
 
   !+-------------------------------------------------------------+
@@ -594,7 +642,7 @@ contains
     endif
     bath_(ispin,:) = a(:)
     call set_bath(bath_,dmft_bath)
-    if(ed_verbose<4)write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter'//reg(ed_file_suffix)//'=',chi," | ",iter,"  <--  all Orbs, Spin"//reg(txtfy(ispin))
+    if(ed_verbose<5)write(LOGfile,"(A,ES18.9,A,I5)") 'chi^2|iter'//reg(ed_file_suffix)//'=',chi," | ",iter,"  <--  all Orbs, Spin"//reg(txtfy(ispin))
     if(ed_verbose<2)then
        suffix="_ALLorb_s"//reg(txtfy(ispin))//reg(ed_file_suffix)
        unit=free_unit()
