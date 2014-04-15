@@ -14,7 +14,7 @@ subroutine lanc_ed_getgf_normal()
 
   do ispin=1,Nspin
      do iorb=1,Norb
-        if(ed_verbose)write(LOGfile,"(A)")" Get G_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))
+        if(ed_verbose<3)write(LOGfile,"(A)")"Get G_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))
         select case(ed_type)
         case default
            call lanc_ed_buildgf_d(iorb,ispin,.false.)
@@ -28,7 +28,7 @@ subroutine lanc_ed_getgf_normal()
      do ispin=1,Nspin
         do iorb=1,Norb
            do jorb=iorb+1,Norb
-              if(ed_verbose)write(LOGfile,"(A)")" Get G_l"//&
+              if(ed_verbose<3)write(LOGfile,"(A)")"Get G_l"//&
                    reg(txtfy(iorb))//"_m"//reg(txtfy(jorb))//"_s"//reg(txtfy(ispin))
               select case(ed_type)
               case default
@@ -92,9 +92,9 @@ subroutine lanc_ed_buildgf_d(iorb,ispin,iverbose)
   numstates=numgs
   if(finiteT)numstates=state_list%size
   !   
-  call start_progress
+  if(ed_verbose<2)call start_progress
   do izero=1,numstates
-     if(ed_verbose)call progress(izero,numstates)
+     if(ed_verbose<1)call progress(izero,numstates)
      isect0     =  es_return_sector(state_list,izero)
      state_e    =  es_return_energy(state_list,izero)
      state_vec  => es_return_vector(state_list,izero)
@@ -176,7 +176,7 @@ subroutine lanc_ed_buildgf_d(iorb,ispin,iverbose)
      deallocate(HImap)
      !
   enddo
-  call stop_progress
+  if(ed_verbose<2)call stop_progress
   deallocate(alfa_,beta_)
 end subroutine lanc_ed_buildgf_d
 
@@ -209,9 +209,9 @@ subroutine lanc_ed_buildgf_c(iorb,ispin,iverbose)
   numstates=numgs
   if(finiteT)numstates=state_list%size
   !   
-  call start_progress
+  if(ed_verbose<2)call start_progress
   do izero=1,numstates
-     if(ed_verbose)call progress(izero,numstates)
+     if(ed_verbose<1)call progress(izero,numstates)
      isect0     =  es_return_sector(state_list,izero)
      state_e    =  es_return_energy(state_list,izero)
      state_cvec => es_return_cvector(state_list,izero)
@@ -293,7 +293,7 @@ subroutine lanc_ed_buildgf_c(iorb,ispin,iverbose)
      deallocate(HImap)
      !
   enddo
-  call stop_progress
+  if(ed_verbose<2)call stop_progress
   deallocate(alfa_,beta_)
 end subroutine lanc_ed_buildgf_c
 
@@ -331,9 +331,9 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
   numstates=numgs
   if(finiteT)numstates=state_list%size
   !   
-  call start_progress
+  if(ed_verbose<2)call start_progress
   do izero=1,numstates
-     if(ed_verbose)call progress(izero,numstates)
+     if(ed_verbose<1)call progress(izero,numstates)
      isect0     =  es_return_sector(state_list,izero)
      state_e    =  es_return_energy(state_list,izero)
      state_vec  => es_return_vector(state_list,izero)
@@ -521,7 +521,7 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
      deallocate(HImap)
      !
   enddo
-  call stop_progress
+  if(ed_verbose<2)call stop_progress
   deallocate(alfa_,beta_)
 end subroutine lanc_ed_buildgf_mix_d
 
@@ -556,9 +556,9 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
   numstates=numgs
   if(finiteT)numstates=state_list%size
   !   
-  call start_progress
+  if(ed_verbose<2)call start_progress
   do izero=1,numstates
-     if(ed_verbose)call progress(izero,numstates)
+     if(ed_verbose<1)call progress(izero,numstates)
      isect0     =  es_return_sector(state_list,izero)
      state_e    =  es_return_energy(state_list,izero)
      state_cvec => es_return_cvector(state_list,izero)
@@ -746,7 +746,7 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
      deallocate(HImap)
      !
   enddo
-call stop_progress
+  if(ed_verbose<2)call stop_progress
   deallocate(alfa_,beta_)
 end subroutine lanc_ed_buildgf_mix_c
 

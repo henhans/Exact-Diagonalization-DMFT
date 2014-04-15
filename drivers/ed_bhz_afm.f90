@@ -201,8 +201,8 @@ contains
        do ispin=1,Nspin
           do iorb=1,Norb
              suffix="_is"//reg(txtfy(ip))//"_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//"_realw.ed"
-             call splot("Gloc"//reg(suffix),wr,gloc(ip,ispin,ispin,iorb,iorb,:))
-             call splot("DOS"//reg(suffix),wr,-dimag(gloc(ip,ispin,ispin,iorb,iorb,:))/pi)
+             call splot("Gloc"//reg(suffix),wr,-dimag(gloc(ip,ispin,ispin,iorb,iorb,:))/pi,dreal(gloc(ip,ispin,ispin,iorb,iorb,:)))
+             !call splot("DOS"//reg(suffix),wr,-dimag(gloc(ip,ispin,ispin,iorb,iorb,:))/pi)
           enddo
        enddo
     enddo

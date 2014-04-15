@@ -64,9 +64,9 @@ contains
     call es_free_espace(state_list)
     oldzero=1000.d0
     numgs=0
-    call start_progress(LOGfile)
+    if(ed_verbose<2)call start_progress(LOGfile)
     sector: do isector=1,Nsect
-       if(ed_verbose)call progress(isector,Nsect)
+       if(ed_verbose<1)call progress(isector,Nsect)
        dim     = getdim(isector)
        Neigen  = min(dim,neigen_sector(isector))
        Nitermax= min(dim,lanc_niter)
@@ -112,10 +112,10 @@ contains
        if(spH0%status)call sp_delete_matrix(spH0)
        !
     enddo sector
-    call stop_progress
+    if(ed_verbose<2)call stop_progress
 
     !POST PROCESSING:
-    if(ed_verbose)then
+    if(ed_verbose<2)then
        unit=free_unit()
        open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
        if(.not.ed_supercond)then
@@ -160,20 +160,20 @@ contains
        if(.not.ed_supercond)then
           nup0  = getnup(isect0)
           ndw0  = getndw(isect0)
-          write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
+          if(ed_verbose<3)write(LOGfile,"(A,F20.12,2I4)")'egs =',egs,nup0,ndw0
        else
           sz0  = getsz(isect0)
-          write(LOGfile,"(1A6,f20.12,I4)")'egs =',egs,sz0
+          if(ed_verbose<3)write(LOGfile,"(A,F20.12,I4)")'egs =',egs,sz0
        endif
     enddo
-    write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function
-    open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
-    write(3,*)egs
-    close(3)
+    if(ed_verbose<3)write(LOGfile,"(A,F20.12)")'Z   =',zeta_function
+    ! open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
+    ! write(3,*)egs
+    ! close(3)
 
     !Get histogram distribution of the sector contributing to the evaluated spectrum:
     !Go thru states list and update the neigen_sector(isector) sector-by-sector
-    if(ed_verbose.AND.finiteT)then
+    if(ed_verbose<2.AND.finiteT)then
        unit=free_unit()
        open(unit,file="histogram_states"//reg(ed_file_suffix)//".ed",access='append')
        hist_n = Nsect
@@ -248,12 +248,9 @@ contains
     oldzero=1000.d0
     numgs=0
     write(LOGfile,"(A)")"Get Hamiltonian:"
-    !<DEBUG
-    print*,"DOING COMPLEX"
-    !>DEBUG
-    call start_progress(LOGfile)
+    if(ed_verbose<2)call start_progress(LOGfile)
     sector: do isector=1,Nsect
-       if(ed_verbose)call progress(isector,Nsect)
+       if(ed_verbose<1)call progress(isector,Nsect)
        dim     = getdim(isector)
        Neigen  = min(dim,neigen_sector(isector))
        Nitermax= min(dim,lanc_niter)
@@ -299,9 +296,9 @@ contains
        if(spH0%status)call sp_delete_matrix(spH0)
        !
     enddo sector
-    call stop_progress
+    if(ed_verbose<2)call stop_progress
     !POST PROCESSING:
-    if(ed_verbose)then
+    if(ed_verbose<2)then
        unit=free_unit()
        open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
        write(unit,"(A)")"#i       E_i                nup ndw"
@@ -342,20 +339,19 @@ contains
        if(.not.ed_supercond)then
           nup0  = getnup(isect0)
           ndw0  = getndw(isect0)
-          write(LOGfile,"(1A6,f20.12,2I4)")'egs =',egs,nup0,ndw0
+          if(ed_verbose<3)write(LOGfile,"(A,F20.12,2I4)")'egs =',egs,nup0,ndw0
        else
           sz0  = getsz(isect0)
-          write(LOGfile,"(1A6,f20.12,I4)")'egs =',egs,sz0
+          if(ed_verbose<3)write(LOGfile,"(A,F20.12,I4)")'egs =',egs,sz0
        endif
     enddo
-    write(LOGfile,"(1A6,F20.12)")'Z   =',zeta_function
-    write(LOGfile,*)""
-    open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
-    write(3,*)egs
-    close(3)
+    if(ed_verbose<3)write(LOGfile,"(A,F20.12)")'Z   =',zeta_function
+    ! open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
+    ! write(3,*)egs
+    ! close(3)
     !Get histogram distribution of the sector contributing to the evaluated spectrum:
     !Go thru states list and update the neigen_sector(isector) sector-by-sector
-    if(ed_verbose.AND.finiteT)then
+    if(ed_verbose<2.AND.finiteT)then
        unit=free_unit()
        open(unit,file="histogram_states"//reg(ed_file_suffix)//".ed",access='append')
        hist_n = Nsect
@@ -443,8 +439,8 @@ contains
        enddo
     enddo
     write(LOGfile,"(A)")"DIAG resume:"
-    write(LOGfile,"(A,f18.12)")'egs  =',egs
-    write(LOGfile,"(A,f18.12)")'Z    =',zeta_function    
+    write(LOGfile,"(A,f20.12)")'egs  =',egs
+    write(LOGfile,"(A,f20.12)")'Z    =',zeta_function    
     open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
     write(3,*)egs
     close(3)
