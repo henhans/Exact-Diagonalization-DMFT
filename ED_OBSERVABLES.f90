@@ -2,8 +2,8 @@
 !PURPOSE  : Obtain some physical quantities and print them out
 !########################################################################
 MODULE ED_OBSERVABLES
-  USE COMMON_VARS
-  USE IOTOOLS, only:free_unit,reg
+  USE CONSTANTS, only:zero,pi
+  USE IOTOOLS, only:free_unit,reg,txtfy
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_AUX_FUNX

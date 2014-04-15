@@ -611,39 +611,47 @@ contains
     logical,intent(inout) :: converged
     logical               :: bool
     real(8)               :: ndiff
-    integer,save          :: count=0,totcount=0
+    integer,save          :: count=0,totcount=0,i
     integer,save          :: nindex=0
-    integer               :: nindex1
-    real(8)               :: ndelta1,nratio
+    integer               :: nindex_old(3)
+    real(8)               :: ndelta_old,nratio
     integer,save          :: nth_magnitude=-2,nth_magnitude_old=-2
     real(8),save          :: nth=1.d-2
     logical,save          :: ireduce=.true.
-    integer :: unit
+    integer               :: unit
     !
     ndiff=ntmp-nread
-    nratio = 0.5d0
-    !nratio = 1.d0/(6.d0/11.d0*pi)
+    nratio = 0.5d0;!nratio = 1.d0/(6.d0/11.d0*pi)
     !
     !check actual value of the density *ntmp* with respect to goal value *nread*
     count=count+1
     totcount=totcount+1
-    nindex1=nindex
-    ndelta1=ndelta
-    if(ndiff >= nth)then      !if((ntmp >= nread+nth))then
+    if(count>2)then
+       do i=1,2
+          nindex_old(i+1)=nindex_old(i)
+       enddo
+    endif
+    nindex_old(1)=nindex
+    !
+    if(ndiff >= nth)then
        nindex=-1
-    elseif(ndiff <= -nth)then !elseif(ntmp <= nread-nth)then
+    elseif(ndiff <= -nth)then
        nindex=1
     else
        nindex=0
     endif
-    if(nindex1+nindex==0.AND.nindex/=0)then !avoid loop forth and back
-       ndelta=ndelta1*nratio !decreasing the step
+    !
+    ndelta_old=ndelta
+    bool=nindex/=0.AND.( (nindex+nindex_old(1)==0).OR.(nindex+sum(nindex_old(:))==0) )
+    !if(nindex_old(1)+nindex==0.AND.nindex/=0)then !avoid loop forth and back
+    if(bool)then
+       ndelta=ndelta_old*nratio !decreasing the step
     else
-       ndelta=ndelta1
+       ndelta=ndelta_old
     endif
     !
-    if(ndelta1<1.d-9)then
-       ndelta1=0.d0
+    if(ndelta_old<1.d-9)then
+       ndelta_old=0.d0
        nindex=0
     endif
     !update chemical potential
@@ -677,7 +685,7 @@ contains
        nth=max(nerr,10.d0**(nth_magnitude))   !set the new threshold 
        count=0                                !reset the counter
        converged=.false.                      !reset convergence
-       ndelta=ndelta1*nratio                  !reduce the delta step
+       ndelta=ndelta_old*nratio                  !reduce the delta step
        !
     endif
     !

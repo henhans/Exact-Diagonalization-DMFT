@@ -59,6 +59,10 @@ contains
     call allocate_bath(dmft_bath)
     call set_bath(bath_,dmft_bath)
     if(ed_verbose<2)call write_bath(dmft_bath,LOGfile)
+    unit=free_unit()
+    open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".used")
+    call write_bath(dmft_bath,unit)
+    close(unit)
     select case(ed_method)
     case default
        call lanc_ed_diag
@@ -71,10 +75,6 @@ contains
        if(chiflag)call full_ed_getchi
     end select
     call ed_getobs
-    unit=free_unit()
-    open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
-    call write_bath(dmft_bath,unit)
-    close(unit)
     call deallocate_bath(dmft_bath)
   end subroutine ed_solver
 

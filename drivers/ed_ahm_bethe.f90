@@ -50,7 +50,7 @@ program lancED
      call get_delta_bethe
 
      !Perform the SELF-CONSISTENCY by fitting the new bath
-     call chi2_fitgf(delta,bath,ispin=1,iverbose=.true.)
+     call chi2_fitgf(delta,bath,ispin=1)
 
      !Check convergence (if required change chemical potential)
      if(mpiID==0)then

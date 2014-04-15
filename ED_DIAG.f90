@@ -3,7 +3,7 @@
 !|{ImpUP1,...,ImpUPN},BathUP>|{ImpDW1,...,ImpDWN},BathDW>
 !########################################################################
 module ED_DIAG
-  USE COMMON_VARS
+  USE CONSTANTS
   USE MATRIX, only: matrix_diagonalize
   USE TIMER
   USE IOTOOLS, only:reg,free_unit

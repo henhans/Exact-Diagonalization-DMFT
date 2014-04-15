@@ -11,8 +11,8 @@
 ! N = Nspin*(Norb+1)*Nbath
 !########################################################################
 MODULE ED_BATH
-  USE COMMON_VARS
-  USE IOTOOLS, only:free_unit,reg,file_length
+  USE CONSTANTS, only: zero
+  USE IOTOOLS, only:free_unit,reg,file_length,txtfy
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   implicit none
@@ -485,7 +485,6 @@ contains
        write(LOGfile,"(A)")"spin_symmetrize_bath: Nspin=1 nothing to symmetrize"
        return
     endif
-    if(Nspin>2)stop "spin_symmetrize_bath: Nspin>2..."
     call allocate_bath(dmft_bath_)
     call set_bath(bath_,dmft_bath_)
     dmft_bath_%e(Nspin,:,:)=dmft_bath_%e(1,:,:)
