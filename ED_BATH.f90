@@ -165,9 +165,9 @@ contains
   !PURPOSE  : Initialize the DMFT loop, builindg H parameters and/or 
   !reading previous (converged) solution
   !+------------------------------------------------------------------+
-  subroutine init_bath_ed(dmft_bath_,hwband_)
+  subroutine init_bath_ed(dmft_bath_,hwband_,bcenter_)
     type(effective_bath) :: dmft_bath_
-    real(8)              :: hwband_,wband_
+    real(8)              :: hwband_,wband_,bcenter_
     integer              :: i,iorb,ispin,unit,flen
     logical              :: IOfile
     real(8)              :: Nh,de
@@ -195,6 +195,7 @@ contains
           dmft_bath_%e(:,:,Nh+i)= hwband_ - (i-1)*de
        enddo
     endif
+    if(bcenter_/=0.d0) dmft_bath%e = bcenter_ + dmft_bath%e
     do i=1,Nbath
        dmft_bath_%v(:,:,i)=max(0.1d0,1.d0/sqrt(dble(Nbath)))
     enddo
