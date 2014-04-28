@@ -1,10 +1,14 @@
 #=========================================================================
 include sfmake.inc
-FC=$(SFMPI)/mpif90
-#FPP=MPI
+FC=ifort
 #=========================================================================
 #--> HUBBARD MODELS:
+<<<<<<< HEAD
 EXE=ed_hm_bethe
+=======
+#EXE=ed_hm_bethe
+#EXE=ed_ahm_bethe
+>>>>>>> devel
 #EXE=ed_hm_2dsquare
 #EXE=ed_hm_bethe_mixgf
 
@@ -12,11 +16,22 @@ EXE=ed_hm_bethe
 #EXE=ed_pam_1b
 #EXE=ed_pam_2b
 #EXE=ed_lda1b
+<<<<<<< HEAD
 EXE=ed_lda
+=======
+#EXE=ed_lda
+#EXE=ed_tddpam_lattice
+#EXE=ed_tddpam_bethe
+>>>>>>> devel
 
 #--> B-H-Z MODELS
 #EXE=ed_2x2bhz
 #EXE=ed_bhz
+<<<<<<< HEAD
+=======
+EXE=ed_bhz_afm
+
+>>>>>>> devel
 
 DIR =drivers
 DIREXE=$(HOME)/.bin
@@ -24,20 +39,20 @@ DIREXE=$(HOME)/.bin
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
 #COMPILATION:
-OBJS= MATRIX_SPARSE.o ED_EIGENSPACE.o ED_VARS_GLOBAL.o ARPACK_LANCZOS.o PLAIN_LANCZOS.o ED_AUX_FUNX.o ED_BATH.o ED_HAMILTONIAN.o ED_GREENS_FUNCTIONS.o ED_OBSERVABLES.o ED_CHI2FIT.o ED_DIAG.o DMFT_ED.o
+OBJS= MATRIX_SPARSE.o ED_EIGENSPACE.o ED_BATH_TYPE.o ED_INPUT_VARS.o ED_VARS_GLOBAL.o ARPACK_LANCZOS.o PLAIN_LANCZOS.o ED_AUX_FUNX.o ED_BATH.o ED_HAMILTONIAN.o ED_GREENS_FUNCTIONS.o ED_OBSERVABLES.o ED_CHI2FIT.o ED_DIAG.o DMFT_ED.o
 
 #=================STANDARD COMPILATION====================================
-all: FLAG=$(STD) -fpp -D_$(FPP) #-openmp
+all: FLAG=$(STD) -static-intel
 all: ARGS=$(SFLIBS)
 all:compile
 
 #================OPTIMIZED COMPILATION====================================
-opt: FLAG=$(OPT) -fpp -D_$(FPP) #-openmp
+opt: FLAG=$(OPT)
 opt: ARGS=$(SFLIBS)
 opt:compile
 
 #================DEBUGGIN COMPILATION=====================================
-debug: FLAG=$(DEB) -fpp -D_$(FPP)
+debug: FLAG=$(DEB)
 debug: ARGS=$(SFLIBS_DEB)
 debug:compile
 
@@ -54,7 +69,7 @@ compile: version $(OBJS)
 
 clean: 
 	@echo "Cleaning:"
-	@rm -f *.mod *.o *~ revision.inc
+	@rm -f *.mod *.o *~ 
 
 version:
 	@echo $(VER)

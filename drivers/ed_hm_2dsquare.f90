@@ -46,7 +46,7 @@ program lancED
 
   !DMFT loop
   iloop=0;converged=.false.
-  do while(.not.converged)
+  do while(.not.converged.AND.iloop<nloop)
      iloop=iloop+1
      call start_loop(iloop,nloop,"DMFT-loop")
 

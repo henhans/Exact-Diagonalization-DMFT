@@ -1,20 +1,20 @@
 !+------------------------------------------------------------------+
 !PURPOSE  : Evaluate Green's functions using Lanczos algorithm
 !+------------------------------------------------------------------+
-subroutine lanc_ed_getgf()
+subroutine lanc_ed_getgf_normal()
   integer :: izero,iorb,jorb,ispin,i
   integer :: isect0,numstates
   real(8) :: norm0
   call allocate_grids
 
-  if(.not.allocated(impGmats))allocate(impGmats(Nspin,Nspin,Norb,Norb,NL))
-  if(.not.allocated(impGreal))allocate(impGreal(Nspin,Nspin,Norb,Norb,Nw))
+  if(.not.allocated(impGmats))allocate(impGmats(Nspin,Nspin,Norb,Norb,Lmats))
+  if(.not.allocated(impGreal))allocate(impGreal(Nspin,Nspin,Norb,Norb,Lreal))
   impGmats=zero
   impGreal=zero
 
   do ispin=1,Nspin
      do iorb=1,Norb
-        if(mpiID==0)write(LOGfile,"(A)")" Get G_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))
+        if(ed_verbose<3)write(LOGfile,"(A)")"Get G_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))
         select case(ed_type)
         case default
            call lanc_ed_buildgf_d(iorb,ispin,.false.)
@@ -28,7 +28,7 @@ subroutine lanc_ed_getgf()
      do ispin=1,Nspin
         do iorb=1,Norb
            do jorb=iorb+1,Norb
-              if(mpiID==0)write(LOGfile,"(A)")" Get G_l"//&
+              if(ed_verbose<3)write(LOGfile,"(A)")"Get G_l"//&
                    reg(txtfy(iorb))//"_m"//reg(txtfy(jorb))//"_s"//reg(txtfy(ispin))
               select case(ed_type)
               case default
@@ -53,10 +53,10 @@ subroutine lanc_ed_getgf()
   endif
   !
   !Print impurity functions:
-  if(mpiID==0)call print_imp_gf
+  call print_imp_gf
   deallocate(wm,wr,tau,vm)
   deallocate(impGmats,impGreal)
-end subroutine lanc_ed_getgf
+end subroutine lanc_ed_getgf_normal
 
 
 
@@ -92,9 +92,9 @@ subroutine lanc_ed_buildgf_d(iorb,ispin,iverbose)
   numstates=numgs
   if(finiteT)numstates=state_list%size
   !   
-  if(mpiID==0)call start_progress
+  if(ed_verbose<2)call start_progress
   do izero=1,numstates
-     if(mpiID==0)call progress(izero,numstates)
+     if(ed_verbose<1)call progress(izero,numstates)
      isect0     =  es_return_sector(state_list,izero)
      state_e    =  es_return_energy(state_list,izero)
      state_vec  => es_return_vector(state_list,izero)
@@ -108,7 +108,7 @@ subroutine lanc_ed_buildgf_d(iorb,ispin,iverbose)
      jsect0 = getCDGsector(ispin,isect0)
      if(jsect0/=0)then 
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)write(LOGfile,"(A,2I3,I15)")'add particle:',&
+        if(iverbose_)write(LOGfile,"(A,2I3,I15)")'add particle:',&
              getnup(jsect0),getndw(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap) !note that here you are doing twice the map building...
@@ -126,11 +126,11 @@ subroutine lanc_ed_buildgf_d(iorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_d(lanc_spHtimesV_dd)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_d(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,1,iorb,iorb,ispin)
@@ -142,7 +142,7 @@ subroutine lanc_ed_buildgf_d(iorb,ispin,iverbose)
      jsect0 = getCsector(ispin,isect0)
      if(jsect0/=0)then
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)write(LOGfile,"(A,2I3,I15)")'del particle:',&
+        if(iverbose_)write(LOGfile,"(A,2I3,I15)")'del particle:',&
              getnup(jsect0),getndw(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap)
@@ -160,11 +160,11 @@ subroutine lanc_ed_buildgf_d(iorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_d(lanc_spHtimesV_dd)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_d(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,-1,iorb,iorb,ispin)
@@ -176,7 +176,7 @@ subroutine lanc_ed_buildgf_d(iorb,ispin,iverbose)
      deallocate(HImap)
      !
   enddo
-  if(mpiID==0)call stop_progress
+  if(ed_verbose<2)call stop_progress
   deallocate(alfa_,beta_)
 end subroutine lanc_ed_buildgf_d
 
@@ -209,9 +209,9 @@ subroutine lanc_ed_buildgf_c(iorb,ispin,iverbose)
   numstates=numgs
   if(finiteT)numstates=state_list%size
   !   
-  if(mpiID==0)call start_progress
+  if(ed_verbose<2)call start_progress
   do izero=1,numstates
-     if(mpiID==0)call progress(izero,numstates)
+     if(ed_verbose<1)call progress(izero,numstates)
      isect0     =  es_return_sector(state_list,izero)
      state_e    =  es_return_energy(state_list,izero)
      state_cvec => es_return_cvector(state_list,izero)
@@ -225,7 +225,7 @@ subroutine lanc_ed_buildgf_c(iorb,ispin,iverbose)
      jsect0 = getCDGsector(ispin,isect0)
      if(jsect0/=0)then 
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)write(LOGfile,"(A,2I3,I15)")'add particle:',&
+        if(iverbose_)write(LOGfile,"(A,2I3,I15)")'add particle:',&
              getnup(jsect0),getndw(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap) !note that here you are doing twice the map building...
@@ -243,11 +243,11 @@ subroutine lanc_ed_buildgf_c(iorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_c(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,1,iorb,iorb,ispin)
@@ -259,7 +259,7 @@ subroutine lanc_ed_buildgf_c(iorb,ispin,iverbose)
      jsect0 = getCsector(ispin,isect0)
      if(jsect0/=0)then
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)write(LOGfile,"(A,2I3,I15)")'del particle:',&
+        if(iverbose_)write(LOGfile,"(A,2I3,I15)")'del particle:',&
              getnup(jsect0),getndw(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap)
@@ -277,11 +277,11 @@ subroutine lanc_ed_buildgf_c(iorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_c(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,-1,iorb,iorb,ispin)
@@ -293,7 +293,7 @@ subroutine lanc_ed_buildgf_c(iorb,ispin,iverbose)
      deallocate(HImap)
      !
   enddo
-  if(mpiID==0)call stop_progress
+  if(ed_verbose<2)call stop_progress
   deallocate(alfa_,beta_)
 end subroutine lanc_ed_buildgf_c
 
@@ -331,9 +331,9 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
   numstates=numgs
   if(finiteT)numstates=state_list%size
   !   
-  if(mpiID==0)call start_progress
+  if(ed_verbose<2)call start_progress
   do izero=1,numstates
-     if(mpiID==0)call progress(izero,numstates)
+     if(ed_verbose<1)call progress(izero,numstates)
      isect0     =  es_return_sector(state_list,izero)
      state_e    =  es_return_energy(state_list,izero)
      state_vec  => es_return_vector(state_list,izero)
@@ -349,7 +349,7 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
      jsect0 = getCDGsector(ispin,isect0)
      if(jsect0/=0)then 
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)write(*,"(A,2I3,I15)")'add particle:',&
+        if(iverbose_)write(*,"(A,2I3,I15)")'add particle:',&
              getnup(jsect0),getndw(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap)
@@ -376,11 +376,11 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_d(lanc_spHtimesV_dd)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_d(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,1,iorb,jorb,ispin)
@@ -392,7 +392,7 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
      jsect0 = getCsector(ispin,isect0)
      if(jsect0/=0)then
         jdim0   = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)write(*,"(A,2I3,I15)")'del particle:',&
+        if(iverbose_)write(*,"(A,2I3,I15)")'del particle:',&
              getnup(jsect0),getndw(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap)
@@ -419,11 +419,11 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_d(lanc_spHtimesV_dd)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_d(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_d(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,-1,iorb,jorb,ispin)
@@ -435,7 +435,7 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
      jsect0 = getCDGsector(ispin,isect0)
      if(jsect0/=0)then 
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)write(*,"(A,2I3,I15)")'add particle:',&
+        if(iverbose_)write(*,"(A,2I3,I15)")'add particle:',&
              getnup(jsect0),getndw(jsect0),jdim0
         allocate(HJmap(jdim0),cvinit(jdim0))
         call build_sector(jsect0,HJmap)
@@ -462,11 +462,11 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
         norm2=dot_product(cvinit,cvinit)
         cvinit=cvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_dc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_d(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(cvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=-xi*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,1,iorb,jorb,ispin)
@@ -478,7 +478,7 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
      jsect0 = getCsector(ispin,isect0)
      if(jsect0/=0)then
         jdim0   = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)write(*,"(A,2I3,I15)")'del particle:',&
+        if(iverbose_)write(*,"(A,2I3,I15)")'del particle:',&
              getnup(jsect0),getndw(jsect0),jdim0
         allocate(HJmap(jdim0),cvinit(jdim0))
         call build_sector(jsect0,HJmap)
@@ -505,11 +505,11 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
         norm2=dot_product(cvinit,cvinit)
         cvinit=cvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_dc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_d(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(cvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=-xi*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,-1,iorb,jorb,ispin)
@@ -521,7 +521,7 @@ subroutine lanc_ed_buildgf_mix_d(iorb,jorb,ispin,iverbose)
      deallocate(HImap)
      !
   enddo
-  if(mpiID==0)call stop_progress
+  if(ed_verbose<2)call stop_progress
   deallocate(alfa_,beta_)
 end subroutine lanc_ed_buildgf_mix_d
 
@@ -556,9 +556,9 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
   numstates=numgs
   if(finiteT)numstates=state_list%size
   !   
-  if(mpiID==0)call start_progress
+  if(ed_verbose<2)call start_progress
   do izero=1,numstates
-     if(mpiID==0)call progress(izero,numstates)
+     if(ed_verbose<1)call progress(izero,numstates)
      isect0     =  es_return_sector(state_list,izero)
      state_e    =  es_return_energy(state_list,izero)
      state_cvec => es_return_cvector(state_list,izero)
@@ -574,7 +574,7 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
      jsect0 = getCDGsector(ispin,isect0)
      if(jsect0/=0)then 
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)&
+        if(iverbose_)&
              write(*,"(A,2I3,I15)")'add particle:',getnup(jsect0),getndw(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap)
@@ -601,11 +601,11 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_c(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,1,iorb,jorb,ispin)
@@ -617,7 +617,7 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
      jsect0 = getCsector(ispin,isect0)
      if(jsect0/=0)then
         jdim0   = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)&
+        if(iverbose_)&
              write(*,"(A,2I3,I15)")'del particle:',getnup(jsect0),getndw(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap)
@@ -644,11 +644,11 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
         norm2=dot_product(vvinit,vvinit)
         vvinit=vvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_c(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(vvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=one*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,-1,iorb,jorb,ispin)
@@ -660,7 +660,7 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
      jsect0 = getCDGsector(ispin,isect0)
      if(jsect0/=0)then 
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)&
+        if(iverbose_)&
              write(*,"(A,2I3,I15)")'add particle:',getnup(jsect0),getndw(jsect0),jdim0
         allocate(HJmap(jdim0),cvinit(jdim0))
         call build_sector(jsect0,HJmap)
@@ -687,11 +687,11 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
         norm2=dot_product(cvinit,cvinit)
         cvinit=cvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_c(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(cvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=-xi*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,1,iorb,jorb,ispin)
@@ -703,7 +703,7 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
      jsect0 = getCsector(ispin,isect0)
      if(jsect0/=0)then
         jdim0   = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)&
+        if(iverbose_)&
              write(*,"(A,2I3,I15)")'del particle:',getnup(jsect0),getndw(jsect0),jdim0
         allocate(HJmap(jdim0),cvinit(jdim0))
         call build_sector(jsect0,HJmap)
@@ -730,11 +730,11 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
         norm2=dot_product(cvinit,cvinit)
         cvinit=cvinit/sqrt(norm2)
         call lanczos_plain_set_htimesv_c(lanc_spHtimesV_cc)
-        call setup_Hv_sector(jsect0)
+        !call setup_Hv_sector(jsect0)
         call ed_buildH_c(jsect0)
         alfa_=0.d0 ; beta_=0.d0 ; nlanc=nitermax
         call lanczos_plain_tridiag_c(cvinit,alfa_,beta_,nlanc)
-        call delete_Hv_sector()
+        !call delete_Hv_sector()
         call lanczos_plain_delete_htimesv
         cnorm2=-xi*norm2
         call add_to_lanczos_gf(cnorm2,state_e,nlanc,alfa_,beta_,-1,iorb,jorb,ispin)
@@ -746,7 +746,7 @@ subroutine lanc_ed_buildgf_mix_c(iorb,jorb,ispin,iverbose)
      deallocate(HImap)
      !
   enddo
-  if(mpiID==0)call stop_progress
+  if(ed_verbose<2)call stop_progress
   deallocate(alfa_,beta_)
 end subroutine lanc_ed_buildgf_mix_c
 
@@ -784,11 +784,11 @@ subroutine add_to_lanczos_gf(vnorm2,Ei,nlanc,alanc,blanc,isign,iorb,jorb,ispin)
   do j=1,nlanc
      de = diag(j)-Ei
      peso = pesoBZ*Z(1,j)*Z(1,j)
-     do i=1,NL
+     do i=1,Lmats
         iw=xi*wm(i)
         impGmats(ispin,ispin,iorb,jorb,i)=impGmats(ispin,ispin,iorb,jorb,i) + peso/(iw-isign*de)
      enddo
-     do i=1,Nw
+     do i=1,Lreal
         iw=dcmplx(wr(i),eps)
         impGreal(ispin,ispin,iorb,jorb,i)=impGreal(ispin,ispin,iorb,jorb,i) + peso/(iw-isign*de)
      enddo

@@ -4,6 +4,8 @@
 ! |1,2;3...Ns>_UP * |Ns+1,Ns+2;Ns+3,...,2*Ns>_DOWN
 !########################################################################
 MODULE ED_HAMILTONIAN
+  USE COMMON_VARS
+  USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_BATH
   USE ED_AUX_FUNX
@@ -11,25 +13,33 @@ MODULE ED_HAMILTONIAN
   private
 
   !Get sparse sector Hamiltonian
-  public :: ed_buildH_d,ed_buildH_c
+  public                       :: ed_buildH_d,ed_buildH_c
 
   !Sparse Matrix-vector product using stored sparse matrix 
-  public :: spHtimesV_dd,spHtimesV_dc,spHtimesV_cc
-  public :: lanc_spHtimesV_dd,lanc_spHtimesV_dc,lanc_spHtimesV_cc
-
-  !WRONG!! !Direct Matrix-vector product (no allocation of H)
-  !ALLOCATE AND SET REQUIRED INFO
-  public :: setup_Hv_sector
-  public :: delete_Hv_sector
-  !   public :: HtimesV
-  ! #ifdef _MPI
-  !   public :: HtimesV_mpi
-  ! #endif
+  public                       :: spHtimesV_dd,spHtimesV_dc,spHtimesV_cc
+  public                       :: lanc_spHtimesV_dd,lanc_spHtimesV_dc,lanc_spHtimesV_cc
 
   integer                      :: Hsector
   integer,dimension(:),pointer :: Hmap    !map of the Sector S to Hilbert space H
 
 contains
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE : 
+  !+------------------------------------------------------------------+
+  subroutine setup_Hv_sector(isector)
+    integer                              :: isector
+    integer                              :: dim
+    Hsector=isector
+    dim = getdim(Hsector)
+    allocate(Hmap(dim))
+    call build_sector(isector,Hmap)
+  end subroutine setup_Hv_sector
+
+  subroutine delete_Hv_sector()
+    deallocate(Hmap)
+  end subroutine delete_Hv_sector
 
 
 
@@ -50,26 +60,14 @@ contains
     real(8),dimension(Nspin,Norb)    :: eloc
     logical                          :: Jcondition,flanc
     integer                          :: first_state,last_state
-
+    !
+    call setup_Hv_sector(isector)
     !
     dim=getdim(isector)
     flanc=.true. ; if(present(h))flanc=.false.
-    !
-    first_state= 1
-    last_state = dim
-    !
     if(flanc)then
        if(spH0%status)call sp_delete_matrix(spH0) 
-#ifdef _MPI
-       mpiQ = dim/mpiSIZE
-       mpiR = 0
-       if(mpiID==(mpiSIZE-1))mpiR=mod(dim,mpiSIZE)
-       call sp_init_matrix(spH0,mpiQ+mpiR)
-       first_state= mpiID*mpiQ+1
-       last_state = (mpiID+1)*mpiQ+mpiR
-#else
        call sp_init_matrix(spH0,dim)
-#endif
     else
        if(size(h,1)/=dim)stop "ED_GETH: wrong dimension 1 of H"
        if(size(h,2)/=dim)stop "ED_GETH: wrong dimension 2 of H"
@@ -83,7 +81,7 @@ contains
        enddo
     enddo
     !
-    do i=first_state,last_state
+    do i=1,dim
        m=Hmap(i)
        call bdecomp(m,ib)
        htmp=0.d0
@@ -98,7 +96,12 @@ contains
             dot_product(eloc(1,:),nup)  + &
             dot_product(eloc(Nspin,:),ndw)
        !Density-density interaction: same orbital, opposite spins
-       htmp = htmp + dot_product(uloc,nup*ndw)!=\sum=i U_i*(n_u*n_d)_i
+       if(.not.ed_supercond) then
+          htmp = htmp + dot_product(uloc,nup*ndw)!=\sum=i U_i*(n_u*n_d)_i
+       else
+          !htmp = htmp - dot_product(uloc,nup*ndw)!=\sum=i U_i*(n_u*n_d)_i
+          htmp = htmp - uloc(1)*(nup(1)-0.5d0)*(ndw(1)-0.5d0)
+       end if
        if(Norb>1)then
           !density-density interaction: different orbitals, opposite spins
           do iorb=1,Norb         ! n_up_i*n_dn_j +  n_up_j*n_dn_i
@@ -116,8 +119,12 @@ contains
        endif
        !if using the Hartree-shifted chemical potential: mu=0 for half-filling
        !sum up the contributions of hartree terms:
-       if(hfmode)then
+       if(hfmode.and..not.ed_supercond)then
+          !          if(.not.ed_supercond) then
           htmp=htmp - 0.5d0*dot_product(uloc,nup+ndw) + 0.25d0*sum(uloc)
+          ! else
+          !    htmp=htmp + 0.5d0*dot_product(uloc,nup+ndw) - 0.25d0*sum(uloc) 
+          ! end if
           if(Norb>1)then
              do iorb=1,Norb
                 do jorb=iorb+1,Norb
@@ -131,8 +138,6 @@ contains
        !Hbath: +energy of the bath=\sum_a=1,Norb\sum_{l=1,Nbath}\e^a_l n^a_l
        do iorb=1,size(dmft_bath%e,2)
           do kp=1,Nbath
-             ! ms=Norb+(iorb-1)*Nbath + kp
-             ! if(bath_type=='hybrid')ms=Norb+kp
              ms=getBathStride(iorb,kp)
              htmp =htmp + dmft_bath%e(1,iorb,kp)*real(ib(ms),8) + &
                   dmft_bath%e(Nspin,iorb,kp)*real(ib(ms+Ns),8)
@@ -141,11 +146,7 @@ contains
        !
        !
        if(flanc)then
-#ifdef _MPI
-          call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,i)
-#else
           call sp_insert_element(spH0,htmp,i,i)
-#endif
        else
           h(i,i)=h(i,i)+htmp
        endif
@@ -175,11 +176,7 @@ contains
                    j=binary_search(Hmap,k4)
                    htmp = Jh*sg1*sg2*sg3*sg4
                    if(flanc)then
-#ifdef _MPI
-                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                       call sp_insert_element(spH0,htmp,i,j)
-#endif
                    else
                       h(i,j)=h(i,j)+htmp
                    endif
@@ -206,11 +203,7 @@ contains
                    j=binary_search(Hmap,k4)
                    htmp = Jh*sg1*sg2*sg3*sg4
                    if(flanc)then
-#ifdef _MPI
-                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                       call sp_insert_element(spH0,htmp,i,j)
-#endif
                    else
                       h(i,j)=h(i,j)+htmp
                    endif
@@ -230,11 +223,7 @@ contains
                 j=binary_search(Hmap,k2)
                 htmp = Hloc(1,1,iorb,jorb)*sg1*sg2
                 if(flanc)then
-#ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                    call sp_insert_element(spH0,htmp,i,j)
-#endif
                 else
                    h(i,j)=h(i,j)+htmp
                 endif
@@ -246,11 +235,7 @@ contains
                 j=binary_search(Hmap,k2)
                 htmp = Hloc(Nspin,Nspin,iorb,jorb)*sg1*sg2
                 if(flanc)then
-#ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                    call sp_insert_element(spH0,htmp,i,j)
-#endif
                 else
                    h(i,j)=h(i,j)+htmp
                 endif
@@ -268,11 +253,7 @@ contains
                 j = binary_search(Hmap,k2)
                 htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2
                 if(flanc)then
-#ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                    call sp_insert_element(spH0,htmp,i,j)
-#endif
                 else
                    h(i,j)=h(i,j)+htmp
                 endif
@@ -284,11 +265,7 @@ contains
                 j=binary_search(Hmap,k2)
                 htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2
                 if(flanc)then
-#ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                    call sp_insert_element(spH0,htmp,i,j)
-#endif
                 else
                    h(i,j)=h(i,j)+htmp
                 endif
@@ -300,11 +277,7 @@ contains
                 j=binary_search(Hmap,k2)
                 htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2
                 if(flanc)then
-#ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                    call sp_insert_element(spH0,htmp,i,j)
-#endif
                 else
                    h(i,j)=h(i,j)+htmp
                 endif
@@ -316,18 +289,55 @@ contains
                 j=binary_search(Hmap,k2)
                 htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2
                 if(flanc)then
-#ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                    call sp_insert_element(spH0,htmp,i,j)
-#endif
                 else
                    h(i,j)=h(i,j)+htmp
                 endif
              endif
           enddo
        enddo
+
+
+
+       if(ed_supercond)then
+          !Anomalous pair-creation/destruction
+          do iorb=1,size(dmft_bath%e,2)
+             do kp=1,Nbath
+                ms=getBathStride(iorb,kp)
+                !\Delta_l c_{\up,ms} c_{\dw,ms}
+                if(ib(ms)==1 .AND. ib(ms+Ns)==1)then
+                   call c(ms,m,k1,sg1)
+                   call c(ms+Ns,k1,k2,sg2)
+                   j=binary_search(Hmap,k2)
+                   htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2
+                   if(flanc)then
+                      call sp_insert_element(spH0,htmp,i,j)
+                   else
+                      h(i,j)=h(i,j)+htmp
+                   endif
+                endif
+                !\Delta_l cdg_{\dw,ms} cdg_{\up,ms}
+                if(ib(ms)==0 .AND. ib(ms+Ns)==0)then
+                   call cdg(ms+Ns,m,k1,sg1)
+                   call cdg(ms,k1,k2,sg2)
+                   ! call cdg(ms,m,k1,sg1)
+                   ! call cdg(ms+Ns,k1,k2,sg2)
+                   j=binary_search(Hmap,k2)
+                   htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2 !
+                   if(flanc)then
+                      call sp_insert_element(spH0,htmp,i,j)
+                   else
+                      h(i,j)=h(i,j)+htmp
+                   endif
+                endif
+             enddo
+          enddo
+       endif
+       !
     enddo
+    !
+    call delete_Hv_sector()
+    !
   end subroutine ed_buildH_d
 
 
@@ -355,24 +365,13 @@ contains
     logical                            :: Jcondition,flanc
     integer                            :: first_state,last_state
     !
+    call setup_Hv_sector(isector)
+    !
     dim=getdim(isector)
     flanc=.true. ; if(present(h))flanc=.false.
-    !
-    first_state= 1
-    last_state = dim
-    !
     if(flanc)then
        if(spH0%status)call sp_delete_matrix(spH0) 
-#ifdef _MPI
-       mpiQ = dim/mpiSIZE
-       mpiR = 0
-       if(mpiID==(mpiSIZE-1))mpiR=mod(dim,mpiSIZE)
-       call sp_init_matrix(spH0,mpiQ+mpiR)
-       first_state= mpiID*mpiQ+1
-       last_state = (mpiID+1)*mpiQ+mpiR
-#else
        call sp_init_matrix(spH0,dim)
-#endif
     else
        if(size(h,1)/=dim)stop "ED_GETH: wrong dimension 1 of H"
        if(size(h,2)/=dim)stop "ED_GETH: wrong dimension 2 of H"
@@ -387,7 +386,7 @@ contains
     enddo
 
     !
-    do i=first_state,last_state
+    do i=1,dim
        m=Hmap(i)
        call bdecomp(m,ib)
        htmp=0.d0
@@ -433,11 +432,7 @@ contains
        !
        !
        if(flanc)then
-#ifdef _MPI
-          call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,i)
-#else
           call sp_insert_element(spH0,htmp,i,i)
-#endif
        else
           h(i,i)=h(i,i)+htmp
        endif
@@ -467,11 +462,7 @@ contains
                    j=binary_search(Hmap,k4)
                    htmp = Jh*sg1*sg2*sg3*sg4
                    if(flanc)then
-#ifdef _MPI
-                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                       call sp_insert_element(spH0,htmp,i,j)
-#endif
                    else
                       h(i,j)=h(i,j)+htmp
                    endif
@@ -498,11 +489,7 @@ contains
                    j=binary_search(Hmap,k4)
                    htmp = Jh*sg1*sg2*sg3*sg4
                    if(flanc)then
-#ifdef _MPI
-                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                       call sp_insert_element(spH0,htmp,i,j)
-#endif
                    else
                       h(i,j)=h(i,j)+htmp
                    endif
@@ -522,11 +509,7 @@ contains
                 j=binary_search(Hmap,k2)
                 htmp = Hloc(1,1,iorb,jorb)*sg1*sg2
                 if(flanc)then
-#ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                    call sp_insert_element(spH0,htmp,i,j)
-#endif
                 else
                    h(i,j)=h(i,j)+htmp
                 endif
@@ -538,11 +521,7 @@ contains
                 j=binary_search(Hmap,k2)
                 htmp = Hloc(Nspin,Nspin,iorb,jorb)*sg1*sg2
                 if(flanc)then
-#ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                    call sp_insert_element(spH0,htmp,i,j)
-#endif
                 else
                    h(i,j)=h(i,j)+htmp
                 endif
@@ -560,11 +539,7 @@ contains
                 j = binary_search(Hmap,k2)
                 htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2
                 if(flanc)then
-#ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                    call sp_insert_element(spH0,htmp,i,j)
-#endif
                 else
                    h(i,j)=h(i,j)+htmp
                 endif
@@ -576,11 +551,7 @@ contains
                 j=binary_search(Hmap,k2)
                 htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2
                 if(flanc)then
-#ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                    call sp_insert_element(spH0,htmp,i,j)
-#endif
                 else
                    h(i,j)=h(i,j)+htmp
                 endif
@@ -592,11 +563,7 @@ contains
                 j=binary_search(Hmap,k2)
                 htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2
                 if(flanc)then
-#ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                    call sp_insert_element(spH0,htmp,i,j)
-#endif
                 else
                    h(i,j)=h(i,j)+htmp
                 endif
@@ -608,18 +575,52 @@ contains
                 j=binary_search(Hmap,k2)
                 htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2
                 if(flanc)then
-#ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
-#else
                    call sp_insert_element(spH0,htmp,i,j)
-#endif
                 else
                    h(i,j)=h(i,j)+htmp
                 endif
              endif
           enddo
        enddo
+
+
+       if(ed_supercond)then
+          !Anomalous pair-creation/destruction
+          do iorb=1,size(dmft_bath%e,2)
+             do kp=1,Nbath
+                ms=getBathStride(iorb,kp)
+                !\Delta_l c_{\up,ms} c_{\dw,ms}
+                if(ib(ms)==1 .AND. ib(ms+Ns)==1)then
+                   call c(ms,m,k1,sg1)
+                   call c(ms+Ns,k1,k2,sg2)
+                   j=binary_search(Hmap,k2)
+                   htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2
+                   if(flanc)then
+                      call sp_insert_element(spH0,htmp,i,j)
+                   else
+                      h(i,j)=h(i,j)+htmp
+                   endif
+                endif
+                !\Delta_l cdg_{\up,ms} cdg_{\dw,ms}
+                if(ib(ms)==0 .AND. ib(ms+Ns)==0)then
+                   call cdg(ms,m,k1,sg1)
+                   call cdg(ms+Ns,k1,k2,sg2)
+                   j=binary_search(Hmap,k2)
+                   htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2 !
+                   if(flanc)then
+                      call sp_insert_element(spH0,htmp,i,j)
+                   else
+                      h(i,j)=h(i,j)+htmp
+                   endif
+                endif
+             enddo
+          enddo
+       endif
+       !
     enddo
+    !
+    call delete_Hv_sector()
+    !
   end subroutine ed_buildH_c
 
 
@@ -642,19 +643,8 @@ contains
     integer                    :: Q,R
     real(8),dimension(N)       :: vin,vtmp
     integer                    :: i
-#ifdef _MPI
-    Q = N/mpiSIZE ; R = 0
-    if(mpiID==(mpiSIZE-1))R=mod(N,mpiSIZE)
-    vtmp=0.d0
-    do i=mpiID*Q+1,(mpiID+1)*Q+R
-       vtmp(i)=v(i-mpiID*Q)
-    enddo
-    call MPI_AllReduce(vtmp,vin,N,MPI_Double_Precision,MPI_Sum,MPI_Comm_World,mpiErr)
-    call sp_matrix_vector_product_mpi_dd(spH0,Q,R,N,vin,Nloc,Hv)
-#else
     Hv=0.d0
     call sp_matrix_vector_product_dd(spH0,Nloc,v,Hv)
-#endif
   end subroutine spHtimesV_dd
 
   subroutine spHtimesV_dc(N,Nloc,v,Hv)
@@ -664,19 +654,8 @@ contains
     integer                    :: Q,R
     complex(8),dimension(N)    :: vin,vtmp
     integer                    :: i
-#ifdef _MPI
-    Q = N/mpiSIZE ; R = 0
-    if(mpiID==(mpiSIZE-1))R=mod(N,mpiSIZE)
-    vtmp=zero
-    do i=mpiID*Q+1,(mpiID+1)*Q+R
-       vtmp(i)=v(i-mpiID*Q)
-    enddo
-    call MPI_AllReduce(vtmp,vin,N,MPI_Double_Complex,MPI_Sum,MPI_Comm_World,mpiErr)
-    call sp_matrix_vector_product_mpi_dc(spH0,Q,R,N,vin,Nloc,Hv)
-#else
     Hv=zero
     call sp_matrix_vector_product_dc(spH0,Nloc,v,Hv)
-#endif
   end subroutine spHtimesV_dc
 
   subroutine spHtimesV_cc(N,Nloc,v,Hv)
@@ -686,19 +665,8 @@ contains
     integer                    :: Q,R
     complex(8),dimension(N)    :: vin,vtmp
     integer                    :: i
-#ifdef _MPI
-    Q = N/mpiSIZE ; R = 0
-    if(mpiID==(mpiSIZE-1))R=mod(N,mpiSIZE)
-    vtmp=zero
-    do i=mpiID*Q+1,(mpiID+1)*Q+R
-       vtmp(i)=v(i-mpiID*Q)
-    enddo
-    call MPI_AllReduce(vtmp,vin,N,MPI_Double_Complex,MPI_Sum,MPI_Comm_World,mpiErr)
-    call sp_matrix_vector_product_mpi_cc(spH0,Q,R,N,vin,Nloc,Hv)
-#else
     Hv=zero
     call sp_matrix_vector_product_cc(spH0,Nloc,v,Hv)
-#endif
   end subroutine spHtimesV_cc
 
 
@@ -716,20 +684,8 @@ contains
     real(8),dimension(Nloc) :: vout
     integer                 :: Q,R
     integer                 :: i
-#ifdef _MPI
-    Q = N/mpiSIZE ; R = 0
-    if(mpiID==(mpiSIZE-1))R=mod(N,mpiSIZE)
-    call sp_matrix_vector_product_mpi_dd(spH0,Q,R,N,v,Nloc,vout)
-    Hvtmp=0.d0
-    do i=mpiID*Q+1,(mpiID+1)*Q+R
-       Hvtmp(i)=vout(i-mpiID*Q)
-    enddo
-    Hv=0.d0
-    call MPI_AllReduce(Hvtmp,Hv,N,MPI_Double_Precision,MPI_Sum,MPI_Comm_World,mpiErr)
-#else
     Hv=0.d0
     call sp_matrix_vector_product_dd(spH0,N,v,Hv)
-#endif
   end subroutine lanc_spHtimesV_dd
 
   subroutine lanc_spHtimesV_dc(Nloc,N,v,Hv)
@@ -738,20 +694,8 @@ contains
     complex(8),dimension(Nloc) :: vout
     integer                 :: Q,R
     integer                 :: i
-#ifdef _MPI
-    Q = N/mpiSIZE ; R = 0
-    if(mpiID==(mpiSIZE-1))R=mod(N,mpiSIZE)
-    call sp_matrix_vector_product_mpi_dc(spH0,Q,R,N,v,Nloc,vout)
-    Hvtmp=0.d0
-    do i=mpiID*Q+1,(mpiID+1)*Q+R
-       Hvtmp(i)=vout(i-mpiID*Q)
-    enddo
-    Hv=zero
-    call MPI_AllReduce(Hvtmp,Hv,N,MPI_Double_Complex,MPI_Sum,MPI_Comm_World,mpiErr)
-#else
     Hv=zero
     call sp_matrix_vector_product_dc(spH0,N,v,Hv)
-#endif
   end subroutine lanc_spHtimesV_dc
 
   subroutine lanc_spHtimesV_cc(Nloc,N,v,Hv)
@@ -760,49 +704,9 @@ contains
     complex(8),dimension(Nloc) :: vout
     integer                 :: Q,R
     integer                 :: i
-#ifdef _MPI
-    Q = N/mpiSIZE ; R = 0
-    if(mpiID==(mpiSIZE-1))R=mod(N,mpiSIZE)
-    call sp_matrix_vector_product_mpi_cc(spH0,Q,R,N,v,Nloc,vout)
-    Hvtmp=0.d0
-    do i=mpiID*Q+1,(mpiID+1)*Q+R
-       Hvtmp(i)=vout(i-mpiID*Q)
-    enddo
-    Hv=zero
-    call MPI_AllReduce(Hvtmp,Hv,N,MPI_Double_Complex,MPI_Sum,MPI_Comm_World,mpiErr)
-#else
     Hv=zero
     call sp_matrix_vector_product_cc(spH0,N,v,Hv)
-#endif
   end subroutine lanc_spHtimesV_cc
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : Direct Matrix-vector multiplication H*v used in 
-  !Lanczos algorithm. this DOES NOT store the H-matrix (slower but 
-  !more memory efficient)
-  !+------------------------------------------------------------------+
-  !include "ed_htimesv_direct.f90"
-#ifdef _MPI
-  !include "ed_htimesv_direct_mpi.f90"
-#endif
-
-  !+------------------------------------------------------------------+
-  !PURPOSE : 
-  !+------------------------------------------------------------------+
-  subroutine setup_Hv_sector(isector)
-    integer                              :: isector
-    integer                              :: dim
-    Hsector=isector
-    dim = getdim(Hsector)
-    allocate(Hmap(dim))
-    call build_sector(isector,Hmap)
-  end subroutine setup_Hv_sector
-
-  subroutine delete_Hv_sector()
-    deallocate(Hmap)
-  end subroutine delete_Hv_sector
-
 
 
 end MODULE ED_HAMILTONIAN

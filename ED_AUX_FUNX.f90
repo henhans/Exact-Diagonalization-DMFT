@@ -3,245 +3,42 @@
 !AUTHORS  : Adriano Amaricci
 !########################################################################
 MODULE ED_AUX_FUNX
+  !USE COMMON_VARS
   USE TIMER
+  USE IOTOOLS, only:free_unit,reg
+  USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   implicit none
   private
 
-  public :: ed_read_input
   public :: print_Hloc
-#ifdef _MPI
-  public :: ed_init_mpi
-  public :: ed_finalize_mpi
-#endif
   !
   public :: init_ed_structure
   public :: search_chemical_potential
   !
   public :: setup_pointers
+  public :: setup_pointers_sc
   public :: build_sector
   public :: bdecomp
   public :: c,cdg
   public :: binary_search
 
-
 contains
 
 
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : READ THE INPUT FILE AND SETUP GLOBAL VARIABLES
-  !+-------------------------------------------------------------------+
-  subroutine ed_read_input(INPUTunit,Hunit)
-    character(len=*) :: INPUTunit
-    character(len=*) :: Hunit
-    logical          :: control
-    integer          :: iorb,jorb,ispin,jspin
-    if(mpiID==0)call version(revision)
-    !DEFAULT VALUES OF THE PARAMETERS:
-    !ModelConf
-    Norb       = 1
-    Nbath      = 4
-    Nspin      = 1
-    Uloc       = 0.d0;Uloc(1)=2.d0
-    Ust        = 0.d0
-    Jh         = 0.d0
-    xmu        = 0.d0
-    beta       = 500.d0
-    !Loops
-    nloop      = 100
-    chiflag    =.true.
-    Jhflag     =.false.
-    hfmode     =.true.
-    !parameters
-    NL         = 2000
-    Nw         = 2000
-    Ltau       = 1000
-    Nfit       = 1000
-    eps        = 0.01d0
-    nread      = 0.d0
-    nerr       = 1.d-4
-    ndelta     = 0.1d0
-    wini       =-4.d0
-    wfin       = 4.d0
-    cutoff     = 1.d-9
-    dmft_error  = 1.d-5
-    nsuccess   = 2
-    lanc_niter = 512
-    lanc_neigen = 1
-    lanc_ngfiter = 100
-    lanc_nstates = 1            !set to T=0 calculation
-    cg_niter   = 200
-    cg_Ftol     = 1.d-9
-    cg_weight     = 0
-    cg_scheme     = 'delta'
-    ed_method    = 'lanc'
-    ed_type = 'd'
-    bath_type='normal' !hybrid,superc
-    !ReadUnits
-    Hfile  ="hamiltonian.restart"
-    LOGfile=6
 
-    inquire(file=INPUTunit,exist=control)    
-    if(control)then
-       if(mpiID==0)then
-          open(50,file=INPUTunit,status='old')
-          read(50,nml=EDvars)
-          close(50)
-       endif
-    else
-       if(mpiID==0)then
-          print*,"Can not find INPUT file"
-          print*,"Printing a default version in default."//INPUTunit
-          open(50,file="default."//INPUTunit)
-          write(50,nml=EDvars)
-          write(50,*)""
-       endif
-       stop
-    endif
-
-    call parse_cmd_variable(Norb,"NORB")    
-    call parse_cmd_variable(Nbath,"NBATH")
-    call parse_cmd_variable(Nspin,"NSPIN")
-    call parse_cmd_variable(beta,"BETA")
-    call parse_cmd_variable(xmu,"XMU")
-    call parse_cmd_variable(uloc,"ULOC")
-    call parse_cmd_variable(uloc(1),"U")
-    call parse_cmd_variable(ust,"UST")
-    call parse_cmd_variable(Jh,"JH")
-    call parse_cmd_variable(nloop,"NLOOP")
-    call parse_cmd_variable(dmft_error,"DMFT_ERROR")
-    call parse_cmd_variable(nsuccess,"NSUCCESS")
-    call parse_cmd_variable(NL,"NL")
-    call parse_cmd_variable(Nw,"NW")
-    call parse_cmd_variable(Ltau,"LTAU")
-    call parse_cmd_variable(Nfit,"NFIT")
-    call parse_cmd_variable(nread,"NREAD")
-    call parse_cmd_variable(nerr,"NERR")
-    call parse_cmd_variable(ndelta,"NDELTA")
-    call parse_cmd_variable(wini,"WINI")
-    call parse_cmd_variable(wfin,"WFIN")
-    call parse_cmd_variable(chiflag,"CHIFLAG")
-    call parse_cmd_variable(hfmode,"HFMODE")
-    call parse_cmd_variable(eps,"EPS")
-    call parse_cmd_variable(cutoff,"CUTOFF")
-    call parse_cmd_variable(lanc_neigen,"LANC_NEIGEN")
-    call parse_cmd_variable(lanc_niter,"LANC_NITER")
-    call parse_cmd_variable(lanc_nstates,"LANC_NSTATES")
-    call parse_cmd_variable(lanc_ngfiter,"LANC_NGFITER")
-    call parse_cmd_variable(cg_niter,"CG_NITER")
-    call parse_cmd_variable(cg_scheme,"CG_SCHEME")
-    call parse_cmd_variable(cg_ftol,"CG_FTOL")
-    call parse_cmd_variable(cg_weight,"CG_WEIGHT")
-    call parse_cmd_variable(ed_Type,"ED_TYPE")
-    call parse_cmd_variable(ed_Method,"ED_METHOD")
-    call parse_cmd_variable(bath_type,"BATH_TYPE")
-    call parse_cmd_variable(Hfile,"HFILE")
-    call parse_cmd_variable(LOGfile,"LOGFILE")
-    Ltau=max(int(beta),500)
-    !
-    if(mpiID==0)then
-       open(50,file="used."//INPUTunit)
-       write(50,nml=EDvars)
-       close(50)
-       write(*,*)"CONTROL PARAMETERS"
-       write(*,nml=EDvars)
-    endif
-
-    if(mpiID==0)then
-       write(LOGfile,"(A)")"U_local:"
-       write(LOGfile,"(90F12.6,1x)")(Uloc(iorb),iorb=1,Norb)
-    endif
-
-    allocate(reHloc(Nspin,Nspin,Norb,Norb))
-    allocate(imHloc(Nspin,Nspin,Norb,Norb))
-    allocate(Hloc(Nspin,Nspin,Norb,Norb))
-    reHloc = 0.d0
-    imHloc = 0.d0
-
-    inquire(file=Hunit,exist=control)    
-    if(control)then
-       open(50,file=Hunit,status='old')
-       do ispin=1,Nspin
-          do iorb=1,Norb
-             read(50,*)((reHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
-          enddo
-       enddo
-       do ispin=1,Nspin
-          do iorb=1,Norb
-             read(50,*)((imHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
-          enddo
-       enddo
-       close(50)
-    else
-       if(mpiID==0)then
-          print*,"Can not find Uloc/Hloc file"
-          print*,"Printing a default version in default."//Hunit
-          open(50,file="default."//Hunit)
-          do ispin=1,Nspin
-             do iorb=1,Norb
-                write(50,"(90F12.6)")((reHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
-             enddo
-          enddo
-          write(50,*)""
-          do ispin=1,Nspin
-             do iorb=1,Norb
-                write(50,"(90F12.6)")((imHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
-             enddo
-          enddo
-          write(50,*)""
-          close(50)
-       endif
-       stop
-    endif
-
-    hloc = dcmplx(reHloc,imHloc)
-
-    if(mpiID==0)then
-       write(LOGfile,"(A)")"H_local:"
-       call print_Hloc(Hloc)
-    endif
-  end subroutine ed_read_input
-
-
-  subroutine print_Hloc(hloc)
-    integer                                     :: iorb,jorb,ispin,jspin
-    complex(8),dimension(Nspin,Nspin,Norb,Norb) :: hloc
-    do ispin=1,Nspin
-       do iorb=1,Norb
-          write(LOGfile,"(20(A1,F7.3,A1,F7.3,A1,2x))")&
-               (&
-               (&
-               '(',dreal(Hloc(ispin,jspin,iorb,jorb)),',',dimag(Hloc(ispin,jspin,iorb,jorb)),')',&
-               jorb =1,Norb),&
-               jspin=1,Nspin)
-       enddo
-    enddo
-  end subroutine print_Hloc
-
-
-#ifdef _MPI
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine ed_init_mpi
-    call MPI_INIT(mpiERR)
-    call MPI_COMM_RANK(MPI_COMM_WORLD,mpiID,mpiERR)
-    call MPI_COMM_SIZE(MPI_COMM_WORLD,mpiSIZE,mpiERR)
-    write(*,"(A,I4,A,I4,A)")'Processor ',mpiID,' of ',mpiSIZE,' is alive'
-    call MPI_BARRIER(MPI_COMM_WORLD,mpiERR)
-  end subroutine ed_init_mpi
-
-  subroutine ed_finalize_mpi
-    call MPI_FINALIZE(mpiERR)
-  end subroutine ed_finalize_mpi
-#endif
 
 
   !+------------------------------------------------------------------+
   !PURPOSE  : Init calculation
   !+------------------------------------------------------------------+
-  subroutine init_ed_structure
-    integer          :: i,NP,nup,ndw,iorb,jorb,ispin,jspin
+  subroutine init_ed_structure(Hunit)
+    character(len=64)                        :: Hunit
+    logical                                  :: control
+    real(8),dimension(Nspin,Nspin,Norb,Norb) :: reHloc         !local hamiltonian, real part 
+    real(8),dimension(Nspin,Nspin,Norb,Norb) :: imHloc         !local hamiltonian, imag part
+    integer                                  :: i,NP,nup,ndw,iorb,jorb,ispin,jspin
+    !
     !Norb=# of impurity orbitals
     !Nbath=# of bath sites (per orbital or not depending on bath_type)
     !Ns=total number of sites
@@ -255,29 +52,64 @@ contains
     Nbo   = Ns-Norb
     Ntot  = 2*Ns
     NN    = 2**Ntot
-    Nsect = (Ns+1)*(Ns+1)
     !
     nup=Ns/2
     ndw=Ns-nup
-    NP=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
-    NP=NP*(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
-    if(mpiID==0)then
-       write(*,*)"Summary:"
-       write(*,*)"--------------------------------------------"
-       write(*,*)'Number of impurities         = ',Norb
-       write(*,*)'Number of bath/impurity      = ',Nbath
-       write(*,*)'Total # of Bath sites/spin   = ',Nbo
-       write(*,*)'Total # of sites/spin        = ',Ns
-       write(*,*)'Maximum dimension            = ',NP
-       write(*,*)'Total size, Hilber space dim.= ',Ntot,NN
-       write(*,*)'Number of sectors            = ',Nsect
-       write(*,*)"--------------------------------------------"
-       print*,''
+    if(.not.ed_supercond)then
+       Nsect = (Ns+1)*(Ns+1)
+       NP=get_sector_dimension(nup,ndw)
+    else
+       Nsect = Ntot+1
+       NP=get_sc_sector_dimension(0)
     endif
+    !
+    write(LOGfile,*)"Summary:"
+    write(LOGfile,*)"--------------------------------------------"
+    write(LOGfile,*)'Number of impurities         = ',Norb
+    write(LOGfile,*)'Number of bath/impurity      = ',Nbath
+    write(LOGfile,*)'Total # of Bath sites/spin   = ',Nbo
+    write(LOGfile,*)'Total # of sites/spin        = ',Ns
+    write(LOGfile,*)'Maximum dimension            = ',NP
+    write(LOGfile,*)'Total size, Hilber space dim.= ',Ntot,NN
+    write(LOGfile,*)'Number of sectors            = ',Nsect
+    write(LOGfile,*)"--------------------------------------------"
+
+    allocate(Hloc(Nspin,Nspin,Norb,Norb))
+    reHloc = 0.d0
+    imHloc = 0.d0
+
+    inquire(file=Hunit,exist=control)
+    if(control)then
+       write(LOGfile,*)"Reading Hloc from file: "//Hunit
+       open(50,file=Hunit,status='old')
+       do ispin=1,Nspin
+          do iorb=1,Norb
+             read(50,*)((reHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
+          enddo
+       enddo
+       do ispin=1,Nspin
+          do iorb=1,Norb
+             read(50,*)((imHloc(ispin,jspin,iorb,jorb),jorb=1,Norb),jspin=1,Nspin)
+          enddo
+       enddo
+       close(50)
+    else
+       write(LOGfile,*)"Hloc file not found."
+       write(LOGfile,*)"Hloc should be defined elsewhere..."
+    endif
+    Hloc = dcmplx(reHloc,imHloc)
+    write(LOGfile,"(A)")"H_local:"
+    call print_Hloc(Hloc)
+
+
 
     allocate(impIndex(Norb,2))
-    allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect))
-    allocate(getsector(0:Ns,0:Ns))
+    allocate(getdim(Nsect),getnup(Nsect),getndw(Nsect),getsz(Nsect))
+    if(.not.ed_supercond)then
+       allocate(getsector(0:Ns,0:Ns))
+    else
+       allocate(getsector(-Ns:Ns,1))
+    endif
     allocate(getCsector(2,Nsect))
     allocate(getCDGsector(2,Nsect))
     allocate(getBathStride(Norb,Nbath))
@@ -286,28 +118,22 @@ contains
 
     !check finiteT
     finiteT=.true.              !assume doing finite T per default
-    if(lanc_nstates==1)then     !is you only want to keep 1 state
-       lanc_neigen=1            !set the required eigen per sector to 1 see later for neigen_sector
+    if(lanc_nstates_total==1)then     !is you only want to keep 1 state
+       lanc_nstates_sector=1            !set the required eigen per sector to 1 see later for neigen_sector
        finiteT=.false.          !set to do zero temperature calculations
-       if(mpiID==0)then
-          write(LOGfile,"(A)")"Required Lanc_Nstates=1 => set T=0 calculation"
-       endif
+       write(LOGfile,"(A)")"Required Lanc_nstates_total=1 => set T=0 calculation"
     endif
 
 
-    !check whether lanc_neigen and lanc_states are even (we do want to keep doublet among states)
+    !check whether lanc_nstates_sector and lanc_states are even (we do want to keep doublet among states)
     if(finiteT)then
-       if(mod(lanc_neigen,2)/=0)then
-          lanc_neigen=lanc_neigen+1
-          if(mpiID==0)then
-             write(LOGfile,"(A,I10)")"Increased Lanc_Neigen:",lanc_neigen
-          endif
+       if(mod(lanc_nstates_sector,2)/=0)then
+          lanc_nstates_sector=lanc_nstates_sector+1
+          write(LOGfile,"(A,I10)")"Increased Lanc_nstates_sector:",lanc_nstates_sector
        endif
-       if(mod(lanc_nstates,2)/=0)then
-          lanc_nstates=lanc_nstates+1
-          if(mpiID==0)then
-             write(LOGfile,"(A,I10)")"Increased Lanc_Nstates:",lanc_nstates
-          endif
+       if(mod(lanc_nstates_total,2)/=0)then
+          lanc_nstates_total=lanc_nstates_total+1
+          write(LOGfile,"(A,I10)")"Increased Lanc_nstates_total:",lanc_nstates_total
        endif
 
     endif
@@ -319,25 +145,72 @@ contains
     endif
 
     !Some check:
-    if(Nfit>NL)Nfit=NL
+    if(Lfit>Lmats)Lfit=Lmats
     if(Nspin>2)stop "Nspin > 2 ERROR. ask developer or develop your own on separate branch"
     if(Norb>3)stop "Norb > 3 ERROR. ask developer or develop your own on separate branch" 
     if(nerr < dmft_error) nerr=dmft_error
     if(ed_method=='full'.AND.bath_type=='hybrid')stop "FULL ED & HYBRID not implemented yet:ask developer..."
+    if(ed_supercond)then
+       if(Nspin>1)stop "SC+AFM ERROR. ask developer or develop your own on separate branch" 
+       if(ed_method=='full')stop "FULL ED & SUPERC is not implemented yet:ask developer..."
+       if(Norb>1)stop "SC Multi-Band not yet implemented. Wait for the developer to understand what to do..."
+       if(ed_type=='c')stop "SC with Hermitian H not yet implemented. Wait for the developer to code it..."
+    endif
     if(nread/=0.d0)then
        i=abs(floor(log10(abs(nerr)))) !modulus of the order of magnitude of nerror
-       niter=nloop
-       nloop=(i-1)*niter                !increase the max number of dmft loop allowed so to do threshold loop
-       write(LOGfile,"(A,I10)")"Increased Nloop to:",nloop
+       niter=nloop/3
+       !nloop=(i-1)*niter                !increase the max number of dmft loop allowed so to do threshold loop
+       !write(LOGfile,"(A,I10)")"Increased Nloop to:",nloop
     endif
 
     !allocate functions
-    allocate(impSmats(Nspin,Nspin,Norb,Norb,NL))
-    allocate(impSreal(Nspin,Nspin,Norb,Norb,Nw))
+    allocate(impSmats(Nspin,Nspin,Norb,Norb,Lmats))
+    allocate(impSreal(Nspin,Nspin,Norb,Norb,Lreal))
+    if(ed_supercond)then
+       allocate(impSAmats(Nspin,Nspin,Norb,Norb,Lmats))
+       allocate(impSAreal(Nspin,Nspin,Norb,Norb,Lreal))
+    endif
 
     !allocate observables
-    allocate(nimp(Norb),dimp(Norb))
+    allocate(ed_dens(Norb),ed_docc(Norb))
+    if(ed_supercond)allocate(ed_phisc(Norb))
   end subroutine init_ed_structure
+
+
+
+
+
+  subroutine print_Hloc(hloc,unit)
+    integer,optional                            :: unit
+    integer                                     :: iorb,jorb,ispin,jspin
+    complex(8),dimension(Nspin,Nspin,Norb,Norb) :: hloc
+    do ispin=1,Nspin
+       do iorb=1,Norb
+          write(LOGfile,"(20(A1,F7.3,A1,F7.3,A1,2x))")&
+               (&
+               (&
+               '(',dreal(Hloc(ispin,jspin,iorb,jorb)),',',dimag(Hloc(ispin,jspin,iorb,jorb)),')',&
+               jorb =1,Norb),&
+               jspin=1,Nspin)
+       enddo
+    enddo
+    if(present(unit))then
+       do ispin=1,Nspin
+          do iorb=1,Norb
+             write(unit,"(90F12.6)")((dreal(Hloc(ispin,jspin,iorb,jorb)),jorb=1,Norb),jspin=1,Nspin)
+          enddo
+       enddo
+       write(unit,*)""
+       do ispin=1,Nspin
+          do iorb=1,Norb
+             write(unit,"(90F12.6)")((dimag(Hloc(ispin,jspin,iorb,jorb)),jorb=1,Norb),jspin=1,Nspin)
+          enddo
+       enddo
+       write(unit,*)""
+    endif
+  end subroutine print_Hloc
+
+
 
 
 
@@ -350,7 +223,7 @@ contains
     integer                          :: nup,ndw,jup,jdw,iorb
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
-    if(mpiID==0)write(LOGfile,"(A)")"Setting up pointers:"
+    write(LOGfile,"(A)")"Setting up pointers:"
     call start_timer
     isector=0
     do nup=0,Ns
@@ -359,11 +232,9 @@ contains
           getsector(nup,ndw)=isector
           getnup(isector)=nup
           getndw(isector)=ndw
-          dimup=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
-          dimdw=(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
-          dim=dimup*dimdw
+          dim = get_sector_dimension(nup,ndw)
           getdim(isector)=dim
-          neigen_sector(isector) = min(dim,lanc_neigen)   !init every sector to required eigenstates
+          neigen_sector(isector) = min(dim,lanc_nstates_sector)   !init every sector to required eigenstates
        enddo
     enddo
     call stop_timer
@@ -418,6 +289,97 @@ contains
   end subroutine setup_pointers
 
 
+  subroutine setup_pointers_sc
+    integer                          :: i,isz,in,dim,isector,jsector
+    integer                          :: sz,iorb,dim2,jsz
+    integer,dimension(:),allocatable :: imap
+    integer,dimension(:),allocatable :: invmap
+    write(LOGfile,"(A)")"Setting up pointers:"
+    call start_timer
+    isector=0
+    do isz=-Ns,Ns
+       sz=abs(isz)
+       isector=isector+1
+       getsector(isz,1)=isector
+       getsz(isector)=isz
+       dim = get_sc_sector_dimension(isz)
+       getdim(isector)=dim
+       neigen_sector(isector) = min(dim,lanc_nstates_sector)   !init every sector to required eigenstates
+       !<DEBUG
+       allocate(imap(dim))
+       call build_sector(isector,imap,dim2)
+       print*,isz,dim,dim2
+       deallocate(imap)
+       !>DEBUG
+    enddo
+    call stop_timer
+
+    do in=1,Norb
+       impIndex(in,1)=in
+       impIndex(in,2)=in+Ns
+    enddo
+
+    select case(bath_type)
+    case default
+       do i=1,Nbath
+          do iorb=1,Norb
+             getBathStride(iorb,i) = Norb + (iorb-1)*Nbath + i
+          enddo
+       enddo
+    case ('hybrid')
+       do i=1,Nbath
+          getBathStride(:,i)      = Norb + i
+       enddo
+    end select
+
+    getCsector=0
+    !c_up
+    do isector=1,Nsect
+       isz=getsz(isector);if(isz==-Ns)cycle
+       jsz=isz-1
+       jsector=getsector(jsz,1)
+       getCsector(1,isector)=jsector
+    enddo
+    !c_dw
+    do isector=1,Nsect
+       isz=getsz(isector);if(isz==Ns)cycle
+       jsz=isz+1
+       jsector=getsector(jsz,1)
+       getCsector(2,isector)=jsector
+    enddo
+
+    getCDGsector=0
+    !cdg_up
+    do isector=1,Nsect
+       isz=getsz(isector);if(isz==Ns)cycle
+       jsz=isz+1
+       jsector=getsector(jsz,1)
+       getCDGsector(1,isector)=jsector
+    enddo
+    !cdg_dw
+    do isector=1,Nsect
+       isz=getsz(isector);if(isz==-Ns)cycle
+       jsz=isz-1
+       jsector=getsector(jsz,1)
+       getCDGsector(2,isector)=jsector
+    enddo
+  end subroutine setup_pointers_sc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
   !+------------------------------------------------------------------+
@@ -425,25 +387,44 @@ contains
   !states i\in Hilbert_space from the states count in H_sector.
   !+------------------------------------------------------------------+
   !|ImpUP,BathUP>|ImpDW,BathDW >
-  subroutine build_sector(isector,map)
-    integer              :: i,j,isector,iup,idw,count
-    integer              :: nup,ndw
+  subroutine build_sector(isector,map,dim2)
+    integer              :: i,j,isector,iup,idw,mz,dim
+    integer,optional     :: dim2
+    integer              :: nup,ndw,sz
     integer              :: ivec(Ntot)
     integer,dimension(:) :: map
-    nup = getnup(isector)
-    ndw = getndw(isector)
     !if(size(map)/=getdim(isector)stop "error in build_sector: wrong dimension of map"
-    count=0
-    do i=1,NN
-       call bdecomp(i,ivec)
-       iup = sum(ivec(1:Ns))
-       idw = sum(ivec(Ns+1:2*Ns))
-       if(iup==nup.AND.idw==ndw)then
-          count             = count+1 !count the states in the sector (n_up,n_dw)
-          map(count)        = i       !build the map to full space states
-       endif
-    enddo
+    dim=0
+    if(.not.ed_supercond)then
+       nup = getnup(isector)
+       ndw = getndw(isector)
+       do i=1,NN
+          call bdecomp(i,ivec)
+          iup = sum(ivec(1:Ns))
+          idw = sum(ivec(Ns+1:2*Ns))
+          if(iup==nup.AND.idw==ndw)then
+             dim           = dim+1 !count the states in the sector (n_up,n_dw)
+             map(dim)      = i       !build the map to full space states
+          endif
+       enddo
+    else
+       sz = getsz(isector)
+       do i=1,NN
+          call bdecomp(i,ivec)
+          mz = sum(ivec(1:Ns)) - sum(ivec(Ns+1:2*Ns))
+          if(mz==sz)then
+             dim             = dim+1 !count the states in the sector (n_up,n_dw)
+             map(dim)        = i       !build the map to full space states
+          endif
+       enddo
+    endif
+    if(present(dim2))dim2=dim
   end subroutine build_sector
+
+
+
+
+
 
 
   !+------------------------------------------------------------------+
@@ -532,6 +513,34 @@ contains
 
 
 
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : calculate the factorial
+  !+------------------------------------------------------------------+
+  function get_sector_dimension(nup,ndw) result(dim)
+    integer :: nup,ndw,dim,dimup,dimdw
+    dimup=(factorial(Ns)/factorial(nup)/factorial(Ns-nup))
+    dimdw=(factorial(Ns)/factorial(ndw)/factorial(Ns-ndw))
+    dim=dimup*dimdw
+  end function get_sector_dimension
+
+
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : calculate the factorial
+  !+------------------------------------------------------------------+
+  function get_sc_sector_dimension(mz) result(dim)
+    integer :: mz
+    integer :: i,dim,Nb
+    dim=0
+    Nb=Ns-mz
+    do i=0,Nb/2 
+       dim=dim + 2**(Nb-2*i)*nchoos(ns,Nb-2*i)*nchoos(ns-Nb+2*i,i)
+    enddo
+  end function get_sc_sector_dimension
+
+
   !+------------------------------------------------------------------+
   !PURPOSE  : calculate the factorial of an integer N!=1.2.3...(N-1).N
   !+------------------------------------------------------------------+
@@ -544,6 +553,29 @@ contains
        f=n*factorial(n-1)
     end if
   end function factorial
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : calculate the binomial factor
+  !+------------------------------------------------------------------+
+  function nchoos(n1,n2)
+    real(8) :: xh
+    integer :: n1,n2,i
+    integer nchoos
+    xh = 1.d0
+    if(n2<0) then
+       nchoos = 0
+       return
+    endif
+    if(n2==0) then
+       nchoos = 1
+       return
+    endif
+    do i = 1,n2
+       xh = xh*real(n1+1-i,8)/real(i,8)
+    enddo
+    nchoos = int(xh + 0.5d0)
+  end function nchoos
 
 
 
@@ -575,42 +607,54 @@ contains
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine search_chemical_potential(ntmp,niter,converged)
+  subroutine search_chemical_potential(ntmp,converged)
     real(8),intent(in)    :: ntmp
-    integer,intent(in)    :: niter
     logical,intent(inout) :: converged
     logical               :: bool
     real(8)               :: ndiff
-    integer,save          :: count=0
+    integer,save          :: count=0,totcount=0,i
     integer,save          :: nindex=0
-    integer               :: nindex1
-    real(8)               :: ndelta1,nratio
+    integer               :: nindex_old(3)
+    real(8)               :: ndelta_old,nratio
     integer,save          :: nth_magnitude=-2,nth_magnitude_old=-2
-    real(8),save          :: nth=1.d-1
+    real(8),save          :: nth=1.d-2
     logical,save          :: ireduce=.true.
-    integer :: unit
+    integer               :: unit
     !
     ndiff=ntmp-nread
-    !nratio = 0.5d0
-    nratio = 1.d0/(6.d0/11.d0*pi)
+    nratio = 0.5d0;!nratio = 1.d0/(6.d0/11.d0*pi)
     !
     !check actual value of the density *ntmp* with respect to goal value *nread*
     count=count+1
-    nindex1=nindex
-    ndelta1=ndelta
-    if(ndiff >= nth)then      !if((ntmp >= nread+nth))then
+    totcount=totcount+1
+    if(count>2)then
+       do i=1,2
+          nindex_old(i+1)=nindex_old(i)
+       enddo
+    endif
+    nindex_old(1)=nindex
+    !
+    if(ndiff >= nth)then
        nindex=-1
-    elseif(ndiff <= -nth)then !elseif(ntmp <= nread-nth)then
+    elseif(ndiff <= -nth)then
        nindex=1
     else
        nindex=0
     endif
-    if(nindex1+nindex==0.AND.nindex/=0)then !avoid loop forth and back
-       ndelta=ndelta1*nratio !decreasing the step
+    !
+    ndelta_old=ndelta
+    bool=nindex/=0.AND.( (nindex+nindex_old(1)==0).OR.(nindex+sum(nindex_old(:))==0) )
+    !if(nindex_old(1)+nindex==0.AND.nindex/=0)then !avoid loop forth and back
+    if(bool)then
+       ndelta=ndelta_old*nratio !decreasing the step
     else
-       ndelta=ndelta1
+       ndelta=ndelta_old
     endif
     !
+    if(ndelta_old<1.d-9)then
+       ndelta_old=0.d0
+       nindex=0
+    endif
     !update chemical potential
     xmu=xmu+dble(nindex)*ndelta
     !
@@ -626,7 +670,7 @@ contains
     write(LOGfile,"(A,f15.9)")"xmu  = ",xmu
     write(LOGfile,"(A,ES16.9,A,ES16.9)")"dn   = ",ndiff,"/",nth
     unit=free_unit()
-    open(unit,file="search_mu_iteration.ed",position="append")
+    open(unit,file="search_mu_iteration"//reg(ed_file_suffix)//".ed",position="append")
     write(unit,*)xmu,ntmp,ndiff
     close(unit)
     !
@@ -642,21 +686,21 @@ contains
        nth=max(nerr,10.d0**(nth_magnitude))   !set the new threshold 
        count=0                                !reset the counter
        converged=.false.                      !reset convergence
-       !experimental
-       ndelta=ndelta1*nratio
+       ndelta=ndelta_old*nratio                  !reduce the delta step
        !
     endif
     !
     !if density is not converged set convergence to .false.
     if(abs(ntmp-nread)>nth)converged=.false.
     !
-    !check convergence for the smallest threshold
-    !if smallest threshold
-    !if reduce is active
+    !check convergence for this threshold
+    !!---if smallest threshold-- NO MORE
+    !if reduce is active (you reduced the treshold at least once)
     !if # iterations > max number
     !if not yet converged
     !set threshold back to the previous larger one.
-    bool=(nth==nerr).AND.ireduce.AND.(count>niter).AND.(.not.converged)
+    !bool=(nth==nerr).AND.ireduce.AND.(count>niter).AND.(.not.converged)
+    bool=ireduce.AND.(count>niter).AND.(.not.converged)
     if(bool)then
        ireduce=.false.
        nth=10.d0**(nth_magnitude_old)
@@ -712,7 +756,5 @@ contains
   !   write(10,*)ndelta,nindex,xmu
   !   close(10)
   ! end subroutine search_mu
-
-
 
 END MODULE ED_AUX_FUNX
