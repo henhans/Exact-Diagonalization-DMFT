@@ -41,7 +41,7 @@ contains
     integer,allocatable,dimension(:) :: Hmap,HJmap
     real(8),allocatable              :: vvinit(:)
     !
-    if(mpiID==0)then
+    if(ED_MPI_ID==0)then
     allocate(nimp(Norb),dimp(Norb),nupimp(Norb),ndwimp(Norb),magimp(Norb),sz2imp(Norb,Norb),n2imp(Norb,Norb))
     Egs    = state_list%emin
     nimp   = 0.d0
@@ -257,9 +257,9 @@ contains
     if(ed_supercond)deallocate(phiscimp)
 	endif
 #ifdef _MPI
-    call MPI_BCAST(ed_dens,Norb,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-    call MPI_BCAST(ed_docc,Norb,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-    if(ed_supercond)call MPI_BCAST(ed_phisc,Norb,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
+    call MPI_BCAST(ed_dens,Norb,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ED_MPI_ERR)
+    call MPI_BCAST(ed_docc,Norb,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ED_MPI_ERR)
+    if(ed_supercond)call MPI_BCAST(ed_phisc,Norb,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ED_MPI_ERR)
 #endif
   end subroutine ed_getobs
 

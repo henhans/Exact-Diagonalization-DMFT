@@ -27,11 +27,9 @@ contains
   ! real-symmetric (_d.f90) or 
   ! complex-hermitian (_c.f90) cmatrix
   !+-------------------------------------------------------------------+
-  include "lanczos_arpack_d.f90"
-  include "lanczos_arpack_c.f90"
+  include "lanczos_arpack.f90"
 #ifdef _MPI
-  include "lanczos_parpack_d.f90"
-  include "lanczos_parpack_c.f90"
+  include "lanczos_parpack.f90"
 #endif
 
 end module ARPACK_LANCZOS

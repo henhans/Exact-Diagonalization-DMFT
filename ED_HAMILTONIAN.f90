@@ -72,12 +72,12 @@ contains
     if(flanc)then
        if(spH0%status)call sp_delete_matrix(spH0) 
 #ifdef _MPI
-       mpiQ = dim/mpiSIZE
+       mpiQ = dim/ED_MPI_SIZE
        mpiR = 0
-       if(mpiID==(mpiSIZE-1))mpiR=mod(dim,mpiSIZE)
+       if(ED_MPI_ID==(ED_MPI_SIZE-1))mpiR=mod(dim,ED_MPI_SIZE)
        call sp_init_matrix(spH0,mpiQ+mpiR)
-       first_state= mpiID*mpiQ+1
-       last_state = (mpiID+1)*mpiQ+mpiR
+       first_state= ED_MPI_ID*mpiQ+1
+       last_state = (ED_MPI_ID+1)*mpiQ+mpiR
 #else
        call sp_init_matrix(spH0,dim)
 #endif
@@ -160,7 +160,7 @@ contains
        !
        if(flanc)then
 #ifdef _MPI
-          call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,i)
+          call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,i)
 #else
           call sp_insert_element(spH0,htmp,i,i)
 #endif
@@ -194,7 +194,7 @@ contains
                    htmp = Jh*sg1*sg2*sg3*sg4
                    if(flanc)then
 #ifdef _MPI
-                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                      call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                       call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -225,7 +225,7 @@ contains
                    htmp = Jh*sg1*sg2*sg3*sg4
                    if(flanc)then
 #ifdef _MPI
-                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                      call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                       call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -249,7 +249,7 @@ contains
                 htmp = Hloc(1,1,iorb,jorb)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                   call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                    call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -265,7 +265,7 @@ contains
                 htmp = Hloc(Nspin,Nspin,iorb,jorb)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                   call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                    call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -287,7 +287,7 @@ contains
                 htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                   call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                    call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -303,7 +303,7 @@ contains
                 htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                   call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                    call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -319,7 +319,7 @@ contains
                 htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                   call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                    call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -335,7 +335,7 @@ contains
                 htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                   call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                    call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -361,7 +361,7 @@ contains
                    htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2
                    if(flanc)then
 #ifdef _MPI
-                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                      call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                       call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -379,7 +379,7 @@ contains
                    htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2 !
                    if(flanc)then
 #ifdef _MPI
-                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                      call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                       call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -437,12 +437,12 @@ contains
     if(flanc)then
        if(spH0%status)call sp_delete_matrix(spH0) 
 #ifdef _MPI
-       mpiQ = dim/mpiSIZE
+       mpiQ = dim/ED_MPI_SIZE
        mpiR = 0
-       if(mpiID==(mpiSIZE-1))mpiR=mod(dim,mpiSIZE)
+       if(ED_MPI_ID==(ED_MPI_SIZE-1))mpiR=mod(dim,ED_MPI_SIZE)
        call sp_init_matrix(spH0,mpiQ+mpiR)
-       first_state= mpiID*mpiQ+1
-       last_state = (mpiID+1)*mpiQ+mpiR
+       first_state= ED_MPI_ID*mpiQ+1
+       last_state = (ED_MPI_ID+1)*mpiQ+mpiR
 #else
        call sp_init_matrix(spH0,dim)
 #endif
@@ -507,7 +507,7 @@ contains
        !
        if(flanc)then
 #ifdef _MPI
-          call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,i)
+          call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,i)
 #else
           call sp_insert_element(spH0,htmp,i,i)
 #endif
@@ -541,7 +541,7 @@ contains
                    htmp = Jh*sg1*sg2*sg3*sg4
                    if(flanc)then
 #ifdef _MPI
-                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                      call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                       call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -572,7 +572,7 @@ contains
                    htmp = Jh*sg1*sg2*sg3*sg4
                    if(flanc)then
 #ifdef _MPI
-                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                      call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                       call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -596,7 +596,7 @@ contains
                 htmp = Hloc(1,1,iorb,jorb)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                   call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                    call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -612,7 +612,7 @@ contains
                 htmp = Hloc(Nspin,Nspin,iorb,jorb)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                   call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                    call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -634,7 +634,7 @@ contains
                 htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                   call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                    call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -650,7 +650,7 @@ contains
                 htmp = dmft_bath%v(1,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                   call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                    call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -666,7 +666,7 @@ contains
                 htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                   call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                    call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -682,7 +682,7 @@ contains
                 htmp=dmft_bath%v(Nspin,iorb,kp)*sg1*sg2
                 if(flanc)then
 #ifdef _MPI
-                   call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                   call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                    call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -707,7 +707,7 @@ contains
                    htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2
                    if(flanc)then
 #ifdef _MPI
-                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                      call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                       call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -723,7 +723,7 @@ contains
                    htmp=dmft_bath%d(1,iorb,kp)*sg1*sg2 !
                    if(flanc)then
 #ifdef _MPI
-                      call sp_insert_element(spH0,htmp,i-mpiID*mpiQ,j)
+                      call sp_insert_element(spH0,htmp,i-ED_MPI_ID*mpiQ,j)
 #else
                       call sp_insert_element(spH0,htmp,i,j)
 #endif
@@ -762,13 +762,13 @@ contains
     real(8),dimension(N)       :: vin,vtmp
     integer                    :: i
 #ifdef _MPI
-    Q = N/mpiSIZE ; R = 0
-    if(mpiID==(mpiSIZE-1))R=mod(N,mpiSIZE)
+    Q = N/ED_MPI_SIZE ; R = 0
+    if(ED_MPI_ID==(ED_MPI_SIZE-1))R=mod(N,ED_MPI_SIZE)
     vtmp=0.d0
-    do i=mpiID*Q+1,(mpiID+1)*Q+R
-       vtmp(i)=v(i-mpiID*Q)
+    do i=ED_MPI_ID*Q+1,(ED_MPI_ID+1)*Q+R
+       vtmp(i)=v(i-ED_MPI_ID*Q)
     enddo
-    call MPI_AllReduce(vtmp,vin,N,MPI_Double_Precision,MPI_Sum,MPI_Comm_World,mpiErr)
+    call MPI_AllReduce(vtmp,vin,N,MPI_Double_Precision,MPI_Sum,MPI_Comm_World,ED_MPI_ERR)
     call sp_matrix_vector_product_mpi_dd(spH0,Q,R,N,vin,Nloc,Hv)
 #else
     Hv=0.d0
@@ -784,13 +784,13 @@ contains
     complex(8),dimension(N)    :: vin,vtmp
     integer                    :: i
 #ifdef _MPI
-    Q = N/mpiSIZE ; R = 0
-    if(mpiID==(mpiSIZE-1))R=mod(N,mpiSIZE)
+    Q = N/ED_MPI_SIZE ; R = 0
+    if(ED_MPI_ID==(ED_MPI_SIZE-1))R=mod(N,ED_MPI_SIZE)
     vtmp=zero
-    do i=mpiID*Q+1,(mpiID+1)*Q+R
-       vtmp(i)=v(i-mpiID*Q)
+    do i=ED_MPI_ID*Q+1,(ED_MPI_ID+1)*Q+R
+       vtmp(i)=v(i-ED_MPI_ID*Q)
     enddo
-    call MPI_AllReduce(vtmp,vin,N,MPI_Double_Complex,MPI_Sum,MPI_Comm_World,mpiErr)
+    call MPI_AllReduce(vtmp,vin,N,MPI_Double_Complex,MPI_Sum,MPI_Comm_World,ED_MPI_ERR)
     call sp_matrix_vector_product_mpi_dc(spH0,Q,R,N,vin,Nloc,Hv)
 #else
     Hv=zero
@@ -806,13 +806,13 @@ contains
     complex(8),dimension(N)    :: vin,vtmp
     integer                    :: i
 #ifdef _MPI
-    Q = N/mpiSIZE ; R = 0
-    if(mpiID==(mpiSIZE-1))R=mod(N,mpiSIZE)
+    Q = N/ED_MPI_SIZE ; R = 0
+    if(ED_MPI_ID==(ED_MPI_SIZE-1))R=mod(N,ED_MPI_SIZE)
     vtmp=zero
-    do i=mpiID*Q+1,(mpiID+1)*Q+R
-       vtmp(i)=v(i-mpiID*Q)
+    do i=ED_MPI_ID*Q+1,(ED_MPI_ID+1)*Q+R
+       vtmp(i)=v(i-ED_MPI_ID*Q)
     enddo
-    call MPI_AllReduce(vtmp,vin,N,MPI_Double_Complex,MPI_Sum,MPI_Comm_World,mpiErr)
+    call MPI_AllReduce(vtmp,vin,N,MPI_Double_Complex,MPI_Sum,MPI_Comm_World,ED_MPI_ERR)
     call sp_matrix_vector_product_mpi_cc(spH0,Q,R,N,vin,Nloc,Hv)
 #else
     Hv=zero
@@ -836,15 +836,15 @@ contains
     integer                 :: Q,R
     integer                 :: i
 #ifdef _MPI
-    Q = N/mpiSIZE ; R = 0
-    if(mpiID==(mpiSIZE-1))R=mod(N,mpiSIZE)
+    Q = N/ED_MPI_SIZE ; R = 0
+    if(ED_MPI_ID==(ED_MPI_SIZE-1))R=mod(N,ED_MPI_SIZE)
     call sp_matrix_vector_product_mpi_dd(spH0,Q,R,N,v,Nloc,vout)
     Hvtmp=0.d0
-    do i=mpiID*Q+1,(mpiID+1)*Q+R
-       Hvtmp(i)=vout(i-mpiID*Q)
+    do i=ED_MPI_ID*Q+1,(ED_MPI_ID+1)*Q+R
+       Hvtmp(i)=vout(i-ED_MPI_ID*Q)
     enddo
     Hv=0.d0
-    call MPI_AllReduce(Hvtmp,Hv,N,MPI_Double_Precision,MPI_Sum,MPI_Comm_World,mpiErr)
+    call MPI_AllReduce(Hvtmp,Hv,N,MPI_Double_Precision,MPI_Sum,MPI_Comm_World,ED_MPI_ERR)
 #else
     Hv=0.d0
     call sp_matrix_vector_product_dd(spH0,N,v,Hv)
@@ -858,15 +858,15 @@ contains
     integer                 :: Q,R
     integer                 :: i
 #ifdef _MPI
-    Q = N/mpiSIZE ; R = 0
-    if(mpiID==(mpiSIZE-1))R=mod(N,mpiSIZE)
+    Q = N/ED_MPI_SIZE ; R = 0
+    if(ED_MPI_ID==(ED_MPI_SIZE-1))R=mod(N,ED_MPI_SIZE)
     call sp_matrix_vector_product_mpi_dc(spH0,Q,R,N,v,Nloc,vout)
     Hvtmp=0.d0
-    do i=mpiID*Q+1,(mpiID+1)*Q+R
-       Hvtmp(i)=vout(i-mpiID*Q)
+    do i=ED_MPI_ID*Q+1,(ED_MPI_ID+1)*Q+R
+       Hvtmp(i)=vout(i-ED_MPI_ID*Q)
     enddo
     Hv=zero
-    call MPI_AllReduce(Hvtmp,Hv,N,MPI_Double_Complex,MPI_Sum,MPI_Comm_World,mpiErr)
+    call MPI_AllReduce(Hvtmp,Hv,N,MPI_Double_Complex,MPI_Sum,MPI_Comm_World,ED_MPI_ERR)
 #else
     Hv=zero
     call sp_matrix_vector_product_dc(spH0,N,v,Hv)
@@ -880,15 +880,15 @@ contains
     integer                 :: Q,R
     integer                 :: i
 #ifdef _MPI
-    Q = N/mpiSIZE ; R = 0
-    if(mpiID==(mpiSIZE-1))R=mod(N,mpiSIZE)
+    Q = N/ED_MPI_SIZE ; R = 0
+    if(ED_MPI_ID==(ED_MPI_SIZE-1))R=mod(N,ED_MPI_SIZE)
     call sp_matrix_vector_product_mpi_cc(spH0,Q,R,N,v,Nloc,vout)
     Hvtmp=0.d0
-    do i=mpiID*Q+1,(mpiID+1)*Q+R
-       Hvtmp(i)=vout(i-mpiID*Q)
+    do i=ED_MPI_ID*Q+1,(ED_MPI_ID+1)*Q+R
+       Hvtmp(i)=vout(i-ED_MPI_ID*Q)
     enddo
     Hv=zero
-    call MPI_AllReduce(Hvtmp,Hv,N,MPI_Double_Complex,MPI_Sum,MPI_Comm_World,mpiErr)
+    call MPI_AllReduce(Hvtmp,Hv,N,MPI_Double_Complex,MPI_Sum,MPI_Comm_World,ED_MPI_ERR)
 #else
     Hv=zero
     call sp_matrix_vector_product_cc(spH0,N,v,Hv)

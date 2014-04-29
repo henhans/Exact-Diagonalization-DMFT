@@ -97,9 +97,9 @@ contains
     end if
     nloc=1
 #ifdef _MPI
-    mpiQ = ns_/mpiSIZE
+    mpiQ = ns_/ED_MPI_SIZE
     mpiR = 0
-    if(mpiID==(mpiSIZE-1))mpiR=mod(ns_,mpiSIZE)
+    if(ED_MPI_ID==(ED_MPI_SIZE-1))mpiR=mod(ns_,ED_MPI_SIZE)
     nloc=mpiQ+mpiR
 #endif
     call dp_Hprod(nloc,ns_,vin,tmp)
@@ -128,9 +128,9 @@ contains
     end if
     nloc = 1 
 #ifdef _MPI
-    mpiQ = ns_/mpiSIZE
+    mpiQ = ns_/ED_MPI_SIZE
     mpiR = 0
-    if(mpiID == mpiSIZE-1)mpiR=mod(Ns_,mpiSIZE)
+    if(ED_MPI_ID == ED_MPI_SIZE-1)mpiR=mod(Ns_,ED_MPI_SIZE)
     nloc=mpiQ+mpiR
 #endif
     call cp_Hprod(nloc,ns_,vin,tmp)

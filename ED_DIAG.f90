@@ -64,9 +64,9 @@ contains
     call es_free_espace(state_list)
     oldzero=1000.d0
     numgs=0
-    if(ed_verbose<2.AND.mpiID==0)call start_progress(LOGfile)
+    if(ed_verbose<2.AND.ED_MPI_ID==0)call start_progress(LOGfile)
     sector: do isector=1,Nsect
-       if(ed_verbose<1.AND.mpiID==0)call progress(isector,Nsect)
+       if(ed_verbose<1.AND.ED_MPI_ID==0)call progress(isector,Nsect)
        dim     = getdim(isector)
        Neigen  = min(dim,neigen_sector(isector))
        Nitermax= min(dim,lanc_niter)
@@ -116,10 +116,10 @@ contains
        if(spH0%status)call sp_delete_matrix(spH0)
        !
     enddo sector
-    if(ed_verbose<2.AND.mpiID==0)call stop_progress
+    if(ed_verbose<2.AND.ED_MPI_ID==0)call stop_progress
 
     !POST PROCESSING:
-    if(ed_verbose<2.AND.mpiID==0)then
+    if(ed_verbose<2.AND.ED_MPI_ID==0)then
        unit=free_unit()
        open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
        if(.not.ed_supercond)then
@@ -164,20 +164,20 @@ contains
        if(.not.ed_supercond)then
           nup0  = getnup(isect0)
           ndw0  = getndw(isect0)
-          if(ed_verbose<3.AND.mpiID==0)write(LOGfile,"(A,F20.12,2I4)")'egs =',egs,nup0,ndw0
+          if(ed_verbose<3.AND.ED_MPI_ID==0)write(LOGfile,"(A,F20.12,2I4)")'egs =',egs,nup0,ndw0
        else
           sz0  = getsz(isect0)
-          if(ed_verbose<3.AND.mpiID==0)write(LOGfile,"(A,F20.12,I4)")'egs =',egs,sz0
+          if(ed_verbose<3.AND.ED_MPI_ID==0)write(LOGfile,"(A,F20.12,I4)")'egs =',egs,sz0
        endif
     enddo
-    if(ed_verbose<3.AND.mpiID==0)write(LOGfile,"(A,F20.12)")'Z   =',zeta_function
+    if(ed_verbose<3.AND.ED_MPI_ID==0)write(LOGfile,"(A,F20.12)")'Z   =',zeta_function
     ! open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
     ! write(3,*)egs
     ! close(3)
 
     !Get histogram distribution of the sector contributing to the evaluated spectrum:
     !Go thru states list and update the neigen_sector(isector) sector-by-sector
-    if(ed_verbose<2.AND.finiteT.AND.mpiID==0)then
+    if(ed_verbose<2.AND.finiteT.AND.ED_MPI_ID==0)then
        unit=free_unit()
        open(unit,file="histogram_states"//reg(ed_file_suffix)//".ed",access='append')
        hist_n = Nsect
@@ -223,7 +223,7 @@ contains
        Ec  = state_list%emax
        if(exp(-beta*(Ec-Egs)) > cutoff)then
           lanc_nstates_total=lanc_nstates_total + 2!*lanc_nincrement
-          if(mpiID==0)write(*,"(A,I4)")"Increasing lanc_nstates_total+2:",lanc_nstates_total
+          if(ED_MPI_ID==0)write(*,"(A,I4)")"Increasing lanc_nstates_total+2:",lanc_nstates_total
        endif
     endif
   end subroutine lanc_ed_diag_d
@@ -251,9 +251,9 @@ contains
     call es_free_espace(state_list)
     oldzero=1000.d0
     numgs=0
-    if(ed_verbose<2.AND.mpiID==0)call start_progress(LOGfile)
+    if(ed_verbose<2.AND.ED_MPI_ID==0)call start_progress(LOGfile)
     sector: do isector=1,Nsect
-       if(ed_verbose<1.AND.mpiID==0)call progress(isector,Nsect)
+       if(ed_verbose<1.AND.ED_MPI_ID==0)call progress(isector,Nsect)
        dim     = getdim(isector)
        Neigen  = min(dim,neigen_sector(isector))
        Nitermax= min(dim,lanc_niter)
@@ -303,9 +303,9 @@ contains
        if(spH0%status)call sp_delete_matrix(spH0)
        !
     enddo sector
-    if(ed_verbose<2.AND.mpiID==0)call stop_progress
+    if(ed_verbose<2.AND.ED_MPI_ID==0)call stop_progress
     !POST PROCESSING:
-    if(ed_verbose<2.AND.mpiID==0)then
+    if(ed_verbose<2.AND.ED_MPI_ID==0)then
        unit=free_unit()
        open(unit,file="state_list"//reg(ed_file_suffix)//".ed")
        write(unit,"(A)")"#i       E_i                nup ndw"
@@ -346,19 +346,19 @@ contains
        if(.not.ed_supercond)then
           nup0  = getnup(isect0)
           ndw0  = getndw(isect0)
-          if(ed_verbose<3.AND.mpiID==0)write(LOGfile,"(A,F20.12,2I4)")'egs =',egs,nup0,ndw0
+          if(ed_verbose<3.AND.ED_MPI_ID==0)write(LOGfile,"(A,F20.12,2I4)")'egs =',egs,nup0,ndw0
        else
           sz0  = getsz(isect0)
-          if(ed_verbose<3.AND.mpiID==0)write(LOGfile,"(A,F20.12,I4)")'egs =',egs,sz0
+          if(ed_verbose<3.AND.ED_MPI_ID==0)write(LOGfile,"(A,F20.12,I4)")'egs =',egs,sz0
        endif
     enddo
-    if(ed_verbose<3.AND.mpiID==0)write(LOGfile,"(A,F20.12)")'Z   =',zeta_function
+    if(ed_verbose<3.AND.ED_MPI_ID==0)write(LOGfile,"(A,F20.12)")'Z   =',zeta_function
     ! open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
     ! write(3,*)egs
     ! close(3)
     !Get histogram distribution of the sector contributing to the evaluated spectrum:
     !Go thru states list and update the neigen_sector(isector) sector-by-sector
-    if(ed_verbose<2.AND.finiteT.AND.mpiID==0)then
+    if(ed_verbose<2.AND.finiteT.AND.ED_MPI_ID==0)then
        unit=free_unit()
        open(unit,file="histogram_states"//reg(ed_file_suffix)//".ed",access='append')
        hist_n = Nsect
@@ -403,7 +403,7 @@ contains
        Ec  = state_list%emax
        if(exp(-beta*(Ec-Egs)) > cutoff)then
           lanc_nstates_total=lanc_nstates_total + 2!*lanc_nincrement
-          if(mpiID==0)write(*,"(A,I4)")"Increasing lanc_nstates_total+2:",lanc_nstates_total
+          if(ED_MPI_ID==0)write(*,"(A,I4)")"Increasing lanc_nstates_total+2:",lanc_nstates_total
        endif
     endif
   end subroutine lanc_ed_diag_c
@@ -422,10 +422,10 @@ contains
     real(8),dimension(Nsect) :: e0 
     real(8)                  :: egs
     e0=0.d0
-    if(mpiID==0)write(LOGfile,"(A)")"Get Hamiltonian:"
-    if(mpiID==0)call start_progress(LOGfile)
+    if(ED_MPI_ID==0)write(LOGfile,"(A)")"Get Hamiltonian:"
+    if(ED_MPI_ID==0)call start_progress(LOGfile)
     do isector=1,Nsect
-       if(mpiID==0)call progress(isector,Nsect)
+       if(ED_MPI_ID==0)call progress(isector,Nsect)
        dim=getdim(isector)
        !call setup_Hv_sector(isector)
        call ed_buildH_d(isector,espace(isector)%M(:,:))
@@ -433,7 +433,7 @@ contains
        call matrix_diagonalize(espace(isector)%M,espace(isector)%e,'V','U')
        e0(isector)=minval(espace(isector)%e)
     enddo
-    if(mpiID==0)call stop_progress
+    if(ED_MPI_ID==0)call stop_progress
     !
     egs=minval(e0)
     forall(isector=1:Nsect)espace(isector)%e = espace(isector)%e - egs
@@ -446,7 +446,7 @@ contains
        enddo
     enddo
 #ifdef _MPI
-    if(mpiID==0)then
+    if(ED_MPI_ID==0)then
 #endif
        write(LOGfile,"(A)")"DIAG resume:"
        write(LOGfile,"(A,f18.12)")'egs  =',egs

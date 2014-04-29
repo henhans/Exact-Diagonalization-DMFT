@@ -10,18 +10,18 @@ subroutine full_ed_getchi()
   real(8)                               :: expterm,de,w0,it
   complex(8)                            :: iw
   integer,allocatable,dimension(:)      :: HImap    !map of the Sector S to Hilbert space H
-  if(mpiID==0)write(LOGfile,"(A)")"Evaluating Suceptibility:"
+  if(ED_MPI_ID==0)write(LOGfile,"(A)")"Evaluating Suceptibility:"
   call allocate_grids
   allocate(Chitau(Norb,0:Ltau),Chiw(Norb,Lreal),Chiiw(Norb,0:Lmats))
   Chitau=0.d0
   Chiw=zero
   Chiiw=zero
   !Spin susceptibility \X(tau). |<i|S_z|j>|^2
-  if(mpiID==0)write(LOGfile,"(A)")"Evaluating Chi_Sz"
-  if(mpiID==0)call start_progress(LOGfile)
+  if(ED_MPI_ID==0)write(LOGfile,"(A)")"Evaluating Chi_Sz"
+  if(ED_MPI_ID==0)call start_progress(LOGfile)
 
   do isector=1,Nsect !loop over <i| total particle number
-     if(mpiID==0)call progress(isector,Nsect)
+     if(ED_MPI_ID==0)call progress(isector,Nsect)
      idim=getdim(isector)
      allocate(HImap(idim))
      call build_sector(isector,HImap)
@@ -94,8 +94,8 @@ subroutine full_ed_getchi()
         enddo
      enddo
   enddo
-  if(mpiID==0)call stop_progress
-  if(mpiID==0)call print_imp_chi()
+  if(ED_MPI_ID==0)call stop_progress
+  if(ED_MPI_ID==0)call print_imp_chi()
   deallocate(Chitau,Chiw,Chiiw)
   deallocate(wm,tau,wr,vm)
 end subroutine full_ed_getchi

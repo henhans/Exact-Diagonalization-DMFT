@@ -638,7 +638,7 @@ contains
           c => c%next
        end do matmul
     end do
-    !call MPI_ALLREDUCE(vtmp,vout,Ndim,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,mpiERR)
+    !call MPI_ALLREDUCE(vtmp,vout,Ndim,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ED_MPI_ERR)
   end subroutine sp_matrix_vector_product_mpi_dd
   !+------------------------------------------------------------------+
   subroutine sp_matrix_vector_product_mpi_dc(sparse,Q,R,Ndim,vin,Nloc,vout)

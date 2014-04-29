@@ -27,7 +27,7 @@ contains
     logical,save                         :: isetup=.true.
     hwband_=2.d0;if(present(hwband))hwband_=hwband
     Hunit_='inputHLOC.in';if(present(Hunit))Hunit_=Hunit
-    if(ed_verbose<2.AND.mpiID==0)write(LOGfile,"(A)")"INIT SOLVER FOR "//reg(ed_file_suffix)
+    if(ed_verbose<2.AND.ED_MPI_ID==0)write(LOGfile,"(A)")"INIT SOLVER FOR "//reg(ed_file_suffix)
     if(isetup)call init_ed_structure(Hunit_)
     bath_ = 0.d0
     check = check_bath_dimension(bath_)
@@ -59,7 +59,13 @@ contains
     if(.not.check)stop "init_ed_solver: wrong bath dimensions"
     call allocate_bath(dmft_bath)
     call set_bath(bath_,dmft_bath)
-    if(ed_verbose<2.AND.mpiID==0)call write_bath(dmft_bath,LOGfile)
+    if(ed_verbose<2.AND.ED_MPI_ID==0)call write_bath(dmft_bath,LOGfile)
+    if(ED_MPI_ID==0)then
+       unit=free_unit()
+       open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".used")
+       call write_bath(dmft_bath,unit)
+       close(unit)
+    endif
     select case(ed_method)
     case default
        call lanc_ed_diag
@@ -72,12 +78,6 @@ contains
        if(chiflag)call full_ed_getchi
     end select
     call ed_getobs
-    if(mpiID==0)then
-       unit=free_unit()
-       open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
-       call write_bath(dmft_bath,unit)
-       close(unit)
-    endif
     call deallocate_bath(dmft_bath)
   end subroutine ed_solver
 

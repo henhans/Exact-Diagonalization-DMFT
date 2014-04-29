@@ -54,24 +54,34 @@ contains
     complex(8),dimension(:,:,:)          :: fg
     real(8),dimension(:,:),intent(inout) :: bath
     integer                              :: ispin
-    select case(bath_type)
-    case default
-       call chi2_fitgf_irred(fg,bath,ispin)
-    case ('hybrid')
-       call chi2_fitgf_hybrd(fg,bath,ispin)
-    end select
+    if(ED_MPI_ID==0)then
+       select case(bath_type)
+       case default
+          call chi2_fitgf_irred(fg,bath,ispin)
+       case ('hybrid')
+          call chi2_fitgf_hybrd(fg,bath,ispin)
+       end select
+    endif
+#ifdef _MPI
+    call MPI_BCAST(bath,size(bath),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ED_MPI_ERR)
+#endif
   end subroutine chi2_fitgf_
 
   subroutine chi2_fitgf__(fg,bath,ispin)
     complex(8),dimension(:,:,:,:)          :: fg
     real(8),dimension(:,:),intent(inout) :: bath
     integer                              :: ispin
-    select case(bath_type)
-    case default
-       call chi2_fitgf_irred_sc(fg,bath,ispin)
-    case ('hybrid')
-       stop 'Error: Hybrid bath + SC is not implemented yet: ask the developer...'
-    end select
+    if(ED_MPI_ID==0)then
+       select case(bath_type)
+       case default
+          call chi2_fitgf_irred_sc(fg,bath,ispin)
+       case ('hybrid')
+          stop 'Error: Hybrid bath + SC is not implemented yet: ask the developer...'
+       end select
+    endif
+#ifdef _MPI
+    call MPI_BCAST(bath,size(bath),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ED_MPI_ERR)
+#endif
   end subroutine chi2_fitgf__
 
 
@@ -107,7 +117,7 @@ contains
     real(8)                              :: w
     character(len=20)                  :: suffix
     integer                            :: unit
-    if(mpiID==0)then
+
     if(size(fg,1)/=Norb)stop"CHI2_FITGF: wrong dimension 1 in chi2_input"
     if(size(fg,2)/=Norb)stop"CHI2_FITGF: wrong dimension 2 in chi2_input"
     check= check_bath_dimension(bath_)
@@ -157,14 +167,14 @@ contains
        dmft_bath%v(ispin,iorb,1:Nbath) = a(Nbath+1:2*Nbath)
     enddo
     if(ed_verbose<2)call write_bath(dmft_bath,LOGfile)
+    unit=free_unit()
+    open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
+    call write_bath(dmft_bath,unit)
+    close(unit)
     if(ed_verbose<3)call write_fit_result(ispin)
     call copy_bath(dmft_bath,bath_)
     call deallocate_bath(dmft_bath)
     deallocate(Fdelta,Xdelta,Wdelta)
-    endif
-#ifdef _MPI
-    call MPI_BCAST(bath_,size(bath_),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-#endif
     !
   contains
     !
@@ -343,7 +353,6 @@ contains
     real(8)                              :: w
     character(len=20)                    :: suffix
     integer                              :: unit
-    if(mpiID==0)then
     if(size(fg,1)/=2)stop"CHI2_FITGF: wrong dimension 1 in chi2_input"
     if(size(fg,2)/=Norb)stop"CHI2_FITGF: wrong dimension 2 in chi2_input"
     if(size(fg,3)/=Norb)stop"CHI2_FITGF: wrong dimension 3 in chi2_input"
@@ -397,15 +406,14 @@ contains
        dmft_bath%v(ispin,iorb,1:Nbath) = a(2*Nbath+1:3*Nbath)
     enddo
     if(ed_verbose<2)call write_bath(dmft_bath,LOGfile)
+    unit=free_unit()
+    open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
+    call write_bath(dmft_bath,unit)
+    close(unit)
     if(ed_verbose<3)call write_fit_result(ispin)
     call copy_bath(dmft_bath,bath_)
     call deallocate_bath(dmft_bath)
     deallocate(Fdelta,Xdelta,Wdelta)
-    endif
-#ifdef _MPI
-    call MPI_BCAST(bath_,size(bath_),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-#endif
-
     !
   contains
     !
@@ -606,8 +614,6 @@ contains
     real(8)                              :: w
     character(len=20)                    :: suffix
     integer                              :: unit
-    !
-    if(mpiID==0)then
     if(size(fg,1)/=Norb)stop "CHI2FIT: wrong dimension 1 in chi2_input"
     if(size(fg,2)/=Norb)stop "CHI2FIT: wrong dimension 2 in chi2_input"
     check= check_bath_dimension(bath_)
@@ -663,14 +669,14 @@ contains
        close(unit)
     endif
     if(ed_verbose<2)call write_bath(dmft_bath,LOGfile)
+    unit=free_unit()
+    open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
+    call write_bath(dmft_bath,unit)
+    close(unit)
     if(ed_verbose<3)call write_fit_result(ispin)
     call deallocate_bath(dmft_bath)
     deallocate(Fdelta,Xdelta,Wdelta)
     deallocate(getIorb,getJorb)
-    endif
-#ifdef _MPI
-    call MPI_BCAST(bath_,size(bath_),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-#endif
   contains
     subroutine write_fit_result(ispin)
       integer                              :: i,j,l,m,iorb,jorb,ispin,jspin

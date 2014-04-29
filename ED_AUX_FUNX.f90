@@ -29,7 +29,7 @@ contains
 
 
 
- 
+
 
 
   !+------------------------------------------------------------------+
@@ -66,7 +66,7 @@ contains
        NP=get_sc_sector_dimension(0)
     endif
     !
-    if(mpiID==0)then
+    if(ED_MPI_ID==0)then
        write(LOGfile,*)"Summary:"
        write(LOGfile,*)"--------------------------------------------"
        write(LOGfile,*)'Number of impurities         = ',Norb
@@ -85,7 +85,7 @@ contains
 
     inquire(file=Hunit,exist=control)
     if(control)then
-       if(mpiID==0)write(LOGfile,*)"Reading Hloc from file: "//Hunit
+       if(ED_MPI_ID==0)write(LOGfile,*)"Reading Hloc from file: "//Hunit
        open(50,file=Hunit,status='old')
        do ispin=1,Nspin
           do iorb=1,Norb
@@ -99,13 +99,13 @@ contains
        enddo
        close(50)
     else
-       if(mpiID==0)then
+       if(ED_MPI_ID==0)then
           write(LOGfile,*)"Hloc file not found."
           write(LOGfile,*)"Hloc should be defined elsewhere..."
        endif
     endif
     Hloc = dcmplx(reHloc,imHloc)
-    if(mpiID==0)then
+    if(ED_MPI_ID==0)then
        write(LOGfile,"(A)")"H_local:"
        call print_Hloc(Hloc)
     endif
@@ -130,7 +130,7 @@ contains
     if(lanc_nstates_total==1)then     !is you only want to keep 1 state
        lanc_nstates_sector=1            !set the required eigen per sector to 1 see later for neigen_sector
        finiteT=.false.          !set to do zero temperature calculations
-       if(mpiID==0)then
+       if(ED_MPI_ID==0)then
           write(LOGfile,"(A)")"Required Lanc_nstates_total=1 => set T=0 calculation"
        endif
     endif
@@ -140,23 +140,19 @@ contains
     if(finiteT)then
        if(mod(lanc_nstates_sector,2)/=0)then
           lanc_nstates_sector=lanc_nstates_sector+1
-          if(mpiID==0)then
-             write(LOGfile,"(A,I10)")"Increased Lanc_nstates_sector:",lanc_nstates_sector
-          endif
+          if(ED_MPI_ID==0)write(LOGfile,"(A,I10)")"Increased Lanc_nstates_sector:",lanc_nstates_sector
        endif
        if(mod(lanc_nstates_total,2)/=0)then
           lanc_nstates_total=lanc_nstates_total+1
-          if(mpiID==0)then
-             write(LOGfile,"(A,I10)")"Increased Lanc_nstates_total:",lanc_nstates_total
-          endif
+          if(ED_MPI_ID==0)write(LOGfile,"(A,I10)")"Increased Lanc_nstates_total:",lanc_nstates_total
        endif
 
     endif
 
     if(finiteT)then
-       write(LOGfile,"(A)")"Lanczos FINITE temperature calculation:"
+       if(ED_MPI_ID==0)write(LOGfile,"(A)")"Lanczos FINITE temperature calculation:"
     else
-       write(LOGfile,"(A)")"Lanczos ZERO temperature calculation:"
+       if(ED_MPI_ID==0)write(LOGfile,"(A)")"Lanczos ZERO temperature calculation:"
     endif
 
     !Some check:
@@ -238,8 +234,8 @@ contains
     integer                          :: nup,ndw,jup,jdw,iorb
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
-    if(mpiID==0)write(LOGfile,"(A)")"Setting up pointers:"
-    call start_timer
+    if(ED_MPI_ID==0)write(LOGfile,"(A)")"Setting up pointers:"
+    if(ED_MPI_ID==0)call start_timer
     isector=0
     do nup=0,Ns
        do ndw=0,Ns
@@ -252,7 +248,7 @@ contains
           neigen_sector(isector) = min(dim,lanc_nstates_sector)   !init every sector to required eigenstates
        enddo
     enddo
-    call stop_timer
+    if(ED_MPI_ID==0)call stop_timer
 
     do in=1,Norb
        impIndex(in,1)=in
@@ -309,8 +305,8 @@ contains
     integer                          :: sz,iorb,dim2,jsz
     integer,dimension(:),allocatable :: imap
     integer,dimension(:),allocatable :: invmap
-    if(mpiID==0)write(LOGfile,"(A)")"Setting up pointers:"
-    call start_timer
+    if(ED_MPI_ID==0)write(LOGfile,"(A)")"Setting up pointers:"
+    if(ED_MPI_ID==0)call start_timer
     isector=0
     do isz=-Ns,Ns
        sz=abs(isz)
@@ -320,14 +316,14 @@ contains
        dim = get_sc_sector_dimension(isz)
        getdim(isector)=dim
        neigen_sector(isector) = min(dim,lanc_nstates_sector)   !init every sector to required eigenstates
-       !<DEBUG
-       allocate(imap(dim))
-       call build_sector(isector,imap,dim2)
-       print*,isz,dim,dim2
-       deallocate(imap)
-       !>DEBUG
+       ! !<DEBUG
+       ! allocate(imap(dim))
+       ! call build_sector(isector,imap,dim2)
+       ! print*,isz,dim,dim2
+       ! deallocate(imap)
+       ! !>DEBUG
     enddo
-    call stop_timer
+    if(ED_MPI_ID==0)call stop_timer
 
     do in=1,Norb
        impIndex(in,1)=in
@@ -635,95 +631,100 @@ contains
     logical,save          :: ireduce=.true.
     integer               :: unit
     !
-    ndiff=ntmp-nread
-    nratio = 0.5d0;!nratio = 1.d0/(6.d0/11.d0*pi)
-    !
-    !check actual value of the density *ntmp* with respect to goal value *nread*
-    count=count+1
-    totcount=totcount+1
-    if(count>2)then
-       do i=1,2
-          nindex_old(i+1)=nindex_old(i)
-       enddo
-    endif
-    nindex_old(1)=nindex
-    !
-    if(ndiff >= nth)then
-       nindex=-1
-    elseif(ndiff <= -nth)then
-       nindex=1
-    else
-       nindex=0
-    endif
-    !
-    ndelta_old=ndelta
-    bool=nindex/=0.AND.( (nindex+nindex_old(1)==0).OR.(nindex+sum(nindex_old(:))==0) )
-    !if(nindex_old(1)+nindex==0.AND.nindex/=0)then !avoid loop forth and back
-    if(bool)then
-       ndelta=ndelta_old*nratio !decreasing the step
-    else
-       ndelta=ndelta_old
-    endif
-    !
-    if(ndelta_old<1.d-9)then
-       ndelta_old=0.d0
-       nindex=0
-    endif
-    !update chemical potential
-    xmu=xmu+dble(nindex)*ndelta
-    !
-    !Print information
-    write(LOGfile,"(A,f16.9,A,f15.9)")"n    = ",ntmp," /",nread
-    if(nindex>0)then
-       write(LOGfile,"(A,es16.9,A)")"shift= ",nindex*ndelta," ==>"
-    elseif(nindex<0)then
-       write(LOGfile,"(A,es16.9,A)")"shift= ",nindex*ndelta," <=="
-    else
-       write(LOGfile,"(A,es16.9,A)")"shift= ",nindex*ndelta," == "
-    endif
-    write(LOGfile,"(A,f15.9)")"xmu  = ",xmu
-    write(LOGfile,"(A,ES16.9,A,ES16.9)")"dn   = ",ndiff,"/",nth
-    unit=free_unit()
-    open(unit,file="search_mu_iteration"//reg(ed_file_suffix)//".ed",position="append")
-    write(unit,*)xmu,ntmp,ndiff
-    close(unit)
-    !
-    !check convergence within actual threshold
-    !if reduce is activetd
-    !if density is in the actual threshold
-    !if DMFT is converged
-    !if threshold is larger than nerror (i.e. this is not last loop)
-    bool=ireduce.AND.(abs(ndiff)<nth).AND.converged.AND.(nth>nerr)
-    if(bool)then
-       nth_magnitude_old=nth_magnitude        !save old threshold magnitude
-       nth_magnitude=nth_magnitude_old-1      !decrease threshold magnitude || floor(log10(abs(ntmp-nread)))
-       nth=max(nerr,10.d0**(nth_magnitude))   !set the new threshold 
-       count=0                                !reset the counter
-       converged=.false.                      !reset convergence
-       ndelta=ndelta_old*nratio                  !reduce the delta step
+    if(ED_MPI_ID==0)then
+       ndiff=ntmp-nread
+       nratio = 0.5d0;!nratio = 1.d0/(6.d0/11.d0*pi)
+       !
+       !check actual value of the density *ntmp* with respect to goal value *nread*
+       count=count+1
+       totcount=totcount+1
+       if(count>2)then
+          do i=1,2
+             nindex_old(i+1)=nindex_old(i)
+          enddo
+       endif
+       nindex_old(1)=nindex
+       !
+       if(ndiff >= nth)then
+          nindex=-1
+       elseif(ndiff <= -nth)then
+          nindex=1
+       else
+          nindex=0
+       endif
+       !
+       ndelta_old=ndelta
+       bool=nindex/=0.AND.( (nindex+nindex_old(1)==0).OR.(nindex+sum(nindex_old(:))==0) )
+       !if(nindex_old(1)+nindex==0.AND.nindex/=0)then !avoid loop forth and back
+       if(bool)then
+          ndelta=ndelta_old*nratio !decreasing the step
+       else
+          ndelta=ndelta_old
+       endif
+       !
+       if(ndelta_old<1.d-9)then
+          ndelta_old=0.d0
+          nindex=0
+       endif
+       !update chemical potential
+       xmu=xmu+dble(nindex)*ndelta
+       !
+       !Print information
+       write(LOGfile,"(A,f16.9,A,f15.9)")"n    = ",ntmp," /",nread
+       if(nindex>0)then
+          write(LOGfile,"(A,es16.9,A)")"shift= ",nindex*ndelta," ==>"
+       elseif(nindex<0)then
+          write(LOGfile,"(A,es16.9,A)")"shift= ",nindex*ndelta," <=="
+       else
+          write(LOGfile,"(A,es16.9,A)")"shift= ",nindex*ndelta," == "
+       endif
+       write(LOGfile,"(A,f15.9)")"xmu  = ",xmu
+       write(LOGfile,"(A,ES16.9,A,ES16.9)")"dn   = ",ndiff,"/",nth
+       unit=free_unit()
+       open(unit,file="search_mu_iteration"//reg(ed_file_suffix)//".ed",position="append")
+       write(unit,*)xmu,ntmp,ndiff
+       close(unit)
+       !
+       !check convergence within actual threshold
+       !if reduce is activetd
+       !if density is in the actual threshold
+       !if DMFT is converged
+       !if threshold is larger than nerror (i.e. this is not last loop)
+       bool=ireduce.AND.(abs(ndiff)<nth).AND.converged.AND.(nth>nerr)
+       if(bool)then
+          nth_magnitude_old=nth_magnitude        !save old threshold magnitude
+          nth_magnitude=nth_magnitude_old-1      !decrease threshold magnitude || floor(log10(abs(ntmp-nread)))
+          nth=max(nerr,10.d0**(nth_magnitude))   !set the new threshold 
+          count=0                                !reset the counter
+          converged=.false.                      !reset convergence
+          ndelta=ndelta_old*nratio                  !reduce the delta step
+          !
+       endif
+       !
+       !if density is not converged set convergence to .false.
+       if(abs(ntmp-nread)>nth)converged=.false.
+       !
+       !check convergence for this threshold
+       !!---if smallest threshold-- NO MORE
+       !if reduce is active (you reduced the treshold at least once)
+       !if # iterations > max number
+       !if not yet converged
+       !set threshold back to the previous larger one.
+       !bool=(nth==nerr).AND.ireduce.AND.(count>niter).AND.(.not.converged)
+       bool=ireduce.AND.(count>niter).AND.(.not.converged)
+       if(bool)then
+          ireduce=.false.
+          nth=10.d0**(nth_magnitude_old)
+       endif
+       !
+       write(LOGfile,"(A,I5)")"count= ",count
+       write(LOGfile,"(A,L2)"),"Converged=",converged
+       print*,""
        !
     endif
-    !
-    !if density is not converged set convergence to .false.
-    if(abs(ntmp-nread)>nth)converged=.false.
-    !
-    !check convergence for this threshold
-    !!---if smallest threshold-- NO MORE
-    !if reduce is active (you reduced the treshold at least once)
-    !if # iterations > max number
-    !if not yet converged
-    !set threshold back to the previous larger one.
-    !bool=(nth==nerr).AND.ireduce.AND.(count>niter).AND.(.not.converged)
-    bool=ireduce.AND.(count>niter).AND.(.not.converged)
-    if(bool)then
-       ireduce=.false.
-       nth=10.d0**(nth_magnitude_old)
-    endif
-    !
-    write(LOGfile,"(A,I5)")"count= ",count
-    write(LOGfile,"(A,L2)"),"Converged=",converged
-    print*,""
-    !
+#ifdef _MPI
+    call MPI_BCAST(xmu,1,MPI_Double_Precision,0,MPI_COMM_WORLD,mpiERR)
+#endif
   end subroutine search_chemical_potential
 
 

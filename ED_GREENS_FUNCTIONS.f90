@@ -139,7 +139,7 @@ contains
           enddo
        enddo
        !
-       if(mpiID==0)then	
+       if(ED_MPI_ID==0)then	
        do iorb=1,Norb
           suffix="_l"//reg(txtfy(iorb))//"_m"//reg(txtfy(iorb))
           call open_units(reg(suffix))
@@ -219,7 +219,7 @@ contains
        enddo
        !
        !Print the impurity functions:
-       if(mpiID==0)then
+       if(ED_MPI_ID==0)then
           do iorb=1,Norb
              do jorb=1,Norb
                 suffix="_l"//reg(txtfy(iorb))//"_m"//reg(txtfy(jorb))
@@ -366,7 +366,7 @@ contains
     deallocate(fg0,fg,sigma,det)
 
     !
-    if(mpiID==0)then
+    if(ED_MPI_ID==0)then
     do iorb=1,Norb
        suffix="_l"//reg(txtfy(iorb))//"_m"//reg(txtfy(iorb))
        call open_units(reg(suffix))
@@ -491,7 +491,7 @@ contains
   subroutine print_imp_chi
     integer                               :: i,j,iorb
     integer                               :: unit(3)
-    if(ed_verbose<3.AND.mpiID==0)then
+    if(ed_verbose<3.AND.ED_MPI_ID==0)then
        do iorb=1,Norb
           unit(1)=free_unit()
           open(unit(1),file="Chi_orb"//reg(txtfy(iorb))//"_tau"//reg(ed_file_suffix)//".ed")

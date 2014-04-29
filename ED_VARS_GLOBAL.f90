@@ -3,7 +3,6 @@ MODULE ED_VARS_GLOBAL
   USE MATRIX_SPARSE
   USE EIGEN_SPACE
 #ifdef _MPI
-  USE MPI_VARS
   USE MPI
 #endif
   implicit none
@@ -65,5 +64,14 @@ MODULE ED_VARS_GLOBAL
   !Density and double occupancy
   !=========================================================
   real(8),dimension(:),allocatable            ::  ed_dens,ed_docc,ed_phisc
+
+
+#ifdef _MPI
+  !MPI Parallel environment variables
+  !=========================================================
+  integer                                     :: ED_MPI_ID=0
+  integer                                     :: ED_MPI_SIZE=1
+  integer                                     :: ED_MPI_ERR
+#endif  
 
 END MODULE ED_VARS_GLOBAL
