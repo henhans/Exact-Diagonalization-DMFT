@@ -22,7 +22,7 @@ subroutine lanc_ed_getgf_superc()
 
   do ispin=1,Nspin
      do iorb=1,Norb
-        if(mpiID==0)write(LOGfile,"(A)")" Get G&F_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))
+        if(ed_verbose<3.AND.mpiID==0)write(LOGfile,"(A)")"Get G&F_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))
         call lanc_ed_buildgf_sc_d(iorb,ispin,.false.)
      enddo
   enddo
@@ -78,9 +78,9 @@ subroutine lanc_ed_buildgf_sc_d(iorb,ispin,iverbose)
   numstates=numgs
   if(finiteT)numstates=state_list%size
   !   
-  if(mpiID==0)call start_progress
+  if(ed_verbose<2.AND.mpiID==0)call start_progress
   do izero=1,numstates
-     if(mpiID==0)call progress(izero,numstates)
+     if(ed_verbose<1.AND.mpiID==0)call progress(izero,numstates)
      isect0     =  es_return_sector(state_list,izero)
      state_e    =  es_return_energy(state_list,izero)
      state_vec  => es_return_vector(state_list,izero)
@@ -94,7 +94,7 @@ subroutine lanc_ed_buildgf_sc_d(iorb,ispin,iverbose)
      jsect0 = getCDGsector(1,isect0)
      if(jsect0/=0)then 
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)&
+        if(iverbose_.AND.mpiID==0)&
              write(LOGfile,"(A,I3,I15)")'apply cdg_up:',getsz(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap) !note that here you are doing twice the map building...
@@ -126,7 +126,7 @@ subroutine lanc_ed_buildgf_sc_d(iorb,ispin,iverbose)
      jsect0 = getCsector(2,isect0)
      if(jsect0/=0)then 
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)&
+        if(iverbose_.AND.mpiID==0)&
              write(LOGfile,"(A,I3,I15)")'apply c_dw:',getsz(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap) !note that here you are doing twice the map building...
@@ -160,7 +160,7 @@ subroutine lanc_ed_buildgf_sc_d(iorb,ispin,iverbose)
         jsz0   = isz0+1
         jsect0 = getsector(jsz0,1)
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)&
+        if(iverbose_.AND.mpiID==0)&
              write(LOGfile,"(A,I3,I15)")'apply c_dw:',getsz(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap) !note that here you are doing twice the map building...
@@ -205,7 +205,7 @@ subroutine lanc_ed_buildgf_sc_d(iorb,ispin,iverbose)
      jsect0 = getCsector(1,isect0)
      if(jsect0/=0)then 
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)&
+        if(iverbose_.AND.mpiID==0)&
              write(LOGfile,"(A,I3,I15)")'apply cdg_up:',getsz(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap) !note that here you are doing twice the map building...
@@ -237,7 +237,7 @@ subroutine lanc_ed_buildgf_sc_d(iorb,ispin,iverbose)
      jsect0 = getCDGsector(2,isect0)
      if(jsect0/=0)then 
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)&
+        if(iverbose_.AND.mpiID==0)&
              write(LOGfile,"(A,I3,I15)")'apply c_dw:',getsz(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap) !note that here you are doing twice the map building...
@@ -271,7 +271,7 @@ subroutine lanc_ed_buildgf_sc_d(iorb,ispin,iverbose)
         jsz0   = isz0-1
         jsect0 = getsector(jsz0,1)
         jdim0  = getdim(jsect0)
-        if(mpiID==0.AND.iverbose_)&
+        if(iverbose_.AND.mpiID==0)&
              write(LOGfile,"(A,I3,I15)")'apply c_dw:',getsz(jsect0),jdim0
         allocate(HJmap(jdim0),vvinit(jdim0))
         call build_sector(jsect0,HJmap) !note that here you are doing twice the map building...
@@ -312,7 +312,7 @@ subroutine lanc_ed_buildgf_sc_d(iorb,ispin,iverbose)
      deallocate(HImap)
      !
   enddo
-  if(mpiID==0)call stop_progress
+  if(ed_verbose<2.AND.mpiID==0)call stop_progress
   deallocate(alfa_,beta_)
 end subroutine lanc_ed_buildgf_sc_d
 

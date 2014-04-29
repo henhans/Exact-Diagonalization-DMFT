@@ -16,7 +16,7 @@ program ed_tddpam_lattice
   !Bath:
   integer                :: Nb(2)
   real(8),allocatable    :: Bath(:,:)
-  complex(8),allocatable :: Delta(:,:,:)
+  complex(8),allocatable :: Delta(:,:,:),Delta_Old(:,:,:)
   !Hamiltonian input:
   complex(8),allocatable :: Hk(:,:,:)
   real(8),allocatable    :: fg0(:,:,:)
@@ -24,13 +24,12 @@ program ed_tddpam_lattice
   !variables for the model:
   character(len=32)      :: hkfile,finput
   integer                :: Nx,Lk,ntype
-  real(8)                :: nobj
+  real(8)                :: nobj,wmixing
   real(8)                :: alpha,tpp,ep0,tpd,v0,gzero,gzerop,gzerom,gmu
   logical                :: bool
 
   !parse additional variables
   call parse_cmd_variable(finput,"FINPUT",default='inputED.in')
-  call ed_read_input(trim(finput))
   call parse_input_variable(ntype,"NTYPE",trim(finput),default=0)
   call parse_input_variable(Nx,"NX",trim(finput),default=100)
   call parse_input_variable(tpp,"TPP",trim(finput),default=0.25d0)
@@ -38,6 +37,8 @@ program ed_tddpam_lattice
   call parse_input_variable(tpd,"TPD",trim(finput),default=0.d0)
   call parse_input_variable(v0,"V0",trim(finput),default=0.d0)
   call parse_input_variable(ep0,"EP0",trim(finput),default=0.d0)
+  call parse_input_variable(wmixing,"WMIXING",finput,default=0.75d0)
+  call ed_read_input(trim(finput))
 
 
   inquire(file="last_mu.restart",exist=bool)
@@ -61,6 +62,7 @@ program ed_tddpam_lattice
 
   !Allocate Weiss Field:
   allocate(delta(Norb,Norb,Lmats))
+  allocate(delta_old(Norb,Norb,Lmats))
 
   !Setup solver
   Nb=get_bath_size()
@@ -80,9 +82,12 @@ program ed_tddpam_lattice
      call ed_solver(bath) 
 
      !Get the Weiss field/Delta function to be fitted (user defined)
+     delta_old=delta
      call get_delta
 
+
      !Fit the new bath, starting from the old bath + the supplied delta
+     if(iloop>1)delta = wmixing*delta + (1.d0-wmixing)*delta_old
      call chi2_fitgf(delta,bath,ispin=1)
 
      !Check convergence (if required change chemical potential)

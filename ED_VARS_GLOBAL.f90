@@ -3,6 +3,7 @@ MODULE ED_VARS_GLOBAL
   USE MATRIX_SPARSE
   USE EIGEN_SPACE
 #ifdef _MPI
+  USE MPI_VARS
   USE MPI
 #endif
   implicit none

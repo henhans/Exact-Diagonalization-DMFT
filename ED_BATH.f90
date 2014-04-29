@@ -11,8 +11,7 @@
 ! N = Nspin*(Norb+1)*Nbath
 !########################################################################
 MODULE ED_BATH
-  USE COMMON_VARS
-  USE IOTOOLS, only:free_unit,reg,file_length
+  USE IOTOOLS, only:free_unit,reg,file_length,txtfy
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   implicit none
@@ -172,79 +171,73 @@ contains
     logical              :: IOfile
     real(8)              :: Nh,de
     if(.not.dmft_bath_%status)stop "init_bath: bath not allocated"
-    if(mpiID==0)then
-       !Generating the bath anyway, then you may want to read it to 
-       !update some entries. This way you can restart even 
-       !from different Ns calculation, this is better than 
-       !start from a complete guess
-       dmft_bath_%e(:,:,1)    =-hwband_ 
-       dmft_bath_%e(:,:,Nbath)= hwband_ 
-       Nh=Nbath/2
-       if(mod(Nbath,2)==0)then
-          de=hwband_/dble(Nh-1)
-          dmft_bath_%e(:,:,Nh)  = -1.d-4
-          dmft_bath_%e(:,:,Nh+1)=  1.d-4
-          do i=2,Nh-1
-             dmft_bath_%e(:,:,i)   =-hwband_ + (i-1)*de
-             dmft_bath_%e(:,:,Nh+i)= hwband_ - (i-1)*de
-          enddo
-       else
-          de=hwband_/dble(Nh)
-          dmft_bath_%e(:,:,Nh+1)= 0.d0
-          do i=2,Nh
-             dmft_bath_%e(:,:,i)   =-hwband_ + (i-1)*de
-             dmft_bath_%e(:,:,Nh+i)= hwband_ - (i-1)*de
-          enddo
-       endif
-       do i=1,Nbath
-          dmft_bath_%v(:,:,i)=1.d-1/sqrt(dble(Nbath))
+    !Generating the bath anyway, then you may want to read it to 
+    !update some entries. This way you can restart even 
+    !from different Ns calculation, this is better than 
+    !start from a complete guess
+    dmft_bath_%e(:,:,1)    =-hwband_ 
+    dmft_bath_%e(:,:,Nbath)= hwband_ 
+    Nh=Nbath/2
+    if(mod(Nbath,2)==0)then
+       de=hwband_/dble(Nh-1)
+       dmft_bath_%e(:,:,Nh)  = -1.d-4
+       dmft_bath_%e(:,:,Nh+1)=  1.d-4
+       do i=2,Nh-1
+          dmft_bath_%e(:,:,i)   =-hwband_ + (i-1)*de
+          dmft_bath_%e(:,:,Nh+i)= hwband_ - (i-1)*de
        enddo
-       if(ed_supercond)then
-          dmft_bath_%d(:,:,:)=deltasc
-       endif
-       !
-       !Read from file if exist:
-       !
-       inquire(file=trim(Hfile)//trim(ed_file_suffix)//".restart",exist=IOfile)
-       if(IOfile)then
-          write(LOGfile,"(A)")'Reading bath from file'//trim(Hfile)//trim(ed_file_suffix)//".restart"
-          unit = free_unit()
-          flen = file_length(trim(Hfile)//trim(ed_file_suffix)//".restart")
-          open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
-          read(unit,*)
-          select case(bath_type)
-          case default
-             if(.not.ed_supercond)then
-                do i=1,min(flen,Nbath)
-                   read(unit,*)((dmft_bath_%e(ispin,iorb,i),&
-                        dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
-                enddo
-             else
-                do i=1,min(flen,Nbath)
-                   read(unit,*)((dmft_bath_%e(ispin,iorb,i),dmft_bath_%d(ispin,iorb,i),&
-                        dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
-                enddo
-             endif
-          case ('hybrid')
-             if(.not.ed_supercond)then
-                do i=1,min(flen,Nbath)
-                   read(unit,*)(dmft_bath_%e(ispin,1,i),&
-                        (dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
-                enddo
-             else
-                do i=1,min(flen,Nbath)
-                   read(unit,*)(dmft_bath_%e(ispin,1,i),dmft_bath_%d(ispin,1,i),&
-                        (dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
-                enddo
-             endif
-          end select
-          close(unit)
-       endif
-    endif                       !mpiID==0
-#ifdef _MPI
-    call MPI_BCAST(dmft_bath_%e,size(dmft_bath_%e),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_BCAST(dmft_bath_%v,size(dmft_bath_%v),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
-#endif
+    else
+       de=hwband_/dble(Nh)
+       dmft_bath_%e(:,:,Nh+1)= 0.d0
+       do i=2,Nh
+          dmft_bath_%e(:,:,i)   =-hwband_ + (i-1)*de
+          dmft_bath_%e(:,:,Nh+i)= hwband_ - (i-1)*de
+       enddo
+    endif
+    do i=1,Nbath
+       dmft_bath_%v(:,:,i)=max(0.1d0,1.d0/sqrt(dble(Nbath)))
+    enddo
+    if(ed_supercond)then
+       dmft_bath_%d(:,:,:)=deltasc
+    endif
+    !
+    !Read from file if exist:
+    !
+    inquire(file=trim(Hfile)//trim(ed_file_suffix)//".restart",exist=IOfile)
+    if(IOfile)then
+       write(LOGfile,"(A)")'Reading bath from file'//trim(Hfile)//trim(ed_file_suffix)//".restart"
+       unit = free_unit()
+       flen = file_length(trim(Hfile)//trim(ed_file_suffix)//".restart")
+       open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
+       read(unit,*)
+       select case(bath_type)
+       case default
+          if(.not.ed_supercond)then
+             do i=1,min(flen,Nbath)
+                read(unit,*)((dmft_bath_%e(ispin,iorb,i),&
+                     dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
+             enddo
+          else
+             do i=1,min(flen,Nbath)
+                read(unit,*)((dmft_bath_%e(ispin,iorb,i),dmft_bath_%d(ispin,iorb,i),&
+                     dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
+             enddo
+          endif
+       case ('hybrid')
+          if(.not.ed_supercond)then
+             do i=1,min(flen,Nbath)
+                read(unit,*)(dmft_bath_%e(ispin,1,i),&
+                     (dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
+             enddo
+          else
+             do i=1,min(flen,Nbath)
+                read(unit,*)(dmft_bath_%e(ispin,1,i),dmft_bath_%d(ispin,1,i),&
+                     (dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
+             enddo
+          endif
+       end select
+       close(unit)
+    endif
   end subroutine init_bath_ed
 
 
@@ -278,43 +271,43 @@ contains
     integer              :: i,unit,ispin,iorb
     if(.not.dmft_bath_%status)stop "WRITE_BATH: bath not allocated"
     if(mpiID==0)then
-       select case(bath_type)
-       case default
-          if(.not.ed_supercond)then
-             write(unit,"(90(A21,1X))")&
-                  (("#Ek_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),&
-                  "Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
-             do i=1,Nbath
-                write(unit,"(90(F21.12,1X))")((dmft_bath_%e(ispin,iorb,i),&
-                     dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
-             enddo
-          else
-             write(unit,"(90(A21,1X))")&
-                  (("#Ek_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),"#Dk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),&
-                  "Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
-             do i=1,Nbath
-                write(unit,"(90(F21.12,1X))")((dmft_bath_%e(ispin,iorb,i),dmft_bath_%d(ispin,iorb,i),&
-                     dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
-             enddo
-          endif
+    select case(bath_type)
+    case default
+       if(.not.ed_supercond)then
+          write(unit,"(90(A21,1X))")&
+               (("#Ek_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),&
+               "Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
+          do i=1,Nbath
+             write(unit,"(90(F21.12,1X))")((dmft_bath_%e(ispin,iorb,i),&
+                  dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
+          enddo
+       else
+          write(unit,"(90(A21,1X))")&
+               (("#Ek_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),"#Dk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),&
+               "Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
+          do i=1,Nbath
+             write(unit,"(90(F21.12,1X))")((dmft_bath_%e(ispin,iorb,i),dmft_bath_%d(ispin,iorb,i),&
+                  dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
+          enddo
+       endif
 
-       case('hybrid')
-          if(.not.ed_supercond)then
-             write(unit,"(90(A21,1X))")("#Ek_s"//reg(txtfy(ispin)),&
-                  ("Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
-             do i=1,Nbath
-                write(unit,"(90(F21.12,1X))")( dmft_bath_%e(ispin,1,i),&
-                     (dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
-             enddo
-          else
-             write(unit,"(90(A21,1X))")("#Ek_s"//reg(txtfy(ispin)),"#Dk_s"//reg(txtfy(ispin)),&
-                  ("Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
-             do i=1,Nbath
-                write(unit,"(90(F21.12,1X))")( dmft_bath_%e(ispin,1,i),dmft_bath_%d(ispin,1,i),&
-                     (dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
-             enddo
-          endif
-       end select
+    case('hybrid')
+       if(.not.ed_supercond)then
+          write(unit,"(90(A21,1X))")("#Ek_s"//reg(txtfy(ispin)),&
+               ("Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
+          do i=1,Nbath
+             write(unit,"(90(F21.12,1X))")( dmft_bath_%e(ispin,1,i),&
+                  (dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
+          enddo
+       else
+          write(unit,"(90(A21,1X))")("#Ek_s"//reg(txtfy(ispin)),"#Dk_s"//reg(txtfy(ispin)),&
+               ("Vk_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
+          do i=1,Nbath
+             write(unit,"(90(F21.12,1X))")( dmft_bath_%e(ispin,1,i),dmft_bath_%d(ispin,1,i),&
+                  (dmft_bath_%v(ispin,iorb,i),iorb=1,Norb),ispin=1,Nspin)
+          enddo
+       endif
+    end select
     endif
   end subroutine write_bath
 
@@ -493,7 +486,6 @@ contains
        write(LOGfile,"(A)")"spin_symmetrize_bath: Nspin=1 nothing to symmetrize"
        return
     endif
-    if(Nspin>2)stop "spin_symmetrize_bath: Nspin>2..."
     call allocate_bath(dmft_bath_)
     call set_bath(bath_,dmft_bath_)
     dmft_bath_%e(Nspin,:,:)=dmft_bath_%e(1,:,:)

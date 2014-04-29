@@ -1,3 +1,4 @@
+include "MIXING.f90"
 !###################################################################
 !PURPOSE  : LANCZOS ED solution of DMFT problem for Hubbard model.
 !AUTHORS  : A. Amaricci
@@ -13,29 +14,33 @@ program lancED
   USE ARRAYS
   USE FFTGF
   USE PARSE_INPUT
+  USE MIXING
   implicit none
   integer                :: iloop,Nb(2)
   logical                :: converged
   real(8)                :: wband,ts
   !Bath:
-  real(8),allocatable    :: Bath(:,:)
+  real(8),allocatable    :: Bath(:,:),Bath_old(:,:)
   !The local hybridization function:
-  complex(8),allocatable :: Delta(:,:,:)
-  character(len=16)      :: finput,fhloc
-
+  complex(8),allocatable :: Delta(:,:,:),Delta_Old(:,:,:)
+  character(len=16)      :: finput
+  integer :: M
+  real(8) :: alpha
 #ifdef _MPI
   call ed_init_mpi()
 #endif
 
   call parse_cmd_variable(finput,"FINPUT",default='inputED.in')
-  call parse_cmd_variable(wband,"wband",default=1.d0)
+  call parse_input_variable(wband,"wband",finput,default=1.d0)
+  call parse_input_variable(M,"M",finput,default=0)
+  call parse_input_variable(alpha,"ALPHA",finput,default=1.d0)
   !
   call ed_read_input(trim(finput))
   Hloc=zero
 
   !Allocate Weiss Field:
   allocate(delta(Norb,Norb,Lmats))
-
+  allocate(delta_old(Norb,Norb,Lmats))
   LOGfile=100+mpiID
   open(LOGfile,file="LOG"//reg(ed_file_suffix))
 
@@ -43,6 +48,7 @@ program lancED
   Nb=get_bath_size()
   allocate(bath(Nb(1),Nb(2)))
   call init_ed_solver(bath)
+
 
   !DMFT loop
   iloop=0;converged=.false.
@@ -54,10 +60,12 @@ program lancED
      call ed_solver(bath) 
 
      !Get the Weiss field/Delta function to be fitted (user defined)
-     call get_delta_bethe
+     delta_old=delta
+     call get_delta_bethe()
 
+     if(iloop>1)call broyden_mix(delta(1,1,:),delta_old(1,1,:),alpha,M,iloop-1)
      !Perform the SELF-CONSISTENCY by fitting the new bath
-     call chi2_fitgf(delta,bath,ispin=1,iverbose=.false.)
+     call chi2_fitgf(delta,bath,ispin=1)
 
      !Check convergence (if required change chemical potential)
      if(mpiID==0)then
@@ -111,18 +119,18 @@ contains
        call splot("DOS"//reg(txtfy(iorb))//".ed",wr,-dimag(grloc)/pi)
        call splot("Delta_"//reg(txtfy(iorb))//"_iw.ed",wm,delta(iorb,iorb,:))
 
-       n0=ed_dens(1)/2.d0
-       C0=Uloc(1)*(n0-0.5d0)
-       C1=Uloc(1)**2*n0*(1.d0-n0)
-       print*,n0,C0,C1
-       sigma = impSmats(1,1,iorb,iorb,:)  - C1/(xi*wm) - C0
-       call fftgf_iw2tau(sigma,sigt(0:),beta,notail=.true.)
-       sigt=sigt-C1*0.5d0
-       call splot("Sigma_"//reg(txtfy(iorb))//"_tau.ed",tau,sigt)
+       ! n0=ed_dens(1)/2.d0
+       ! C0=Uloc(1)*(n0-0.5d0)
+       ! C1=Uloc(1)**2*n0*(1.d0-n0)
+       ! print*,n0,C0,C1
+       ! sigma = impSmats(1,1,iorb,iorb,:)  - C1/(xi*wm) - C0
+       ! call fftgf_iw2tau(sigma,sigt(0:),beta,notail=.true.)
+       ! sigt=sigt-C1*0.5d0
+       ! call splot("Sigma_"//reg(txtfy(iorb))//"_tau.ed",tau,sigt)
 
-       call fftgf_tau2iw(sigt(0:),sigma,beta)
+       ! call fftgf_tau2iw(sigt(0:),sigma,beta)
 
-       call splot("Sigma_"//reg(txtfy(iorb))//"_iw.ed",wm,sigma)
+       ! call splot("Sigma_"//reg(txtfy(iorb))//"_iw.ed",wm,sigma)
     enddo
 
 

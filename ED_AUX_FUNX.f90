@@ -3,7 +3,7 @@
 !AUTHORS  : Adriano Amaricci
 !########################################################################
 MODULE ED_AUX_FUNX
-  USE COMMON_VARS, only:mpiID
+  USE MPI_VARS
   USE TIMER
   USE IOTOOLS, only:free_unit,reg
   USE ED_INPUT_VARS
@@ -12,10 +12,7 @@ MODULE ED_AUX_FUNX
   private
 
   public :: print_Hloc
-#ifdef _MPI
-  public :: ed_init_mpi
-  public :: ed_finalize_mpi
-#endif
+
   !
   public :: init_ed_structure
   public :: search_chemical_potential
@@ -32,23 +29,7 @@ contains
 
 
 
-#ifdef _MPI
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine ed_init_mpi
-    call MPI_INIT(mpiERR)
-    call MPI_COMM_RANK(MPI_COMM_WORLD,mpiID,mpiERR)
-    call MPI_COMM_SIZE(MPI_COMM_WORLD,mpiSIZE,mpiERR)
-    write(*,"(A,I4,A,I4,A)")'Processor ',mpiID,' of ',mpiSIZE,' is alive'
-    call MPI_BARRIER(MPI_COMM_WORLD,mpiERR)
-  end subroutine ed_init_mpi
-
-  subroutine ed_finalize_mpi
-    call MPI_FINALIZE(mpiERR)
-  end subroutine ed_finalize_mpi
-#endif
-
+ 
 
 
   !+------------------------------------------------------------------+
@@ -102,7 +83,7 @@ contains
     reHloc = 0.d0
     imHloc = 0.d0
 
-    inquire(file=Hunit,exist=control)    
+    inquire(file=Hunit,exist=control)
     if(control)then
        if(mpiID==0)write(LOGfile,*)"Reading Hloc from file: "//Hunit
        open(50,file=Hunit,status='old')
@@ -192,9 +173,9 @@ contains
     endif
     if(nread/=0.d0)then
        i=abs(floor(log10(abs(nerr)))) !modulus of the order of magnitude of nerror
-       niter=nloop
-       nloop=(i-1)*niter                !increase the max number of dmft loop allowed so to do threshold loop
-       write(LOGfile,"(A,I10)")"Increased Nloop to:",nloop
+       niter=nloop/3
+       !nloop=(i-1)*niter                !increase the max number of dmft loop allowed so to do threshold loop
+       !write(LOGfile,"(A,I10)")"Increased Nloop to:",nloop
     endif
 
     !allocate functions
@@ -645,39 +626,47 @@ contains
     logical,intent(inout) :: converged
     logical               :: bool
     real(8)               :: ndiff
-    integer,save          :: count=0,totcount=0
+    integer,save          :: count=0,totcount=0,i
     integer,save          :: nindex=0
-    integer               :: nindex1
-    real(8)               :: ndelta1,nratio
+    integer               :: nindex_old(3)
+    real(8)               :: ndelta_old,nratio
     integer,save          :: nth_magnitude=-2,nth_magnitude_old=-2
     real(8),save          :: nth=1.d-2
     logical,save          :: ireduce=.true.
-    integer :: unit
+    integer               :: unit
     !
     ndiff=ntmp-nread
-    nratio = 0.5d0
-    !nratio = 1.d0/(6.d0/11.d0*pi)
+    nratio = 0.5d0;!nratio = 1.d0/(6.d0/11.d0*pi)
     !
     !check actual value of the density *ntmp* with respect to goal value *nread*
     count=count+1
     totcount=totcount+1
-    nindex1=nindex
-    ndelta1=ndelta
-    if(ndiff >= nth)then      !if((ntmp >= nread+nth))then
+    if(count>2)then
+       do i=1,2
+          nindex_old(i+1)=nindex_old(i)
+       enddo
+    endif
+    nindex_old(1)=nindex
+    !
+    if(ndiff >= nth)then
        nindex=-1
-    elseif(ndiff <= -nth)then !elseif(ntmp <= nread-nth)then
+    elseif(ndiff <= -nth)then
        nindex=1
     else
        nindex=0
     endif
-    if(nindex1+nindex==0.AND.nindex/=0)then !avoid loop forth and back
-       ndelta=ndelta1*nratio !decreasing the step
+    !
+    ndelta_old=ndelta
+    bool=nindex/=0.AND.( (nindex+nindex_old(1)==0).OR.(nindex+sum(nindex_old(:))==0) )
+    !if(nindex_old(1)+nindex==0.AND.nindex/=0)then !avoid loop forth and back
+    if(bool)then
+       ndelta=ndelta_old*nratio !decreasing the step
     else
-       ndelta=ndelta1
+       ndelta=ndelta_old
     endif
     !
-    if(ndelta1<1.d-9)then
-       ndelta1=0.d0
+    if(ndelta_old<1.d-9)then
+       ndelta_old=0.d0
        nindex=0
     endif
     !update chemical potential
@@ -711,7 +700,7 @@ contains
        nth=max(nerr,10.d0**(nth_magnitude))   !set the new threshold 
        count=0                                !reset the counter
        converged=.false.                      !reset convergence
-       ndelta=ndelta1*nratio                  !reduce the delta step
+       ndelta=ndelta_old*nratio                  !reduce the delta step
        !
     endif
     !

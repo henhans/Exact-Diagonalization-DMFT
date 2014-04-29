@@ -1,5 +1,5 @@
 module DMFT_ED
-  USE COMMON_VARS, only: mpiID
+  USE MPI_VARS
   USE IOTOOLS, only:free_unit,reg
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
@@ -12,13 +12,12 @@ module DMFT_ED
   USE ED_DIAG
   implicit none
 
-  logical :: iverbose_
 contains
 
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine init_ed_solver(bath_,hwband,Hunit,iverbose)
+  subroutine init_ed_solver(bath_,hwband,Hunit)
     real(8),dimension(:,:),intent(inout) :: bath_
     real(8),optional,intent(in)          :: hwband
     real(8)                              :: hwband_
@@ -26,11 +25,9 @@ contains
     character(len=64)                    :: Hunit_
     logical                              :: check 
     logical,save                         :: isetup=.true.
-    logical,optional                     :: iverbose
-    iverbose_=.false.;if(present(iverbose))iverbose_=iverbose
     hwband_=2.d0;if(present(hwband))hwband_=hwband
     Hunit_='inputHLOC.in';if(present(Hunit))Hunit_=Hunit
-    if(mpiID==0.AND.iverbose_)write(LOGfile,"(A)")"INIT SOLVER, SETUP EIGENSPACE"
+    if(ed_verbose<2.AND.mpiID==0)write(LOGfile,"(A)")"INIT SOLVER FOR "//reg(ed_file_suffix)
     if(isetup)call init_ed_structure(Hunit_)
     bath_ = 0.d0
     check = check_bath_dimension(bath_)
@@ -58,12 +55,11 @@ contains
     real(8),dimension(:,:),intent(in) :: bath_
     integer                           :: unit
     logical                           :: check
-    if(mpiID==0.AND.iverbose_)write(LOGfile,"(A)")"ED SOLUTION"
     check = check_bath_dimension(bath_)
     if(.not.check)stop "init_ed_solver: wrong bath dimensions"
     call allocate_bath(dmft_bath)
     call set_bath(bath_,dmft_bath)
-    call write_bath(dmft_bath,LOGfile)
+    if(ed_verbose<2.AND.mpiID==0)call write_bath(dmft_bath,LOGfile)
     select case(ed_method)
     case default
        call lanc_ed_diag

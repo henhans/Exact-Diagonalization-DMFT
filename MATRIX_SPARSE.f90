@@ -4,7 +4,7 @@
 !!but we still miss some elementary action such as +update_value, +check_value_exist, +delete_value
 !!that I am not gonna use in ED code (for which this module is developed).
 MODULE MATRIX_SPARSE
-  USE COMMON_VARS
+  USE CONSTANTS
 #ifdef _MPI
   USE MPI
 #endif
@@ -43,16 +43,6 @@ MODULE MATRIX_SPARSE
   interface sp_dump_matrix
      module procedure sp_dump_matrix_d,sp_dump_matrix_c
   end interface sp_dump_matrix
-
-  ! interface sp_matrix_vector_product
-  !    module procedure sp_matrix_vector_product_dd, sp_matrix_vector_product_dc
-  ! end interface sp_matrix_vector_product
-
-  ! #ifdef _MPI
-  !   interface sp_matrix_vector_product_mpi
-  !      module procedure sp_matrix_vector_product_d_mpi,sp_matrix_vector_product_c_mpi
-  !   end interface sp_matrix_vector_product_mpi
-  ! #endif
 
   public :: sparse_matrix
   !

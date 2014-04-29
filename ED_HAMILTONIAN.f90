@@ -4,7 +4,7 @@
 ! |1,2;3...Ns>_UP * |Ns+1,Ns+2;Ns+3,...,2*Ns>_DOWN
 !########################################################################
 MODULE ED_HAMILTONIAN
-  USE COMMON_VARS
+  USE CONSTANTS
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_BATH
@@ -13,20 +13,11 @@ MODULE ED_HAMILTONIAN
   private
 
   !Get sparse sector Hamiltonian
-  public :: ed_buildH_d,ed_buildH_c
+  public                       :: ed_buildH_d,ed_buildH_c
 
   !Sparse Matrix-vector product using stored sparse matrix 
-  public :: spHtimesV_dd,spHtimesV_dc,spHtimesV_cc
-  public :: lanc_spHtimesV_dd,lanc_spHtimesV_dc,lanc_spHtimesV_cc
-
-  !WRONG!! !Direct Matrix-vector product (no allocation of H)
-  !ALLOCATE AND SET REQUIRED INFO
-  public :: setup_Hv_sector
-  public :: delete_Hv_sector
-  !   public :: HtimesV
-  ! #ifdef _MPI
-  !   public :: HtimesV_mpi
-  ! #endif
+  public                       :: spHtimesV_dd,spHtimesV_dc,spHtimesV_cc
+  public                       :: lanc_spHtimesV_dd,lanc_spHtimesV_dc,lanc_spHtimesV_cc
 
   integer                      :: Hsector
   integer,dimension(:),pointer :: Hmap    !map of the Sector S to Hilbert space H
@@ -106,12 +97,6 @@ contains
     do i=first_state,last_state
        m=Hmap(i)
        call bdecomp(m,ib)
-       !DEBGU
-       ! if(dim==1) then
-       !    write(*,*) m,i
-       !    write(*,*) ib
-       ! end if
-       !DEBUG
        htmp=0.d0
        do iorb=1,Norb
           nup(iorb)=real(ib(iorb),8)
@@ -364,15 +349,10 @@ contains
 
 
        if(ed_supercond)then
-          
           !Anomalous pair-creation/destruction
-          !write(*,*) getsz(isector)
           do iorb=1,size(dmft_bath%e,2)
              do kp=1,Nbath
                 ms=getBathStride(iorb,kp)
-                !<DEBUG
-                !write(*,*) iorb,kp,ms
-                !DEBUG>
                 !\Delta_l c_{\up,ms} c_{\dw,ms}
                 if(ib(ms)==1 .AND. ib(ms+Ns)==1)then
                    call c(ms,m,k1,sg1)
@@ -410,14 +390,11 @@ contains
              enddo
           enddo
        endif
-
-
+       !
     enddo
-
     !
     call delete_Hv_sector()
     !
-
   end subroutine ed_buildH_d
 
 
@@ -757,13 +734,11 @@ contains
              enddo
           enddo
        endif
-
+       !
     enddo
-
     !
     call delete_Hv_sector()
     !
-
   end subroutine ed_buildH_c
 
 
@@ -921,35 +896,4 @@ contains
   end subroutine lanc_spHtimesV_cc
 
 
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : Direct Matrix-vector multiplication H*v used in 
-  !Lanczos algorithm. this DOES NOT store the H-matrix (slower but 
-  !more memory efficient)
-  !+------------------------------------------------------------------+
-  !include "ed_htimesv_direct.f90"
-#ifdef _MPI
-  !include "ed_htimesv_direct_mpi.f90"
-#endif
-
-
-! <<<<<<< HEAD
-!   !+------------------------------------------------------------------+
-!   !PURPOSE : 
-!   !+------------------------------------------------------------------+
-!   subroutine setup_Hv_sector(isector)
-!     integer                              :: isector
-!     integer                              :: dim
-!     Hsector=isector
-!     dim = getdim(Hsector)
-!     allocate(Hmap(dim))
-!     call build_sector(isector,Hmap)
-!   end subroutine setup_Hv_sector
-
-
-!   subroutine delete_Hv_sector()
-!     deallocate(Hmap)
-!   end subroutine delete_Hv_sector
-! =======
-! >>>>>>> devel_sc
 end MODULE ED_HAMILTONIAN

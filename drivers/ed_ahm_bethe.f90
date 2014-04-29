@@ -50,7 +50,7 @@ program lancED
      call get_delta_bethe
 
      !Perform the SELF-CONSISTENCY by fitting the new bath
-     call chi2_fitgf(delta,bath,ispin=1,iverbose=.true.)
+     call chi2_fitgf(delta,bath,ispin=1)
 
      !Check convergence (if required change chemical potential)
      if(mpiID==0)then
@@ -86,18 +86,20 @@ contains
           gloc(1,i)=gloc(1,i) + wt(ik)*(conjg(zita)-epsik(ik))/cdet
           gloc(2,i)=gloc(2,i) - wt(ik)*impSAmats(1,1,1,1,i)/cdet
        enddo
-       cdet       = abs(gloc(1,i))**2 + (gloc(2,i))**2
-       calG(1,i) = conjg(gloc(1,i))/cdet + impSmats(1,1,1,1,i)
-       calG(2,i) =  gloc(2,i)/cdet + impSAmats(1,1,1,1,i) 
        if(cg_scheme=='weiss')then
+          !Get G0^{-1} matrix components:
+          cdet      =  abs(gloc(1,i))**2 + (gloc(2,i))**2
+          calG(1,i) =  conjg(gloc(1,i))/cdet + impSmats(1,1,1,1,i)
+          calG(2,i) =  gloc(2,i)/cdet        + impSAmats(1,1,1,1,i) 
+          !Get Weiss field G0 components:
           cdet            =  abs(calG(1,i))**2 + (calG(2,i))**2
           delta(1,1,1,i)  =  conjg(calG(1,i))/cdet
           delta(2,1,1,i)  =  calG(2,i)/cdet
+          write(200,*)wm(i),dimag(delta(1,1,1,i)),dreal(delta(2,1,1,i))
        else
-          cdet       = abs(gloc(1,i))**2 + (gloc(2,i))**2
-          delta(1,1,1,i)= iw + xmu - impSmats(1,1,1,1,i) - &
-               conjg(gloc(1,i))/cdet 
-          delta(2,1,1,i) = -(gloc(2,i)/cdet + impSAmats(1,1,1,1,i))
+          cdet            = abs(gloc(1,i))**2 + (gloc(2,i))**2
+          delta(1,1,1,i)  = iw + xmu - impSmats(1,1,1,1,i)  - conjg(gloc(1,i))/cdet 
+          delta(2,1,1,i)  =          - impSAmats(1,1,1,1,i) - gloc(2,i)/cdet 
        endif
     enddo
     !
