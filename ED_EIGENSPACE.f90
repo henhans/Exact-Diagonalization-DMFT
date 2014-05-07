@@ -87,6 +87,7 @@ contains        !some routine to perform simple operation on the lists
        deallocate(c)
     end do
     deallocate(space%root)
+    space%status=.false.
     p=>null()
     c=>null()
   end subroutine es_delete_espace
