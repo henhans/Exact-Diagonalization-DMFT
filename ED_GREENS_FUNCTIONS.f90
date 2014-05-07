@@ -7,9 +7,9 @@
 !AUTHORS  : Adriano Amaricci
 !###################################################################
 MODULE ED_GREENS_FUNCTIONS
-  USE COMMON_VARS
+  USE CONSTANTS, only:one,xi,zero,pi
   USE TIMER  
-  USE IOTOOLS, only: free_unit,reg,free_units
+  USE IOTOOLS, only: free_unit,reg,free_units,txtfy
   USE ARRAYS,   only: arange,linspace
   USE MATRIX,  only: matrix_inverse
   USE PLAIN_LANCZOS

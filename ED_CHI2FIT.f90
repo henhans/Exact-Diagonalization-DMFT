@@ -18,10 +18,10 @@
 !
 !########################################################################
 MODULE ED_CHI2FIT
-  USE COMMON_VARS
+  USE CONSTANTS
   USE OPTIMIZE, only:fmin_cg
   USE MATRIX,   only:matrix_inverse
-  USE IOTOOLS,  only:reg,free_unit 
+  USE IOTOOLS,  only:reg,free_unit,txtfy
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_BATH
@@ -107,6 +107,7 @@ contains
     real(8)                              :: w
     character(len=20)                  :: suffix
     integer                            :: unit
+
     if(size(fg,1)/=Norb)stop"CHI2_FITGF: wrong dimension 1 in chi2_input"
     if(size(fg,2)/=Norb)stop"CHI2_FITGF: wrong dimension 2 in chi2_input"
     check= check_bath_dimension(bath_)
@@ -156,6 +157,10 @@ contains
        dmft_bath%v(ispin,iorb,1:Nbath) = a(Nbath+1:2*Nbath)
     enddo
     if(ed_verbose<2)call write_bath(dmft_bath,LOGfile)
+    unit=free_unit()
+    open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
+    call write_bath(dmft_bath,unit)
+    close(unit)
     if(ed_verbose<3)call write_fit_result(ispin)
     call copy_bath(dmft_bath,bath_)
     call deallocate_bath(dmft_bath)
@@ -391,6 +396,10 @@ contains
        dmft_bath%v(ispin,iorb,1:Nbath) = a(2*Nbath+1:3*Nbath)
     enddo
     if(ed_verbose<2)call write_bath(dmft_bath,LOGfile)
+    unit=free_unit()
+    open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
+    call write_bath(dmft_bath,unit)
+    close(unit)
     if(ed_verbose<3)call write_fit_result(ispin)
     call copy_bath(dmft_bath,bath_)
     call deallocate_bath(dmft_bath)
@@ -595,7 +604,6 @@ contains
     real(8)                              :: w
     character(len=20)                    :: suffix
     integer                              :: unit
-    !
     if(size(fg,1)/=Norb)stop "CHI2FIT: wrong dimension 1 in chi2_input"
     if(size(fg,2)/=Norb)stop "CHI2FIT: wrong dimension 2 in chi2_input"
     check= check_bath_dimension(bath_)
@@ -651,6 +659,10 @@ contains
        close(unit)
     endif
     if(ed_verbose<2)call write_bath(dmft_bath,LOGfile)
+    unit=free_unit()
+    open(unit,file=trim(Hfile)//trim(ed_file_suffix)//".restart")
+    call write_bath(dmft_bath,unit)
+    close(unit)
     if(ed_verbose<3)call write_fit_result(ispin)
     call deallocate_bath(dmft_bath)
     deallocate(Fdelta,Xdelta,Wdelta)

@@ -1,26 +1,28 @@
+include "MIXING.f90"
 program ed_bhz_afm
   USE DMFT_ED
+  USE MIXING
   USE SCIFOR
   implicit none
-  integer                :: ip,iloop,Lk,Nso,afmNso
+  integer                :: ip,iloop,Lk,Nso,afmNso,ispin,iorb
   logical                :: converged
-  integer                :: Nindep
+  integer                :: Nindep,Nsites
   !Bath:
   integer                :: Nb(2)
   real(8),allocatable    :: Bath(:,:,:),Bath_(:,:,:)
   !The local hybridization function:
-  complex(8),allocatable :: Delta(:,:,:,:,:,:)
+  complex(8),allocatable :: Delta(:,:,:,:,:,:),Amix(:,:,:,:),Amix_old(:,:,:,:)
   complex(8),allocatable :: Smats(:,:,:,:,:,:)
   complex(8),allocatable :: Sreal(:,:,:,:,:,:)
   !Hamiltonian input:
   complex(8),allocatable :: Hk(:,:,:),bhzHloc(:,:)
   real(8),allocatable    :: dos_wt(:)
   !variables for the model:
-  integer                :: Nk
+  integer                :: Nk,Mbroyden
   real(8)                :: mh,lambda,wmixing,akrange
   character(len=16)      :: finput
   character(len=32)      :: hkfile
-  logical                :: waverage,spinsym,getak
+  logical                :: waverage,spinsym,sitesym,fullsym,getak,wbroyden
 
   !Parse additional variables && read Input && read H(k)^4x4
   call parse_cmd_variable(finput,"FINPUT",default='inputED_BHZ.in')
@@ -32,10 +34,45 @@ program ed_bhz_afm
   call parse_input_variable(wmixing,"WMIXING",finput,default=0.75d0)
   call parse_input_variable(waverage,"WAVERAGE",finput,default=.false.)
   call parse_input_variable(spinsym,"spinsym",finput,default=.false.)
+  call parse_input_variable(sitesym,"sitesym",finput,default=.false.)
+  call parse_input_variable(fullsym,"fullsym",finput,default=.true.)
   call parse_input_variable(lambda,"LAMBDA",finput,default=0.d0)
+  call parse_input_variable(Mbroyden,"MBROYDEN",finput,default=0)
+  call parse_input_variable(wBroyden,"WBROYDEN",finput,default=.false.)
   call ed_read_input(trim(finput))
 
+  if(sitesym.AND.fullsym)stop "sitesym AND fullsym both .true.! chose one symmetry!"
+
+
+
   Nindep=4                      !number of independent sites, 4 for AFM ordering
+  Nsites=Nindep
+
+  if(sitesym)then
+     Nsites=2
+     write(*,*)"Using Nindep sites=",Nsites
+     write(*,*)"(site=4,l,s)=(site=1,l,s)"
+     write(*,*)"(site=3,l,s)=(site=2,l,s)"
+     open(999,file="symmetries.used")
+     write(999,*)"Symmetries used are:"
+     write(999,*)"(site=4,l,s)=(site=1,l,s)"
+     write(999,*)"(site=3,l,s)=(site=2,l,s)"
+     close(999)
+  endif
+  if(fullsym)then
+     Nsites=1
+     write(*,*)"Using Nindep sites=",Nsites
+     write(999,*)"(site=2,l,s)=(site=1,l,-s)"
+     write(999,*)"(site=4,l,s)=(site=1,l,s)"
+     write(999,*)"(site=3,l,s)=(site=2,l,s)"
+     open(999,file="symmetries.used")
+     write(999,*)"Symmetries used are:"
+     write(999,*)"(site=2,l,s)=(site=1,l,-s)"
+     write(999,*)"(site=4,l,s)=(site=1,l,s)"
+     write(999,*)"(site=3,l,s)=(site=2,l,s)"
+     close(999)
+  endif
+
   if(Nspin/=2.OR.Norb/=2)stop "wrong setup from input file: Nspin=Norb=2 -> 4Spin-Orbitals"
   Nso=Nspin*Norb
   afmNso=Nindep*Nso!=16
@@ -45,7 +82,7 @@ program ed_bhz_afm
   allocate(delta(Nindep,Nspin,Nspin,Norb,Norb,Lmats))
   allocate(Smats(Nindep,Nspin,Nspin,Norb,Norb,Lmats))
   allocate(Sreal(Nindep,Nspin,Nspin,Norb,Norb,Lreal))
-
+  if(wBroyden)allocate(Amix(Nsites,Nspin,Norb,Lfit),Amix_old(Nsites,Nspin,Norb,Lfit))
 
   !Buil the Hamiltonian on a grid or on  path
   call build_hk(trim(hkfile))
@@ -70,6 +107,7 @@ program ed_bhz_afm
      call print_Hloc(Hloc)
   enddo
 
+
   !DMFT loop
   iloop=0;converged=.false.
   do while(.not.converged.AND.iloop<nloop)
@@ -77,7 +115,7 @@ program ed_bhz_afm
      call start_loop(iloop,nloop,"DMFT-loop")
 
      !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
-     do ip=1,Nindep
+     do ip=1,Nsites
         write(LOGfile,*)"Solving site:",ip
         ed_file_suffix="_is"//reg(txtfy(ip))
         Hloc = bhzHloc_site(ip)
@@ -85,12 +123,38 @@ program ed_bhz_afm
         Smats(ip,:,:,:,:,:) = impSmats
         Sreal(ip,:,:,:,:,:) = impSreal
      enddo
+     if(sitesym)then
+        Smats(4,:,:,:,:,:) = Smats(1,:,:,:,:,:)
+        Sreal(4,:,:,:,:,:) = Sreal(1,:,:,:,:,:)
+        Smats(3,:,:,:,:,:) = Smats(2,:,:,:,:,:)
+        Sreal(3,:,:,:,:,:) = Sreal(2,:,:,:,:,:)
+     endif
+     if(fullsym)then
+        !step 1 extend the solution to ip=2 using the relations
+        !A(ip=2,l,sigma) = A(ip=1,l,-sigma)
+        do ispin=1,2
+           Smats(2,ispin,ispin,:,:,:)=Smats(1,3-ispin,3-ispin,:,:,:)
+           Sreal(2,ispin,ispin,:,:,:)=Sreal(1,3-ispin,3-ispin,:,:,:)
+        enddo
+        !step 2 extend the solution to other ip=3,4
+        Smats(4,:,:,:,:,:) = Smats(1,:,:,:,:,:)
+        Sreal(4,:,:,:,:,:) = Sreal(1,:,:,:,:,:)
+        Smats(3,:,:,:,:,:) = Smats(2,:,:,:,:,:)
+        Sreal(3,:,:,:,:,:) = Sreal(2,:,:,:,:,:)
+     endif
+
 
      !Get the Weiss field/Delta function to be fitted (user defined)
      call get_delta
+     if(wbroyden)then
+        Amix_old=Amix
+        forall(ispin=1:Nspin,iorb=1:Norb)Amix(1:Nsites,ispin,iorb,:)=Delta(1:Nsites,ispin,ispin,iorb,iorb,1:Lfit)
+        if(iloop>1)call broyden_mix(pack(Amix,.true.),pack(Amix_old,.true.),1.d0,Mbroyden,iloop-1)
+        forall(ispin=1:Nspin,iorb=1:Norb)Delta(1:Nsites,ispin,ispin,iorb,iorb,:Lfit)=Amix(1:Nsites,ispin,iorb,:)
+     endif
 
      !Fit the new bath, starting from the old bath + the supplied delta
-     do ip=1,Nindep
+     do ip=1,Nsites
         ed_file_suffix="_is"//reg(txtfy(ip))
         Hloc = bhzHloc_site(ip)
         call chi2_fitgf(delta(ip,1,1,:,:,:),bath(ip,:,:),ispin=1)
@@ -102,19 +166,30 @@ program ed_bhz_afm
      enddo
 
 
-     !AVERAGE OUT 1-->4, 2-->3
-     if(waverage)then
-        bath(1,:,:)=(bath(1,:,:)+bath(4,:,:))/2.d0
-        bath(2,:,:)=(bath(2,:,:)+bath(3,:,:))/2.d0
+     if(fullsym)then
+        do ispin=1,2
+           bath(2,:,ispin)=bath(1,:,3-ispin)
+        enddo
         bath(3,:,:)=bath(2,:,:)
         bath(4,:,:)=bath(1,:,:)
+     elseif(sitesym)then
+        bath(3,:,:)=bath(2,:,:)
+        bath(4,:,:)=bath(1,:,:)
+     elseif(.not.fullsym.AND..not.sitesym)then
+        if(waverage)then
+           bath(1,:,:)=(bath(1,:,:)+bath(4,:,:))/2.d0
+           bath(2,:,:)=(bath(2,:,:)+bath(3,:,:))/2.d0
+           bath(3,:,:)=bath(2,:,:)
+           bath(4,:,:)=bath(1,:,:)
+        endif
      endif
+
      !MIXING:
-     do ip=1,Nindep
+     do ip=1,Nsites
         if(iloop>1)bath(ip,:,:) = wmixing*bath(ip,:,:) + (1.d0-wmixing)*Bath_(ip,:,:)
         Bath_(ip,:,:)=bath(ip,:,:)
      enddo
-     converged = check_convergence(delta(1,1,1,1,1,:)+delta(4,1,1,1,1,:),dmft_error,nsuccess,nloop)
+     converged = check_convergence(delta(1,1,1,1,1,1:Lfit),dmft_error,nsuccess,nloop)
 
      call end_loop
   enddo
@@ -149,7 +224,7 @@ contains
 
     if(getak)then
        print*,"Get A(k,w):"
-       do ip=1,Nindep
+       do ip=1,Nsites
           do iorb=1,Norb
              unit=free_unit()
              suffix="_l"//reg(txtfy(iorb))//"_m"//reg(txtfy(iorb))//"_realw_is"//reg(txtfy(ip))//".ed"
@@ -189,7 +264,7 @@ contains
        enddo
        call stop_progress()
        !PRINT
-       do ip=1,Nindep
+       do ip=1,Nsites
           do ispin=1,Nspin
              do iorb=1,Norb
                 unit=free_unit()
@@ -239,7 +314,7 @@ contains
        enddo
     enddo
     !PRINT
-    do ip=1,Nindep
+    do ip=1,Nsites
        do ispin=1,Nspin
           do iorb=1,Norb
              suffix="_is"//reg(txtfy(ip))//"_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//"_iw.ed"
@@ -273,12 +348,11 @@ contains
        enddo
     enddo
     !PRINT
-    do ip=1,Nindep
+    do ip=1,Nsites
        do ispin=1,Nspin
           do iorb=1,Norb
              suffix="_is"//reg(txtfy(ip))//"_l"//reg(txtfy(iorb))//"_s"//reg(txtfy(ispin))//"_realw.ed"
              call splot("Gloc"//reg(suffix),wr,-dimag(gloc(ip,ispin,ispin,iorb,iorb,:))/pi,dreal(gloc(ip,ispin,ispin,iorb,iorb,:)))
-             !call splot("DOS"//reg(suffix),wr,-dimag(gloc(ip,ispin,ispin,iorb,iorb,:))/pi)
           enddo
        enddo
     enddo
