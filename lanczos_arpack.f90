@@ -114,7 +114,7 @@ subroutine lanczos_arpack_d(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   !  LWORKL is set as illustrated below. 
   lworkl = ncv*(ncv+8)
   tol    = 0.d0
-  info   = 0
+  info   = 1
   ido    = 0
 
   !=========================================================================
@@ -132,6 +132,9 @@ subroutine lanczos_arpack_d(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   iparam(3) = maxitr
   iparam(7) = mode1
 
+  call random_seed(put=[1234567])
+  call random_number(resid)
+  resid=resid/sqrt(dot_product(resid,resid))
 
   !=========================================================================
   !  MAIN LOOP (Reverse communication loop)
@@ -223,9 +226,14 @@ subroutine lanczos_arpack_d(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   endif
   !< DEBUG
   !this term breaks memory, why?
-  ! deallocate(ax,resid,workd,v,d,workl,select)
+  !deallocate(ax,resid,workd,v,d,workl,select)
   !> DEBUG
 end subroutine lanczos_arpack_d
+
+
+
+
+
 
 !+-------------------------------------------------------------------+
 !PURPOSE: This routine use ARPACK to find a few eigenvalues
@@ -271,6 +279,7 @@ subroutine lanczos_arpack_c(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   character              :: bmat  
   character(len=2)       :: which
   real(8),external       :: dznrm2,dlapy2
+  real(8),allocatable    :: reV(:),imV(:)
 
   !Interface to Matrix-Vector routine:
   interface
@@ -331,7 +340,7 @@ subroutine lanczos_arpack_c(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   lworkl = ncv*(3*ncv+5) + 10
   tol    = 0.0 
   ido    = 0
-  info   = 0
+  info   = 1
 
 
   allocate(ax(n))
@@ -369,6 +378,16 @@ subroutine lanczos_arpack_c(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   iparam(1) = ishfts
   iparam(3) = maxitr
   iparam(7) = mode1
+
+
+
+  call random_seed(put=[1234567])
+  allocate(reV(size(resid)),imV(size(resid)))
+  call random_number(reV)
+  call random_number(imV)
+  resid=dcmplx(reV,imV)
+  deallocate(reV,imV)
+  resid=resid/sqrt(dot_product(resid,resid))
 
 
   !=========================================================================

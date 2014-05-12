@@ -20,8 +20,8 @@ FPP=MPI
 
 #--> B-H-Z MODELS
 #EXE=ed_2x2bhz
-#EXE=ed_bhz
-EXE=ed_bhz_afm
+EXE=ed_bhz
+#EXE=ed_bhz_afm
 
 
 DIR =drivers
@@ -49,11 +49,11 @@ debug:compile
 
 compile: version $(OBJS)
 	@echo " ..................... compile ........................... "
-	$(FC) $(FLAG) $(OBJS) $(DIR)/$(EXE).f90 -o $(DIREXE)/$(EXE)_$(BRANCH)$(FPP) $(ARGS)
+	$(FC) $(FLAG) $(OBJS) $(DIR)/$(EXE).f90 -o $(DIREXE)/$(EXE)_$(BRANCH) $(ARGS)
 	@echo " ...................... done .............................. "
 	@echo ""
 	@echo ""
-	@echo "created" $(DIREXE)/$(EXE)_$(BRANCH)$(FPP)
+	@echo "created" $(DIREXE)/$(EXE)_$(BRANCH)
 
 .f90.o:	
 	$(FC) $(FLAG) -c $< $(SFINCLUDE) 

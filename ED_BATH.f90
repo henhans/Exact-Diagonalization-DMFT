@@ -11,6 +11,7 @@
 ! N = Nspin*(Norb+1)*Nbath
 !########################################################################
 MODULE ED_BATH
+  USE CONSTANTS, only: zero
   USE IOTOOLS, only:free_unit,reg,file_length,txtfy
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
@@ -179,7 +180,7 @@ contains
     dmft_bath_%e(:,:,Nbath)= hwband_ 
     Nh=Nbath/2
     if(mod(Nbath,2)==0)then
-       de=hwband_/dble(Nh-1)
+       de=hwband_/max(dble(Nh-1),1.d0)
        dmft_bath_%e(:,:,Nh)  = -1.d-4
        dmft_bath_%e(:,:,Nh+1)=  1.d-4
        do i=2,Nh-1

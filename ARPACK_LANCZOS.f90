@@ -1,5 +1,5 @@
 module ARPACK_LANCZOS
-  USE CONSTANTS
+  USE CONSTANTS, only:zero
   USE ED_VARS_GLOBAL
   implicit none
   private 

@@ -79,6 +79,7 @@ contains
     end select
     call ed_getobs
     call deallocate_bath(dmft_bath)
+    call es_delete_espace(state_list)
   end subroutine ed_solver
 
 

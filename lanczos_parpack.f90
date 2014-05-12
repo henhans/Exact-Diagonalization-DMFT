@@ -28,7 +28,7 @@ subroutine lanczos_parpack_d(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   integer             :: n,nconv,ncv,nev
   !Arrays:
   real(8),allocatable :: ax(:),d(:,:)
-  real(8),allocatable :: resid(:)
+  real(8),allocatable :: resid(:),vec(:)
   real(8),allocatable :: workl(:),workd(:)
   real(8),allocatable :: v(:,:)
   logical,allocatable :: select(:)
@@ -131,8 +131,18 @@ subroutine lanczos_parpack_d(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   !  LWORKL is set as illustrated below. 
   lworkl = ncv*(ncv+8)
   tol    = 0.d0
-  info   = 0
+  info   = 1
   ido    = 0
+
+  allocate(vec(n))
+  call random_seed(put=[1234567])
+  call random_number(vec)
+  vec=vec/sqrt(dot_product(vec,vec))
+  do i=ED_MPI_ID*mpiQ+1,(ED_MPI_ID+1)*mpiQ+mpiR
+     resid(i-ED_MPI_ID*mpiQ)=vec(i)
+  enddo
+
+
   !=========================================================================
   !  Specification of Algorithm Mode:
   !  This program uses the exact shift strategy
@@ -266,7 +276,7 @@ subroutine lanczos_parpack_c(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   complex(8),allocatable          :: ax(:),d(:)
   complex(8),allocatable          :: v(:,:)
   complex(8),allocatable          :: workl(:),workd(:),workev(:)
-  complex(8),allocatable          :: resid(:)
+  complex(8),allocatable          :: resid(:),vec(:)
   real(8),allocatable             :: rwork(:),rd(:,:)
   logical,allocatable             :: select(:)
   integer                         :: iparam(11)
@@ -280,8 +290,10 @@ subroutine lanczos_parpack_c(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   character                       :: bmat  
   character(len=2)                :: which
   real(8),external                :: dznrm2,dlapy2
+  real(8),allocatable             :: reV(:),imV(:)
   !MPI
   integer                         :: comm,ED_MPI_ID,ED_MPI_SIZE,ED_MPI_ERR,mpiQ,mpiR,mpiCHUNK
+
   !Interface to Matrix-Vector routine:
   interface
      subroutine hprod(n,nloc,vin,vout)!hprod(Q,R,nloc,n,vin,vout)
@@ -329,6 +341,28 @@ subroutine lanczos_parpack_c(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   else if ( ncv > maxncv ) then
      stop ' ERROR with _SDRV1: NCV is greater than MAXNCV '
   end if
+  allocate(ax(ldv))
+  allocate(d(ncv))
+  allocate(resid(ldv))
+  allocate(v(ldv,ncv))
+  allocate(workd(3*ldv))
+  allocate(workev(3*ncv))
+  allocate(workl(lworkl))
+  allocate(rwork(ncv))
+  allocate(rd(ncv,3))
+  allocate(select(ncv))
+  !
+  ax     = zero
+  d      = zero
+  v      = zero
+  workl  = zero
+  workd  = zero
+  resid  = zero
+  workev = zero
+  rwork  = 0.d0
+  rd     = 0.d0
+
+
   !=========================================================================
   !  Specification of stopping rules and initial
   !  conditions before calling SSAUPD
@@ -352,29 +386,23 @@ subroutine lanczos_parpack_c(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   !  * The work array WORKL is used in SSAUPD as workspace.  Its dimension
   !  LWORKL is set as illustrated below. 
   lworkl = ncv*(3*ncv+5) + 10
-  tol    = 0.0 
+  tol    = 0.d0 
   ido    = 0
-  info   = 0
-  allocate(ax(ldv))
-  allocate(d(ncv))
-  allocate(resid(ldv))
-  allocate(v(ldv,ncv))
-  allocate(workd(3*ldv))
-  allocate(workev(3*ncv))
-  allocate(workl(lworkl))
-  allocate(rwork(ncv))
-  allocate(rd(ncv,3))
-  allocate(select(ncv))
-  !
-  ax     = zero
-  d      = zero
-  v      = zero
-  workl  = zero
-  workd  = zero
-  resid  = zero
-  workev = zero
-  rwork  = 0.d0
-  rd     = 0.d0
+  info   = 1
+
+  call random_seed(put=[1234567])
+  allocate(reV(n),imV(n),vec(n))
+  call random_number(reV)
+  call random_number(imV)
+  vec=dcmplx(reV,imV)
+  deallocate(reV,imV)
+  vec=vec/sqrt(dot_product(vec,vec))
+  do i=ED_MPI_ID*mpiQ+1,(ED_MPI_ID+1)*mpiQ+mpiR
+     resid(i-ED_MPI_ID*mpiQ)=vec(i)
+  enddo
+
+
+
   !=========================================================================
   !  Specification of Algorithm Mode:
   !  This program uses the exact shift strategy
@@ -389,6 +417,11 @@ subroutine lanczos_parpack_c(ns,neigen,nblock,nitermax,eval,evec,hprod,iverbose)
   iparam(1) = ishfts
   iparam(3) = maxitr
   iparam(7) = mode1
+
+
+
+
+
   !=========================================================================
   !  MAIN LOOP (Reverse communication loop)
   !  Repeatedly call PSSAUPD and take actions indicated by parameter 

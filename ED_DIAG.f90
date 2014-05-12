@@ -60,8 +60,9 @@ contains
     real(8)             :: hist_a,hist_b,hist_w
     integer             :: hist_n
     integer,allocatable :: list_sector(:),count_sector(:)
-    if(.not.state_list%status)state_list=es_init_espace()
-    call es_free_espace(state_list)
+    if(state_list%status)call es_delete_espace(state_list)
+    state_list=es_init_espace()
+    !call es_free_espace(state_list)
     oldzero=1000.d0
     numgs=0
     if(ed_verbose<2.AND.ED_MPI_ID==0)call start_progress(LOGfile)
@@ -174,6 +175,7 @@ contains
     ! open(3,file='egs'//reg(ed_file_suffix)//".ed",access='append')
     ! write(3,*)egs
     ! close(3)
+
 
     !Get histogram distribution of the sector contributing to the evaluated spectrum:
     !Go thru states list and update the neigen_sector(isector) sector-by-sector

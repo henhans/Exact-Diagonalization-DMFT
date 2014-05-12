@@ -12,7 +12,6 @@ MODULE ED_AUX_FUNX
   private
 
   public :: print_Hloc
-
   !
   public :: init_ed_structure
   public :: search_chemical_potential
@@ -25,8 +24,6 @@ MODULE ED_AUX_FUNX
   public :: binary_search
 
 contains
-
-
 
 
 
