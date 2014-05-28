@@ -3,12 +3,8 @@ include sfmake.inc
 FC=ifort
 #=========================================================================
 #--> HUBBARD MODELS:
-<<<<<<< HEAD
-EXE=ed_hm_bethe
-=======
 #EXE=ed_hm_bethe
-#EXE=ed_ahm_bethe
->>>>>>> devel
+EXE=ed_ahm_bethe
 #EXE=ed_hm_2dsquare
 #EXE=ed_hm_bethe_mixgf
 
@@ -16,22 +12,14 @@ EXE=ed_hm_bethe
 #EXE=ed_pam_1b
 #EXE=ed_pam_2b
 #EXE=ed_lda1b
-<<<<<<< HEAD
-EXE=ed_lda
-=======
 #EXE=ed_lda
 #EXE=ed_tddpam_lattice
 #EXE=ed_tddpam_bethe
->>>>>>> devel
 
 #--> B-H-Z MODELS
 #EXE=ed_2x2bhz
 #EXE=ed_bhz
-<<<<<<< HEAD
-=======
-EXE=ed_bhz_afm
-
->>>>>>> devel
+#EXE=ed_bhz_afm
 
 DIR =drivers
 DIREXE=$(HOME)/.bin
