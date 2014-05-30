@@ -239,6 +239,19 @@ contains
     enddo
     call stop_timer
 
+    !<DEBUG
+    i=0
+    do nup=0,Ns
+       do ndw=nup,Ns
+          i=i+1
+          write(*,"(5I6)")i,nup,ndw,getsector(nup,ndw),getsector(ndw,nup)
+       enddo
+    enddo
+    in=Ns+1
+    print*,i,in*(in+1)/2
+    !>DEBUG
+
+
     do in=1,Norb
        impIndex(in,1)=in
        impIndex(in,2)=in+Ns

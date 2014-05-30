@@ -4,7 +4,7 @@ FC=ifort
 #=========================================================================
 #--> HUBBARD MODELS:
 #EXE=ed_hm_bethe
-EXE=ed_ahm_bethe
+#EXE=ed_ahm_bethe
 #EXE=ed_hm_2dsquare
 #EXE=ed_hm_bethe_mixgf
 
@@ -18,7 +18,7 @@ EXE=ed_ahm_bethe
 
 #--> B-H-Z MODELS
 #EXE=ed_2x2bhz
-#EXE=ed_bhz
+EXE=ed_bhz
 #EXE=ed_bhz_afm
 
 

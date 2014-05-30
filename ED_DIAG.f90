@@ -48,7 +48,7 @@ contains
   ! spectrum DOUBLE PRECISION
   !+------------------------------------------------------------------+
   subroutine lanc_ed_diag_d
-    integer             :: nup,ndw,isector,dim
+    integer             :: nup,ndw,isector,dim,jsector
     integer             :: nup0,ndw0,isect0,dim0,izero,sz0
     integer             :: i,j,unit
     integer             :: Nitermax,Neigen,Nblock
@@ -62,7 +62,6 @@ contains
     integer,allocatable :: list_sector(:),count_sector(:)
     if(state_list%status)call es_delete_espace(state_list)
     state_list=es_init_espace()
-    !call es_free_espace(state_list)
     oldzero=1000.d0
     numgs=0
     if(ed_verbose<2)call start_progress(LOGfile)
@@ -72,8 +71,13 @@ contains
        Neigen  = min(dim,neigen_sector(isector))
        Nitermax= min(dim,lanc_niter)
        Nblock  = min(dim,5*Neigen+10)
+       !<DEBUG
+       jsector=getsector(getndw(isector),getnup(isector))
+       write(998,*),isector,jsector
+       !>DEBUG
        !
-       lanc_solve  = .true. ; if(Neigen==dim)lanc_solve=.false.
+       lanc_solve  = .true. 
+       if(Neigen==dim)lanc_solve=.false.
        if(dim<=128)lanc_solve=.false.
        !
        if(lanc_solve)then
@@ -88,6 +92,11 @@ contains
           call matrix_diagonalize(eig_basis,eig_values,'V','U')
           if(dim==1)eig_basis(dim,dim)=1.d0
        endif
+       !<DEBUG
+       do i=1,dim
+          write(600+isector,*)i,eig_basis(i,1)
+       enddo
+       !>DEBUG
        !
        if(finiteT)then
           do i=1,Neigen
