@@ -35,6 +35,8 @@ MODULE ED_INPUT_VARS
   real(8)                                     :: cg_Ftol             !Tolerance in the cg fit
   integer                                     :: cg_Weight           !CGfit mode 0=normal,1=1/n weight, 2=1/w weight
   character(len=5)                            :: cg_Scheme           !fit scheme: delta (default), weiss for G0^
+  integer                                     :: cg_stop             !fit stop condition:0-3, 0=default
+  real(8)                                     :: cg_eps              !fit eps tolerance
   logical                                     :: finiteT             !flag for finite temperature calculation
   character(len=4)                            :: ed_method           !flag to set ed method solution: lanc=lanczos method, full=full diagonalization
   character(len=1)                            :: ed_type             !flag to set real or complex Ham: d=symmetric H (real), c=hermitian H (cmplx)
@@ -46,6 +48,7 @@ MODULE ED_INPUT_VARS
   real(8)                                     :: ndelta              !initial chemical potential step
   integer                                     :: niter
   integer                                     :: ed_verbose
+
 
   !Some parameters for function dimension:
   !=========================================================
@@ -105,6 +108,8 @@ contains
     call parse_input_variable(cg_niter,"CG_NITER",INPUTunit,default=200,comment="Max. number of Conjugate-Gradient iterations.")
     call parse_input_variable(cg_scheme,"CG_SCHEME",INPUTunit,default='delta',comment="Conjugate-Gradient fit scheme: delta or weiss.")
     call parse_input_variable(cg_ftol,"CG_FTOL",INPUTunit,default=0.00001d0,comment="Conjugate-Gradient tolerance.")
+    call parse_input_variable(cg_stop,"CG_STOP",INPUTunit,default=0,comment="Conjugate-Gradient stopping condition.")
+    call parse_input_variable(cg_eps,"CG_EPS",INPUTunit,default=0.0001d0,comment="Conjugate-Gradient eps tolerance.")
     call parse_input_variable(cg_weight,"CG_WEIGHT",INPUTunit,default=0,comment="Conjugate-Gradient weight form: 0=1.0 ,1=1/n , 2=1/w.")
     call parse_input_variable(ed_Type,"ED_TYPE",INPUTunit,default='d',comment="Flag to set real or complex Ham: d=symmetric H (real), c=hermitian H (cmplx)")
     call parse_input_variable(ed_Supercond,"ED_SUPERCOND",INPUTunit,default=.false.,comment="Flag to set ED type: F=normal, T=superconductive")

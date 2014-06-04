@@ -141,9 +141,9 @@ contains
        a(1:Nbath)         = dmft_bath%e(ispin,iorb,1:Nbath)
        a(Nbath+1:2*Nbath) = dmft_bath%v(ispin,iorb,1:Nbath)
        if(cg_scheme=='weiss')then
-          call fmin_cg(a,chi2_weiss_irred,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.)
+          call fmin_cg(a,chi2_weiss_irred,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.,istop=cg_stop,eps=cg_eps)
        else
-          call fmin_cg(a,chi2_delta_irred,dchi2_delta_irred,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.)
+          call fmin_cg(a,chi2_delta_irred,dchi2_delta_irred,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.,istop=cg_stop,eps=cg_eps)
        endif
        if(ed_verbose<5)write(LOGfile,"(A,ES18.9,A,I5,A)") 'chi^2|iter'//reg(ed_file_suffix)//'= ',chi," | ",iter,"  <--  Orb"//reg(txtfy(iorb))//" Spin"//reg(txtfy(ispin))
        if(ed_verbose<2)then
@@ -379,9 +379,9 @@ contains
        a(Nbath+1:2*Nbath) = dmft_bath%d(ispin,iorb,1:Nbath)
        a(2*Nbath+1:3*Nbath) = dmft_bath%v(ispin,iorb,1:Nbath)
        if(cg_scheme=='weiss')then
-          call fmin_cg(a,chi2_weiss_irred_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.)
+          call fmin_cg(a,chi2_weiss_irred_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.,istop=cg_stop,eps=cg_eps)
        else
-          call fmin_cg(a,chi2_delta_irred_sc,dchi2_delta_irred_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.)
+          call fmin_cg(a,chi2_delta_irred_sc,dchi2_delta_irred_sc,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.,istop=cg_stop,eps=cg_eps)
        endif
        if(ed_verbose<5)write(LOGfile,"(A,ES18.9,A,I5,A)") 'chi^2|iter'//reg(ed_file_suffix)//'=',chi," | ",iter,"  <--  Orb"//reg(txtfy(iorb))//" Spin"//reg(txtfy(ispin))
        if(ed_verbose<2)then
@@ -644,9 +644,9 @@ contains
     Spin_indx=ispin
     a(:) = bath_(ispin,:)
     if(cg_scheme=='weiss')then
-       call fmin_cg(a,chi2_weiss_hybrd,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.)
+       call fmin_cg(a,chi2_weiss_hybrd,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.,istop=cg_stop,eps=cg_eps)
     else
-       call fmin_cg(a,chi2_delta_hybrd,dchi2_delta_hybrd,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.)
+       call fmin_cg(a,chi2_delta_hybrd,dchi2_delta_hybrd,iter,chi,itmax=cg_niter,ftol=cg_Ftol,iverbose=.false.,istop=cg_stop,eps=cg_eps)
     endif
     bath_(ispin,:) = a(:)
     call set_bath(bath_,dmft_bath)
