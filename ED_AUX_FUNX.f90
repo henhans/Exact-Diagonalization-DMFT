@@ -305,12 +305,6 @@ contains
        dim = get_sc_sector_dimension(isz)
        getdim(isector)=dim
        neigen_sector(isector) = min(dim,lanc_nstates_sector)   !init every sector to required eigenstates
-       !<DEBUG
-       allocate(imap(dim))
-       call build_sector(isector,imap,dim2)
-       print*,isz,dim,dim2
-       deallocate(imap)
-       !>DEBUG
     enddo
     call stop_timer
 
